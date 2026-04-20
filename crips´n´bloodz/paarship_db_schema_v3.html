@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paarship DB Schema v3</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; background: #0d1117; color: #e6edf3; padding: 24px; min-height: 100vh; }
+  h1 { font-size: 13px; color: #58a6ff; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px; }
+  .subtitle { font-size: 11px; color: #8b949e; margin-bottom: 8px; letter-spacing: 1px; }
+  .version-badge { display: inline-block; font-size: 10px; background: #1f2d1f; color: #56d364; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; letter-spacing: 1px; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+  .controls input { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 12px; border-radius: 6px; font-size: 12px; outline: none; width: 200px; font-family: 'Courier New', monospace; }
+  .controls input:focus { border-color: #58a6ff; }
+  .controls select { background: #161b22; color: #c9d1d9; border: 1px solid #30363d; padding: 5px 10px; border-radius: 6px; font-size: 12px; outline: none; cursor: pointer; font-family: 'Courier New', monospace; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .table { border: 1px solid #21262d; border-radius: 8px; overflow: hidden; transition: border-color 0.2s, opacity 0.3s; }
+  .table:hover { border-color: #388bfd; }
+  .table.dimmed { opacity: 0.15; }
+  .table-header { padding: 10px 14px; font-size: 12px; font-weight: bold; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .table-header .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .new-badge { margin-left: auto; font-size: 9px; background: #56d36422; color: #56d364; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .fix-badge { margin-left: auto; font-size: 9px; background: #e3b34122; color: #e3b341; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .dsgvo-badge { margin-left: auto; font-size: 9px; background: #bc8cff22; color: #bc8cff; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .future-badge { margin-left: auto; font-size: 9px; background: #378add22; color: #378add; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .trigger-badge { font-size: 9px; background: #f7853022; color: #f78530; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .table-body { background: #161b22; }
+  .field { padding: 6px 14px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #21262d; gap: 8px; }
+  .field.art9 { background: #1e1030; }
+  .field.enc { background: #0e1e20; }
+  .field.chk { background: #1a1a0e; }
+  .field-name { color: #c9d1d9; flex: 1; }
+  .field-name.pk { color: #f0883e; }
+  .field-name.fk { color: #79b8ff; }
+  .field-type { color: #8b949e; font-size: 10px; text-align: right; flex-shrink: 0; }
+  .badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; letter-spacing: 0.5px; flex-shrink: 0; }
+  .badge-pk { background: #3d2b1f; color: #f0883e; }
+  .badge-fk { background: #1d2d3e; color: #79b8ff; }
+  .badge-uq { background: #2d1f3d; color: #bc8cff; }
+  .badge-chk { background: #2a2a0a; color: #e3b341; }
+  .t-blue .table-header { background: #1a2332; color: #58a6ff; } .t-blue .dot { background: #58a6ff; }
+  .t-green .table-header { background: #1f2d1f; color: #56d364; } .t-green .dot { background: #56d364; }
+  .t-amber .table-header { background: #2d2416; color: #e3b341; } .t-amber .dot { background: #e3b341; }
+  .t-purple .table-header { background: #2d1f3d; color: #bc8cff; } .t-purple .dot { background: #bc8cff; }
+  .t-teal .table-header { background: #1f2a2d; color: #39c5cf; } .t-teal .dot { background: #39c5cf; }
+  .t-red .table-header { background: #2d1f1f; color: #f85149; } .t-red .dot { background: #f85149; }
+  .t-future .table-header { background: #1a2233; color: #378add; } .t-future .dot { background: #378add; }
+  .section-label { font-size: 10px; letter-spacing: 2px; color: #8b949e; text-transform: uppercase; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #21262d; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; font-size: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: #8b949e; }
+  .trigger-section { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+  .trigger-section h3 { font-size: 11px; color: #f78530; letter-spacing: 1px; margin-bottom: 10px; }
+  .trigger-item { font-size: 11px; color: #c9d1d9; padding: 4px 0; border-top: 1px solid #21262d; display: flex; gap: 8px; }
+  .trigger-item:first-of-type { border-top: none; }
+  .trigger-name { color: #f78530; flex-shrink: 0; min-width: 260px; }
+  .trigger-desc { color: #8b949e; }
+</style>
+</head>
+<body>
+
+<h1>Datenbankschema</h1>
+<p class="subtitle">PostgreSQL 16 + PostGIS 3.4 · DSGVO-konform · AES-256 + bcrypt · SHA-256+Salt · DB-Level Triggers & Constraints</p>
+<span class="version-badge">v3 – final · Triggers · Regex Constraints · DSGVO vollständig</span>
+
+<div class="legend">
+  <div class="legend-item"><span class="badge badge-pk">PK</span> Primary Key</div>
+  <div class="legend-item"><span class="badge badge-fk">FK</span> Foreign Key</div>
+  <div class="legend-item"><span class="badge badge-uq">UQ</span> Unique</div>
+  <div class="legend-item"><span class="badge badge-chk">CHK</span> Check Constraint</div>
+  <div class="legend-item"><span style="display:inline-block;width:10px;height:10px;background:#1e1030;border:1px solid #bc8cff44;border-radius:2px"></span> Art.9 DSGVO</div>
+  <div class="legend-item"><span style="display:inline-block;width:10px;height:10px;background:#0e1e20;border:1px solid #39c5cf44;border-radius:2px"></span> AES-256</div>
+  <div class="legend-item"><span style="display:inline-block;width:10px;height:10px;background:#1a1a0e;border:1px solid #e3b34144;border-radius:2px"></span> Regex/Check</div>
+  <div class="legend-item"><span class="future-badge">FUTURE</span> Geplant</div>
+</div>
+
+<div class="trigger-section">
+  <h3>DB-LEVEL TRIGGERS & FUNCTIONS</h3>
+  <div class="trigger-item"><span class="trigger-name">trigger_set_updated_at()</span><span class="trigger-desc">Setzt updated_at automatisch bei jedem UPDATE – profiles, notification_settings, profile_sensitive_data</span></div>
+  <div class="trigger-item"><span class="trigger-name">trigger_sort_conversation_users()</span><span class="trigger-desc">Sortiert user_a_id / user_b_id automatisch beim INSERT – kein Backend-Fehler möglich</span></div>
+  <div class="trigger-item"><span class="trigger-name">trigger_check_art9_consent()</span><span class="trigger-desc">Blockiert INSERT/UPDATE in profile_sensitive_data wenn kein gültiger Art.9 Consent vorhanden</span></div>
+  <div class="trigger-item"><span class="trigger-name">trigger_check_ban_expiry()</span><span class="trigger-desc">Hebt Ban automatisch auf wenn strikes.expires_at erreicht ist</span></div>
+  <div class="trigger-item"><span class="trigger-name">trigger_log_vulnerable_flag()</span><span class="trigger-desc">Jede Änderung von vulnerable_flag wird in vulnerable_flag_audit geloggt</span></div>
+  <div class="trigger-item"><span class="trigger-name">pseudonymize_user(uuid)</span><span class="trigger-desc">Pseudonymisiert einen User nach 30 Tagen: email=NULL, consent_logs→System-User, profile_sensitive_data gelöscht</span></div>
+  <div class="trigger-item"><span class="trigger-name">VIEW: users_pending_pseudonymization</span><span class="trigger-desc">Cronjob-Helper: gibt alle User zurück die pseudonymisiert werden müssen (deleted_at + 30 Tage)</span></div>
+</div>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Tabelle suchen..." oninput="filterTables(this.value)">
+  <select onchange="filterGroup(this.value)">
+    <option value="all">Alle Gruppen anzeigen</option>
+    <option value="auth">Auth & Account</option>
+    <option value="profile">Profil & Sozial</option>
+    <option value="chat">Messaging & Chat</option>
+    <option value="moderation">Moderation & Safety</option>
+    <option value="payment">Payment & Legal</option>
+    <option value="notifications">Benachrichtigungen</option>
+    <option value="features">Features & Future</option>
+    <option value="dsgvo">DSGVO Art.9</option>
+  </select>
+</div>
+
+<!-- AUTH & ACCOUNT -->
+<div class="section-label">👤 Auth & Account</div>
+<div class="grid">
+
+  <div class="table t-blue" data-group="auth" data-name="users">
+    <div class="table-header"><span class="dot"></span>users<span class="fix-badge">FIX</span><span class="trigger-badge">TRIGGER</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field enc"><span class="field-name">email</span><span class="field-type">BYTEA · AES-256</span></div>
+      <div class="field chk"><span class="field-name">email_search_hash</span><span class="badge badge-uq">UQ</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(64) · SHA-256+Salt</span></div>
+      <div class="field"><span class="field-name">password_hash</span><span class="field-type">VARCHAR · bcrypt</span></div>
+      <div class="field chk"><span class="field-name">google_id_hash</span><span class="badge badge-uq">UQ</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(64) · SHA-256+Salt</span></div>
+      <div class="field chk"><span class="field-name">preferred_locale</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(10) · regex: de, de-AT</span></div>
+      <div class="field"><span class="field-name">role</span><span class="field-type">ENUM user/admin/org</span></div>
+      <div class="field"><span class="field-name">account_type</span><span class="field-type">ENUM standard/managed</span></div>
+      <div class="field"><span class="field-name">is_verified</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field chk"><span class="field-name">is_banned</span><span class="badge badge-chk">CHK</span><span class="field-type">BOOLEAN · ban_reason Pflicht</span></div>
+      <div class="field"><span class="field-name">ban_reason</span><span class="field-type">TEXT NULL</span></div>
+      <div class="field"><span class="field-name">ban_expires_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field art9"><span class="field-name">vulnerable_flag</span><span class="badge badge-chk">CHK</span><span class="field-type">BOOLEAN · Audit-Trigger</span></div>
+      <div class="field art9"><span class="field-name">enhanced_protection</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">email_verified_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">last_login</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ NULL · Soft Delete</span></div>
+      <div class="field chk"><span class="field-name">pseudonymized_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · nur nach deleted_at</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="auth" data-name="vulnerable_flag_audit">
+    <div class="table-header"><span class="dot"></span>vulnerable_flag_audit<span class="new-badge">NEU</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field art9"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field art9"><span class="field-name">old_value</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field art9"><span class="field-name">new_value</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">changed_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="auth" data-name="refresh_tokens">
+    <div class="table-header"><span class="dot"></span>refresh_tokens</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field chk"><span class="field-name">token_hash</span><span class="badge badge-uq">UQ</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(64) · SHA-256</span></div>
+      <div class="field"><span class="field-name">device_info</span><span class="field-type">VARCHAR(255) NULL</span></div>
+      <div class="field"><span class="field-name">is_revoked</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field chk"><span class="field-name">expires_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ · muss > created_at</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-amber" data-group="auth" data-name="managed_accounts">
+    <div class="table-header"><span class="dot"></span>managed_accounts<span class="fix-badge">FIX</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">caretaker_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">consent_log_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ consent_logs NULL</span></div>
+      <div class="field"><span class="field-name">can_read_chat</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">can_write_chat</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">can_set_protection</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">expires_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field chk"><span class="field-name">revoked_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ · muss > created_at</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(user_id, caretaker_id)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="auth" data-name="account_status">
+    <div class="table-header"><span class="dot"></span>account_status<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">is_verified</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">is_banned</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field art9"><span class="field-name">vulnerable_flag</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">onboarding_completed</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">updated_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="auth" data-name="account_audit_log">
+    <div class="table-header"><span class="dot"></span>account_audit_log<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name fk">changed_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">change_type</span><span class="field-type">VARCHAR</span></div>
+      <div class="field"><span class="field-name">old_value</span><span class="field-type">TEXT NULL</span></div>
+      <div class="field"><span class="field-name">new_value</span><span class="field-type">TEXT NULL</span></div>
+      <div class="field enc"><span class="field-name">ip_hash</span><span class="field-type">SHA-256+Salt</span></div>
+      <div class="field"><span class="field-name">changed_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="auth" data-name="accessibility_settings">
+    <div class="table-header"><span class="dot"></span>accessibility_settings<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="badge badge-uq">UQ</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">lang_simple</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">font_size</span><span class="field-type">ENUM normal/large/xl</span></div>
+      <div class="field"><span class="field-name">high_contrast</span><span class="field-type">BOOLEAN</span></div>
+    </div>
+  </div>
+
+  <div class="table t-amber" data-group="auth" data-name="caretaker_audit_log">
+    <div class="table-header"><span class="dot"></span>caretaker_audit_log<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">managed_account_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ managed_accounts</span></div>
+      <div class="field"><span class="field-name fk">caretaker_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">action</span><span class="field-type">VARCHAR</span></div>
+      <div class="field"><span class="field-name">details</span><span class="field-type">TEXT NULL</span></div>
+      <div class="field"><span class="field-name">performed_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PROFIL & SOZIAL -->
+<div class="section-label">👤 Profil & Sozial</div>
+<div class="grid">
+
+  <div class="table t-green" data-group="profile" data-name="profiles">
+    <div class="table-header"><span class="dot"></span>profiles<span class="fix-badge">FIX</span><span class="trigger-badge">TRIGGER</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="badge badge-uq">UQ</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field chk"><span class="field-name">nickname</span><span class="badge badge-uq">UQ</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(30) · regex a-z0-9_-.</span></div>
+      <div class="field chk"><span class="field-name">birthdate</span><span class="badge badge-chk">CHK</span><span class="field-type">DATE · min. 18 Jahre</span></div>
+      <div class="field chk"><span class="field-name">bio</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT NULL · max 1000 Zeichen</span></div>
+      <div class="field"><span class="field-name fk">photo_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ media_uploads NULL</span></div>
+      <div class="field"><span class="field-name">city</span><span class="field-type">VARCHAR(100) NULL</span></div>
+      <div class="field"><span class="field-name">location</span><span class="field-type">GEOGRAPHY(Point) NULL</span></div>
+      <div class="field chk"><span class="field-name">search_radius_km</span><span class="badge badge-chk">CHK</span><span class="field-type">INTEGER · 1-500</span></div>
+      <div class="field"><span class="field-name">lang_simple</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">font_size</span><span class="field-type">ENUM normal/large/xl</span></div>
+      <div class="field"><span class="field-name">high_contrast</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field chk"><span class="field-name">is_published</span><span class="badge badge-chk">CHK</span><span class="field-type">BOOLEAN · nur wenn onboarding done</span></div>
+      <div class="field"><span class="field-name">onboarding_completed</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">updated_at</span><span class="field-type">TIMESTAMPTZ · auto-trigger</span></div>
+    </div>
+  </div>
+
+  <div class="table t-purple" data-group="profile dsgvo" data-name="profile_sensitive_data">
+    <div class="table-header"><span class="dot"></span>profile_sensitive_data<span class="dsgvo-badge">Art.9</span><span class="trigger-badge">TRIGGER</span></div>
+    <div class="table-body">
+      <div class="field art9"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field art9"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="badge badge-uq">UQ</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field art9"><span class="field-name fk">consent_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ consent_logs RESTRICT · Trigger prüft accepted=true + type=sensitive_data</span></div>
+      <div class="field enc"><span class="field-name">disability_type</span><span class="field-type">BYTEA · AES-256</span></div>
+      <div class="field art9"><span class="field-name">disability_visible</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">collected_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">updated_at</span><span class="field-type">TIMESTAMPTZ · auto-trigger</span></div>
+    </div>
+  </div>
+
+  <div class="table t-amber" data-group="profile" data-name="interests">
+    <div class="table-header"><span class="dot"></span>interests</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field chk"><span class="field-name">name_de</span><span class="badge badge-uq">UQ</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(50) · min 2 Zeichen</span></div>
+      <div class="field"><span class="field-name">name_en</span><span class="field-type">VARCHAR(50) NULL</span></div>
+      <div class="field"><span class="field-name">category</span><span class="field-type">VARCHAR(50) NULL</span></div>
+    </div>
+  </div>
+
+  <div class="table t-amber" data-group="profile" data-name="user_interests">
+    <div class="table-header"><span class="dot"></span>user_interests</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">interest_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ interests CASCADE</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(user_id, interest_id)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-purple" data-group="profile" data-name="media_uploads">
+    <div class="table-header"><span class="dot"></span>media_uploads<span class="fix-badge">FIX</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">uploaded_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field chk"><span class="field-name">file_url</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(1024) · muss https://</span></div>
+      <div class="field"><span class="field-name">file_type</span><span class="field-type">ENUM image/audio</span></div>
+      <div class="field"><span class="field-name">context</span><span class="field-type">ENUM profile/chat/org</span></div>
+      <div class="field"><span class="field-name fk">conversation_id</span><span class="badge badge-fk">FK</span><span class="field-type">NULL</span></div>
+      <div class="field"><span class="field-name fk">org_id</span><span class="badge badge-fk">FK</span><span class="field-type">NULL</span></div>
+      <div class="field"><span class="field-name">moderation_status</span><span class="field-type">ENUM pending/approved/rejected</span></div>
+      <div class="field"><span class="field-name">is_encrypted</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field chk"><span class="field-name">file_size_kb</span><span class="badge badge-chk">CHK</span><span class="field-type">INTEGER · 1-51200 KB</span></div>
+      <div class="field"><span class="field-name">uploaded_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field chk"><span class="field-name">purged_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > deleted_at</span></div>
+    </div>
+  </div>
+
+  <div class="table t-red" data-group="profile" data-name="blocks">
+    <div class="table-header"><span class="dot"></span>blocks</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">blocker_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">blocked_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field chk"><span class="field-name">reason</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT NULL · max 500</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(blocker_id, blocked_id)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-future" data-group="profile features" data-name="user_ratings">
+    <div class="table-header"><span class="dot"></span>user_ratings<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">rater_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name fk">rated_user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">score</span><span class="field-type">INTEGER · CHECK 1-5</span></div>
+      <div class="field"><span class="field-name">review</span><span class="field-type">TEXT NULL</span></div>
+      <div class="field"><span class="field-name">is_visible</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-future" data-group="profile features" data-name="match_scores">
+    <div class="table-header"><span class="dot"></span>match_scores<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_a_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name fk">user_b_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">score</span><span class="field-type">DECIMAL</span></div>
+      <div class="field"><span class="field-name">algorithm_version</span><span class="field-type">VARCHAR</span></div>
+      <div class="field"><span class="field-name">calculated_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- CHAT -->
+<div class="section-label">💬 Messaging & Chat</div>
+<div class="grid">
+
+  <div class="table t-teal" data-group="chat" data-name="contact_requests">
+    <div class="table-header"><span class="dot"></span>contact_requests</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">sender_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">receiver_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM pending/accepted/declined</span></div>
+      <div class="field chk"><span class="field-name">message_preview</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT NULL · max 300</span></div>
+      <div class="field"><span class="field-name">expired_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field chk"><span class="field-name">responded_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss >= created_at</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(sender_id, receiver_id)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-teal" data-group="chat" data-name="conversations">
+    <div class="table-header"><span class="dot"></span>conversations<span class="fix-badge">FIX</span><span class="trigger-badge">TRIGGER</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_a_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users (auto MIN · Trigger)</span></div>
+      <div class="field"><span class="field-name fk">user_b_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users (auto MAX · Trigger)</span></div>
+      <div class="field"><span class="field-name fk">contact_request_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ contact_requests RESTRICT</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM active/blocked/deleted</span></div>
+      <div class="field"><span class="field-name">images_enabled</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">audio_enabled</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">video_enabled</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">last_message_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field chk"><span class="field-name">purged_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > deleted_at</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(user_a_id, user_b_id)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-teal" data-group="chat" data-name="messages">
+    <div class="table-header"><span class="dot"></span>messages<span class="fix-badge">FIX</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">conversation_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ conversations CASCADE</span></div>
+      <div class="field"><span class="field-name fk">sender_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field chk"><span class="field-name">content</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT NULL · max 10000</span></div>
+      <div class="field"><span class="field-name fk">media_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ media_uploads NULL</span></div>
+      <div class="field chk"><span class="field-name">type</span><span class="badge badge-chk">CHK</span><span class="field-type">ENUM · content/media Pflicht-Check</span></div>
+      <div class="field"><span class="field-name">is_deleted</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field chk"><span class="field-name">flagged</span><span class="badge badge-chk">CHK</span><span class="field-type">BOOLEAN · flagged_by+at Konsistenz</span></div>
+      <div class="field"><span class="field-name fk">flagged_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users NULL</span></div>
+      <div class="field"><span class="field-name">flagged_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field chk"><span class="field-name">read_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss >= sent_at</span></div>
+      <div class="field"><span class="field-name">sent_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field chk"><span class="field-name">purged_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > deleted_at</span></div>
+    </div>
+  </div>
+
+  <div class="table t-red" data-group="chat" data-name="blocks">
+    <div class="table-header"><span class="dot"></span>blocks</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">blocker_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">blocked_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(blocker_id, blocked_id)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-teal" data-group="chat" data-name="conversation_members">
+    <div class="table-header"><span class="dot"></span>conversation_members<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">conversation_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ conversations CASCADE</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">role</span><span class="field-type">ENUM member/admin</span></div>
+      <div class="field"><span class="field-name">joined_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">left_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+  <div class="table t-teal" data-group="chat" data-name="message_deletions">
+    <div class="table-header"><span class="dot"></span>message_deletions<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">message_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ messages CASCADE</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-future" data-group="chat features" data-name="video_sessions">
+    <div class="table-header"><span class="dot"></span>video_sessions<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">conversation_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ conversations</span></div>
+      <div class="field"><span class="field-name fk">initiated_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM pending/active/ended</span></div>
+      <div class="field"><span class="field-name">duration_seconds</span><span class="field-type">INTEGER NULL</span></div>
+      <div class="field"><span class="field-name">started_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">ended_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- NOTIFICATIONS -->
+<div class="section-label">🔔 Benachrichtigungen</div>
+<div class="grid">
+
+  <div class="table t-blue" data-group="notifications" data-name="notification_settings">
+    <div class="table-header"><span class="dot"></span>notification_settings<span class="trigger-badge">TRIGGER</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="badge badge-uq">UQ</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">email_messages</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">email_matches</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">email_system</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">push_messages</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">push_matches</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">push_system</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">updated_at</span><span class="field-type">TIMESTAMPTZ · auto-trigger</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="notifications" data-name="notifications">
+    <div class="table-header"><span class="dot"></span>notifications</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">type</span><span class="field-type">ENUM message/match/system/ban/request</span></div>
+      <div class="field chk"><span class="field-name">content</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT · max 500</span></div>
+      <div class="field"><span class="field-name">is_read</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-blue" data-group="notifications features" data-name="push_tokens">
+    <div class="table-header"><span class="dot"></span>push_tokens<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">fcm_token</span><span class="field-type">VARCHAR</span></div>
+      <div class="field"><span class="field-name">device_type</span><span class="field-type">ENUM ios/android/web</span></div>
+      <div class="field"><span class="field-name">is_active</span><span class="field-type">BOOLEAN DEFAULT true</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">last_used_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODERATION -->
+<div class="section-label">🛡️ Moderation & Sicherheit</div>
+<div class="grid">
+
+  <div class="table t-red" data-group="moderation" data-name="reports">
+    <div class="table-header"><span class="dot"></span>reports</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">reporter_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">reported_user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">message_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ messages NULL</span></div>
+      <div class="field"><span class="field-name">reason</span><span class="field-type">ENUM harassment/spam/fake/sexual/abuse</span></div>
+      <div class="field chk"><span class="field-name">description</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT NULL · max 2000</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM open/reviewed/closed</span></div>
+      <div class="field"><span class="field-name">intent_category</span><span class="field-type">ENUM mistake/repeat/malicious</span></div>
+      <div class="field"><span class="field-name fk">reviewed_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users NULL</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field chk"><span class="field-name">reviewed_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss >= created_at</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+  <div class="table t-red" data-group="moderation" data-name="strikes">
+    <div class="table-header"><span class="dot"></span>strikes<span class="fix-badge">FIX</span><span class="trigger-badge">TRIGGER</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name fk">report_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ reports RESTRICT</span></div>
+      <div class="field"><span class="field-name fk">issued_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users RESTRICT</span></div>
+      <div class="field chk"><span class="field-name">type</span><span class="badge badge-chk">CHK</span><span class="field-type">ENUM · temp braucht expires_at</span></div>
+      <div class="field chk"><span class="field-name">reason</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT · 10-2000 Zeichen</span></div>
+      <div class="field"><span class="field-name">expires_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+      <div class="field"><span class="field-name">ban_lifted_at</span><span class="field-type">TIMESTAMPTZ NULL · auto-Trigger</span></div>
+      <div class="field"><span class="field-name">lifted_by_job</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-red" data-group="moderation" data-name="strike_appeals">
+    <div class="table-header"><span class="dot"></span>strike_appeals<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">strike_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ strikes CASCADE</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">reason</span><span class="field-type">TEXT</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM open/approved/rejected</span></div>
+      <div class="field"><span class="field-name fk">reviewed_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users NULL</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">reviewed_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+  <div class="table t-red" data-group="moderation" data-name="moderation_keywords">
+    <div class="table-header"><span class="dot"></span>moderation_keywords<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name">word</span><span class="field-type">VARCHAR</span></div>
+      <div class="field"><span class="field-name">language</span><span class="field-type">VARCHAR</span></div>
+      <div class="field"><span class="field-name">severity</span><span class="field-type">ENUM low/medium/high</span></div>
+      <div class="field"><span class="field-name fk">created_by</span><span class="badge badge-fk">FK</span><span class="field-type">→ users (admin)</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-red" data-group="moderation" data-name="moderation_hits">
+    <div class="table-header"><span class="dot"></span>moderation_hits<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">message_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ messages CASCADE</span></div>
+      <div class="field"><span class="field-name fk">keyword_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ moderation_keywords</span></div>
+      <div class="field"><span class="field-name">action_taken</span><span class="field-type">ENUM flag/block/notify</span></div>
+      <div class="field"><span class="field-name">detected_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PAYMENT -->
+<div class="section-label">💳 Payment & Legal</div>
+<div class="grid">
+
+  <div class="table t-green" data-group="payment" data-name="subscriptions">
+    <div class="table-header"><span class="dot"></span>subscriptions</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users RESTRICT</span></div>
+      <div class="field"><span class="field-name">plan</span><span class="field-type">ENUM monthly/yearly/lifetime</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM active/cancelled/expired</span></div>
+      <div class="field"><span class="field-name">payment_provider</span><span class="field-type">ENUM paypal/sepa</span></div>
+      <div class="field"><span class="field-name">provider_subscription_id</span><span class="field-type">VARCHAR(255) NULL</span></div>
+      <div class="field"><span class="field-name">started_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field chk"><span class="field-name">expires_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > started_at</span></div>
+      <div class="field chk"><span class="field-name">cancelled_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss >= started_at</span></div>
+    </div>
+  </div>
+
+  <div class="table t-green" data-group="payment" data-name="payment_logs">
+    <div class="table-header"><span class="dot"></span>payment_logs</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users RESTRICT · § 147 AO</span></div>
+      <div class="field"><span class="field-name fk">subscription_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ subscriptions RESTRICT</span></div>
+      <div class="field chk"><span class="field-name">amount</span><span class="badge badge-chk">CHK</span><span class="field-type">DECIMAL(10,2) · > 0</span></div>
+      <div class="field chk"><span class="field-name">tax_amount</span><span class="badge badge-chk">CHK</span><span class="field-type">DECIMAL(10,2) NULL · >= 0</span></div>
+      <div class="field chk"><span class="field-name">currency</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(3) · regex [A-Z]{3}</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM success/failed/refunded</span></div>
+      <div class="field"><span class="field-name">provider_tx_id</span><span class="field-type">VARCHAR(255)</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+    </div>
+  </div>
+
+  <div class="table t-green" data-group="payment features" data-name="invoices">
+    <div class="table-header"><span class="dot"></span>invoices<span class="future-badge">FUTURE</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users RESTRICT</span></div>
+      <div class="field"><span class="field-name fk">payment_log_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ payment_logs</span></div>
+      <div class="field"><span class="field-name">amount</span><span class="field-type">DECIMAL(10,2)</span></div>
+      <div class="field"><span class="field-name">tax_amount</span><span class="field-type">DECIMAL(10,2)</span></div>
+      <div class="field"><span class="field-name">currency</span><span class="field-type">VARCHAR(3)</span></div>
+      <div class="field"><span class="field-name">status</span><span class="field-type">ENUM draft/issued/paid</span></div>
+      <div class="field"><span class="field-name">issued_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">due_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+  <div class="table t-purple" data-group="payment dsgvo" data-name="agb_versions">
+    <div class="table-header"><span class="dot"></span>agb_versions</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field chk"><span class="field-name">version</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(20) · Format 1.0 oder 1.0.1</span></div>
+      <div class="field"><span class="field-name">type</span><span class="field-type">ENUM agb/privacy/sensitive_data</span></div>
+      <div class="field"><span class="field-name">content_normal</span><span class="field-type">TEXT</span></div>
+      <div class="field"><span class="field-name">content_simple</span><span class="field-type">TEXT · Leichte Sprache</span></div>
+      <div class="field chk"><span class="field-name">content_url</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(512) NULL · muss https://</span></div>
+      <div class="field"><span class="field-name">valid_from</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field chk"><span class="field-name">valid_until</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > valid_from</span></div>
+      <div class="field"><span class="field-name">is_current</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(version, type)</span></div>
+    </div>
+  </div>
+
+  <div class="table t-purple" data-group="payment dsgvo" data-name="consent_logs">
+    <div class="table-header"><span class="dot"></span>consent_logs<span class="fix-badge">FIX</span></div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users RESTRICT · wird pseudonymisiert</span></div>
+      <div class="field"><span class="field-name fk">agb_version_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ agb_versions RESTRICT</span></div>
+      <div class="field"><span class="field-name">accepted</span><span class="field-type">BOOLEAN</span></div>
+      <div class="field"><span class="field-name">accepted_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field enc"><span class="field-name">ip_hash</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(64) · SHA-256+Salt</span></div>
+      <div class="field enc"><span class="field-name">tp_hash</span><span class="field-type">VARCHAR(64) NULL</span></div>
+      <div class="field chk"><span class="field-name">withdrawn_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > accepted_at</span></div>
+      <div class="field"><span class="field-name">withdraw_reason</span><span class="field-type">TEXT NULL</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(user_id, agb_version_id)</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ORGANISATIONEN -->
+<div class="section-label">🏢 Organisationen</div>
+<div class="grid">
+
+  <div class="table t-purple" data-group="features" data-name="organizations">
+    <div class="table-header"><span class="dot"></span>organizations</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">owner_user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users RESTRICT</span></div>
+      <div class="field chk"><span class="field-name">name</span><span class="badge badge-chk">CHK</span><span class="field-type">VARCHAR(100) · min 2 Zeichen</span></div>
+      <div class="field"><span class="field-name fk">logo_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ media_uploads NULL</span></div>
+      <div class="field chk"><span class="field-name">description</span><span class="badge badge-chk">CHK</span><span class="field-type">TEXT NULL · max 2000</span></div>
+      <div class="field"><span class="field-name">is_verified</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field"><span class="field-name">deleted_at</span><span class="field-type">TIMESTAMPTZ NULL</span></div>
+    </div>
+  </div>
+
+  <div class="table t-purple" data-group="features" data-name="org_members">
+    <div class="table-header"><span class="dot"></span>org_members</div>
+    <div class="table-body">
+      <div class="field"><span class="field-name pk">id</span><span class="badge badge-pk">PK</span><span class="field-type">UUID</span></div>
+      <div class="field"><span class="field-name fk">org_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ organizations CASCADE</span></div>
+      <div class="field"><span class="field-name fk">user_id</span><span class="badge badge-fk">FK</span><span class="field-type">→ users CASCADE</span></div>
+      <div class="field"><span class="field-name">is_verified</span><span class="field-type">BOOLEAN DEFAULT false</span></div>
+      <div class="field"><span class="field-name">role</span><span class="field-type">ENUM admin/member</span></div>
+      <div class="field"><span class="field-name">joined_at</span><span class="field-type">TIMESTAMPTZ</span></div>
+      <div class="field chk"><span class="field-name">left_at</span><span class="badge badge-chk">CHK</span><span class="field-type">TIMESTAMPTZ NULL · muss > joined_at</span></div>
+      <div class="field"><span class="field-name"></span><span class="badge badge-uq">UQ</span><span class="field-type">(org_id, user_id)</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const groupMap = {
+  auth: ['users','vulnerable_flag_audit','refresh_tokens','managed_accounts','account_status','account_audit_log','accessibility_settings','caretaker_audit_log'],
+  profile: ['profiles','profile_sensitive_data','interests','user_interests','media_uploads','blocks','user_ratings','match_scores'],
+  chat: ['contact_requests','conversations','messages','blocks','conversation_members','message_deletions','video_sessions'],
+  moderation: ['reports','strikes','strike_appeals','moderation_keywords','moderation_hits'],
+  payment: ['subscriptions','payment_logs','invoices','agb_versions','consent_logs'],
+  notifications: ['notification_settings','notifications','push_tokens'],
+  features: ['account_audit_log','caretaker_audit_log','accessibility_settings','conversation_members','message_deletions','video_sessions','push_tokens','user_ratings','match_scores','invoices','moderation_keywords','moderation_hits','strike_appeals','organizations','org_members'],
+  dsgvo: ['profile_sensitive_data','consent_logs','agb_versions','vulnerable_flag_audit'],
+};
+
+function filterTables(val) {
+  const v = val.toLowerCase().trim();
+  document.querySelectorAll('.table').forEach(t => {
+    const name = t.dataset.name || '';
+    t.classList.toggle('dimmed', v.length > 0 && !name.includes(v));
+  });
+}
+
+function filterGroup(val) {
+  if (val === 'all') {
+    document.querySelectorAll('.table').forEach(t => t.classList.remove('dimmed'));
+    return;
+  }
+  const tables = groupMap[val] || [];
+  document.querySelectorAll('.table').forEach(t => {
+    const name = t.dataset.name || '';
+    t.classList.toggle('dimmed', !tables.includes(name));
+  });
+}
+</script>
+</body>
+</html>
