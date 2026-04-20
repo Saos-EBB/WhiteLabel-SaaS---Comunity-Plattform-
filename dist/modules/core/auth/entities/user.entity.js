@@ -23,6 +23,11 @@ let User = class User {
     created_at;
     deleted_at;
     pseudonymized_at;
+    email_verified_at;
+    email_verification_token;
+    email_verification_expires_at;
+    password_reset_token;
+    password_reset_expires_at;
 };
 exports.User = User;
 __decorate([
@@ -69,6 +74,26 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
     __metadata("design:type", Object)
 ], User.prototype, "pseudonymized_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "email_verified_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 64, nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "email_verification_token", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "email_verification_expires_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 64, nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "password_reset_token", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "password_reset_expires_at", void 0);
 exports.User = User = __decorate([
     (0, typeorm_1.Entity)('users')
 ], User);

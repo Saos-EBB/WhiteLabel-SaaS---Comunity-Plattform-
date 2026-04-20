@@ -34,4 +34,20 @@ export class User {
 
     @Column({ type: 'timestamptz', nullable: true })
     pseudonymized_at!: Date | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    email_verified_at!: Date | null;
+
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    email_verification_token!: string | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    email_verification_expires_at!: Date | null;
+
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    password_reset_token!: string | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    password_reset_expires_at!: Date | null;
+
 }

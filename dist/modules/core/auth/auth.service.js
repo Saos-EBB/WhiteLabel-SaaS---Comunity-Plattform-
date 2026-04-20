@@ -54,14 +54,17 @@ const bcrypt = __importStar(require("bcrypt"));
 const crypto = __importStar(require("crypto"));
 const user_entity_1 = require("./entities/user.entity");
 const refresh_token_entity_1 = require("./entities/refresh-token.entity");
+const mail_service_1 = require("../../../common/mail/mail.service");
 let AuthService = class AuthService {
     userRepository;
     refreshTokenRepository;
     jwtService;
-    constructor(userRepository, refreshTokenRepository, jwtService) {
+    mailService;
+    constructor(userRepository, refreshTokenRepository, jwtService, mailService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
+        this.mailService = mailService;
     }
     hashEmail(email) {
         const salt = process.env.EMAIL_SALT ?? '';
@@ -134,6 +137,68 @@ let AuthService = class AuthService {
         await this.refreshTokenRepository.update({ token_hash: tokenHash }, { is_revoked: true });
         return { message: 'Erfolgreich ausgeloggt' };
     }
+    async sendVerificationEmail(userId, email) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = this.hashToken(token);
+        await this.userRepository.update(userId, {
+            email_verification_token: tokenHash,
+            email_verification_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+        await this.mailService.sendVerificationEmail(email, token);
+        return { message: 'Verifizierungs-Email gesendet' };
+    }
+    async verifyEmail(token) {
+        const tokenHash = this.hashToken(token);
+        const user = await this.userRepository.findOne({
+            where: { email_verification_token: tokenHash },
+        });
+        if (!user)
+            throw new common_1.UnauthorizedException('Ungültiger Token');
+        if (user.email_verification_expires_at < new Date()) {
+            throw new common_1.UnauthorizedException('Token abgelaufen');
+        }
+        await this.userRepository.update(user.id, {
+            is_verified: true,
+            email_verified_at: new Date(),
+            email_verification_token: null,
+            email_verification_expires_at: null,
+        });
+        return { message: 'Email erfolgreich bestätigt' };
+    }
+    async forgotPassword(email) {
+        const emailHash = this.hashEmail(email);
+        const user = await this.userRepository.findOne({
+            where: { email_search_hash: emailHash },
+        });
+        if (!user)
+            return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = this.hashToken(token);
+        await this.userRepository.update(user.id, {
+            password_reset_token: tokenHash,
+            password_reset_expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        });
+        await this.mailService.sendPasswordResetEmail(email, token);
+        return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
+    }
+    async resetPassword(token, newPassword) {
+        const tokenHash = this.hashToken(token);
+        const user = await this.userRepository.findOne({
+            where: { password_reset_token: tokenHash },
+        });
+        if (!user)
+            throw new common_1.UnauthorizedException('Ungültiger Token');
+        if (user.password_reset_expires_at < new Date()) {
+            throw new common_1.UnauthorizedException('Token abgelaufen');
+        }
+        const passwordHash = await bcrypt.hash(newPassword, 12);
+        await this.userRepository.update(user.id, {
+            password_hash: passwordHash,
+            password_reset_token: null,
+            password_reset_expires_at: null,
+        });
+        return { message: 'Passwort erfolgreich geändert' };
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
@@ -142,6 +207,7 @@ exports.AuthService = AuthService = __decorate([
     __param(1, (0, typeorm_1.InjectRepository)(refresh_token_entity_1.RefreshToken)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        mail_service_1.MailService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

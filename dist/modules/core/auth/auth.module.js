@@ -15,6 +15,8 @@ const auth_service_1 = require("./auth.service");
 const auth_controller_1 = require("./auth.controller");
 const user_entity_1 = require("./entities/user.entity");
 const refresh_token_entity_1 = require("./entities/refresh-token.entity");
+const mail_module_1 = require("../../../common/mail/mail.module");
+const jwt_guard_1 = require("../../../common/guards/jwt.guard");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -30,9 +32,10 @@ exports.AuthModule = AuthModule = __decorate([
                 }),
                 inject: [config_1.ConfigService],
             }),
+            mail_module_1.MailModule,
         ],
         controllers: [auth_controller_1.AuthController],
-        providers: [auth_service_1.AuthService],
+        providers: [auth_service_1.AuthService, jwt_guard_1.JwtGuard],
         exports: [auth_service_1.AuthService],
     })
 ], AuthModule);

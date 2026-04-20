@@ -10,4 +10,9 @@ export declare class User {
     created_at: Date;
     deleted_at: Date | null;
     pseudonymized_at: Date | null;
+    email_verified_at: Date | null;
+    email_verification_token: string | null;
+    email_verification_expires_at: Date | null;
+    password_reset_token: string | null;
+    password_reset_expires_at: Date | null;
 }

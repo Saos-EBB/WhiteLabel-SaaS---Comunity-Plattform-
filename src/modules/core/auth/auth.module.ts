@@ -6,6 +6,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from './entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { MailModule } from '../../../common/mail/mail.module';
+import { JwtGuard } from '../../../common/guards/jwt.guard';
 
 @Module({
     imports: [
@@ -18,9 +20,10 @@ import { RefreshToken } from './entities/refresh-token.entity';
             }),
             inject: [ConfigService],
         }),
+        MailModule,
     ],
     controllers: [AuthController],
-    providers: [AuthService],
+    providers: [AuthService, JwtGuard],
     exports: [AuthService],
 })
 export class AuthModule { }

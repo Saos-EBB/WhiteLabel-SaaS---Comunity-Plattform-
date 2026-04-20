@@ -8,6 +8,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from './entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { MailService } from '../../../common/mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
         @InjectRepository(RefreshToken)
         private readonly refreshTokenRepository: Repository<RefreshToken>,
         private readonly jwtService: JwtService,
+        private readonly mailService: MailService,
     ) { }
 
     private hashEmail(email: string): string {
@@ -112,5 +114,83 @@ export class AuthService {
         );
 
         return { message: 'Erfolgreich ausgeloggt' };
+    }
+
+    async sendVerificationEmail(userId: string, email: string) {
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = this.hashToken(token);
+
+        await this.userRepository.update(userId, {
+            email_verification_token: tokenHash,
+            email_verification_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+
+        await this.mailService.sendVerificationEmail(email, token);
+        return { message: 'Verifizierungs-Email gesendet' };
+    }
+
+    async verifyEmail(token: string) {
+        const tokenHash = this.hashToken(token);
+
+        const user = await this.userRepository.findOne({
+            where: { email_verification_token: tokenHash },
+        });
+
+        if (!user) throw new UnauthorizedException('Ungültiger Token');
+        if (user.email_verification_expires_at! < new Date()) {
+            throw new UnauthorizedException('Token abgelaufen');
+        }
+
+        await this.userRepository.update(user.id, {
+            is_verified: true,
+            email_verified_at: new Date(),
+            email_verification_token: null,
+            email_verification_expires_at: null,
+        });
+
+        return { message: 'Email erfolgreich bestätigt' };
+    }
+
+    async forgotPassword(email: string) {
+        const emailHash = this.hashEmail(email);
+        const user = await this.userRepository.findOne({
+            where: { email_search_hash: emailHash },
+        });
+
+        if (!user) return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = this.hashToken(token);
+
+        await this.userRepository.update(user.id, {
+            password_reset_token: tokenHash,
+            password_reset_expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        });
+
+        await this.mailService.sendPasswordResetEmail(email, token);
+        return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
+    }
+
+    async resetPassword(token: string, newPassword: string) {
+        const tokenHash = this.hashToken(token);
+
+        const user = await this.userRepository.findOne({
+            where: { password_reset_token: tokenHash },
+        });
+
+        if (!user) throw new UnauthorizedException('Ungültiger Token');
+        if (user.password_reset_expires_at! < new Date()) {
+            throw new UnauthorizedException('Token abgelaufen');
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 12);
+
+        await this.userRepository.update(user.id, {
+            password_hash: passwordHash,
+            password_reset_token: null,
+            password_reset_expires_at: null,
+        });
+
+        return { message: 'Passwort erfolgreich geändert' };
     }
 }
