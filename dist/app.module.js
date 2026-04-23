@@ -18,6 +18,10 @@ const core_1 = require("@nestjs/core");
 const auth_module_1 = require("./modules/core/auth/auth.module");
 const mail_module_1 = require("./common/mail/mail.module");
 const profile_module_1 = require("./modules/core/profile/profile.module");
+const chat_module_1 = require("./modules/core/chat/chat.module");
+const notifications_module_1 = require("./modules/core/notifications/notifications.module");
+const moderation_module_1 = require("./modules/core/moderation/moderation.module");
+const payment_module_1 = require("./modules/core/payment/payment.module");
 const app_config_1 = __importDefault(require("./config/app.config"));
 const database_config_1 = __importDefault(require("./config/database.config"));
 let AppModule = class AppModule {
@@ -50,6 +54,10 @@ exports.AppModule = AppModule = __decorate([
             auth_module_1.AuthModule,
             mail_module_1.MailModule,
             profile_module_1.ProfileModule,
+            chat_module_1.ChatModule,
+            notifications_module_1.NotificationsModule,
+            moderation_module_1.ModerationModule,
+            payment_module_1.PaymentModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },

@@ -6,6 +6,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/core/auth/auth.module';
 import { MailModule } from './common/mail/mail.module';
 import { ProfileModule } from './modules/core/profile/profile.module';
+import { ChatModule } from './modules/core/chat/chat.module';
+import { NotificationsModule } from './modules/core/notifications/notifications.module';
+import { ModerationModule } from './modules/core/moderation/moderation.module';
+import { PaymentModule } from './modules/core/payment/payment.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -37,6 +41,10 @@ import databaseConfig from './config/database.config';
     AuthModule,
     MailModule,
     ProfileModule,
+    ChatModule,
+    NotificationsModule,
+    ModerationModule,
+    PaymentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

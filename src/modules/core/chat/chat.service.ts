@@ -1,0 +1,182 @@
+import {
+    Injectable,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, IsNull } from 'typeorm';
+import { User } from '../auth/entities/user.entity';
+import { ContactRequest, ContactRequestStatus } from './entities/contact-request.entity';
+import { Conversation } from './entities/conversation.entity';
+import { Message, MessageType } from './entities/message.entity';
+import { SendContactRequestDto } from './dto/send-contact-request.dto';
+import { SendMessageDto } from './dto/send-message.dto';
+
+@Injectable()
+export class ChatService {
+    constructor(
+        @InjectRepository(User)
+        private readonly userRepository: Repository<User>,
+        @InjectRepository(ContactRequest)
+        private readonly contactRequestRepository: Repository<ContactRequest>,
+        @InjectRepository(Conversation)
+        private readonly conversationRepository: Repository<Conversation>,
+        @InjectRepository(Message)
+        private readonly messageRepository: Repository<Message>,
+    ) { }
+
+    async sendContactRequest(senderId: string, dto: SendContactRequestDto) {
+        if (senderId === dto.receiver_id) {
+            throw new BadRequestException('Anfrage an sich selbst nicht erlaubt');
+        }
+
+        const receiver = await this.userRepository.findOne({
+            where: { id: dto.receiver_id, deleted_at: IsNull() },
+        });
+        if (!receiver) throw new NotFoundException('Benutzer nicht gefunden');
+
+        const existing = await this.contactRequestRepository.findOne({
+            where: { sender_id: senderId, receiver_id: dto.receiver_id, status: ContactRequestStatus.PENDING },
+        });
+        if (existing) throw new ConflictException('Anfrage bereits gesendet');
+
+        const request = this.contactRequestRepository.create({
+            sender_id: senderId,
+            receiver_id: dto.receiver_id,
+            message_preview: dto.message_preview ?? null,
+        });
+
+        return this.contactRequestRepository.save(request);
+    }
+
+    async getIncomingRequests(userId: string) {
+        return this.contactRequestRepository.find({
+            where: { receiver_id: userId, status: ContactRequestStatus.PENDING },
+            order: { created_at: 'DESC' },
+        });
+    }
+
+    async getOutgoingRequests(userId: string) {
+        return this.contactRequestRepository.find({
+            where: { sender_id: userId },
+            order: { created_at: 'DESC' },
+        });
+    }
+
+    async acceptRequest(userId: string, requestId: string) {
+        const request = await this.contactRequestRepository.findOne({
+            where: { id: requestId },
+        });
+
+        if (!request) throw new NotFoundException('Anfrage nicht gefunden');
+        if (request.receiver_id !== userId) throw new ForbiddenException('Keine Berechtigung');
+        if (request.status !== ContactRequestStatus.PENDING) {
+            throw new ConflictException('Anfrage ist nicht mehr ausstehend');
+        }
+
+        request.status = ContactRequestStatus.ACCEPTED;
+        await this.contactRequestRepository.save(request);
+
+        const conversation = this.conversationRepository.create({
+            user_a_id: request.sender_id,
+            user_b_id: request.receiver_id,
+            contact_request_id: request.id,
+        });
+
+        return this.conversationRepository.save(conversation);
+    }
+
+    async declineRequest(userId: string, requestId: string) {
+        const request = await this.contactRequestRepository.findOne({
+            where: { id: requestId },
+        });
+
+        if (!request) throw new NotFoundException('Anfrage nicht gefunden');
+        if (request.receiver_id !== userId) throw new ForbiddenException('Keine Berechtigung');
+        if (request.status !== ContactRequestStatus.PENDING) {
+            throw new ConflictException('Anfrage ist nicht mehr ausstehend');
+        }
+
+        await this.contactRequestRepository.update(requestId, { status: ContactRequestStatus.DECLINED });
+        return { message: 'Anfrage abgelehnt' };
+    }
+
+    async getConversations(userId: string) {
+        return this.conversationRepository.find({
+            where: [
+                { user_a_id: userId },
+                { user_b_id: userId },
+            ],
+            order: { created_at: 'DESC' },
+        });
+    }
+
+    async getConversation(userId: string, conversationId: string) {
+        const conversation = await this.conversationRepository.findOne({
+            where: [
+                { id: conversationId, user_a_id: userId },
+                { id: conversationId, user_b_id: userId },
+            ],
+        });
+
+        if (!conversation) throw new NotFoundException('Konversation nicht gefunden');
+        return conversation;
+    }
+
+    async getMessages(userId: string, conversationId: string) {
+        await this.verifyConversationAccess(userId, conversationId);
+
+        const messages = await this.messageRepository.find({
+            where: { conversation_id: conversationId },
+            order: { sent_at: 'ASC' },
+        });
+
+        return messages.map(msg => ({
+            ...msg,
+            content: msg.is_deleted ? null : msg.content,
+        }));
+    }
+
+    async sendMessage(userId: string, conversationId: string, dto: SendMessageDto) {
+        await this.verifyConversationAccess(userId, conversationId);
+
+        const message = this.messageRepository.create({
+            conversation_id: conversationId,
+            sender_id: userId,
+            content: dto.content ?? null,
+            type: dto.type ?? MessageType.TEXT,
+        });
+
+        return this.messageRepository.save(message);
+    }
+
+    async deleteMessage(userId: string, messageId: string) {
+        const message = await this.messageRepository.findOne({
+            where: { id: messageId },
+        });
+
+        if (!message) throw new NotFoundException('Nachricht nicht gefunden');
+        if (message.sender_id !== userId) throw new ForbiddenException('Keine Berechtigung');
+
+        await this.messageRepository.update(messageId, {
+            is_deleted: true,
+            deleted_at: new Date(),
+        });
+
+        return { message: 'Nachricht gelöscht' };
+    }
+
+    private async verifyConversationAccess(userId: string, conversationId: string) {
+        const conversation = await this.conversationRepository.findOne({
+            where: [
+                { id: conversationId, user_a_id: userId },
+                { id: conversationId, user_b_id: userId },
+            ],
+        });
+
+        if (!conversation) throw new NotFoundException('Konversation nicht gefunden');
+        return conversation;
+    }
+}
