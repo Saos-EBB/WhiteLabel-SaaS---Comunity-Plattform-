@@ -1,6 +1,9 @@
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
@@ -11,10 +14,11 @@ export declare class AuthController {
         accessToken: string;
         refreshToken: string;
     }>;
-    refresh(token: string): Promise<{
+    refresh(dto: RefreshDto): Promise<{
         accessToken: string;
+        refreshToken: string;
     }>;
-    logout(token: string): Promise<{
+    logout(dto: RefreshDto): Promise<{
         message: string;
     }>;
     me(req: any): Promise<{
@@ -23,10 +27,10 @@ export declare class AuthController {
     verifyEmail(token: string): Promise<{
         message: string;
     }>;
-    forgotPassword(email: string): Promise<{
+    forgotPassword(dto: ForgotPasswordDto): Promise<{
         message: string;
     }>;
-    resetPassword(token: string, password: string): Promise<{
+    resetPassword(dto: ResetPasswordDto): Promise<{
         message: string;
     }>;
 }

@@ -54,17 +54,27 @@ const bcrypt = __importStar(require("bcrypt"));
 const crypto = __importStar(require("crypto"));
 const user_entity_1 = require("./entities/user.entity");
 const refresh_token_entity_1 = require("./entities/refresh-token.entity");
+const profile_entity_1 = require("../profile/entities/profile.entity");
 const mail_service_1 = require("../../../common/mail/mail.service");
 let AuthService = class AuthService {
     userRepository;
     refreshTokenRepository;
+    profileRepository;
     jwtService;
     mailService;
-    constructor(userRepository, refreshTokenRepository, jwtService, mailService) {
+    constructor(userRepository, refreshTokenRepository, profileRepository, jwtService, mailService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.profileRepository = profileRepository;
         this.jwtService = jwtService;
         this.mailService = mailService;
+    }
+    generateNickname(email) {
+        const local = email.split('@')[0];
+        const stripped = local.replace(/[^a-zA-Z0-9]/g, '');
+        const truncated = stripped.slice(0, 20);
+        const digits = Math.floor(1000 + Math.random() * 9000).toString();
+        return truncated + digits;
     }
     hashEmail(email) {
         const salt = process.env.EMAIL_SALT ?? '';
@@ -92,12 +102,22 @@ let AuthService = class AuthService {
             password_hash: passwordHash,
         });
         await this.userRepository.save(user);
+        const profile = this.profileRepository.create({
+            user_id: user.id,
+            nickname: this.generateNickname(dto.email),
+            birthdate: '1990-01-01',
+            is_published: false,
+            onboarding_completed: false,
+            updated_at: new Date(),
+        });
+        await this.profileRepository.save(profile);
+        await this.sendVerificationEmail(user.id, dto.email);
         return { message: 'Registrierung erfolgreich' };
     }
     async login(dto) {
         const emailHash = this.hashEmail(dto.email);
         const user = await this.userRepository.findOne({
-            where: { email_search_hash: emailHash },
+            where: { email_search_hash: emailHash, deleted_at: (0, typeorm_2.IsNull)() },
         });
         if (!user)
             throw new common_1.UnauthorizedException('Ungültige Zugangsdaten');
@@ -125,12 +145,21 @@ let AuthService = class AuthService {
             throw new common_1.UnauthorizedException('Ungültiger Token');
         if (stored.expires_at < new Date())
             throw new common_1.UnauthorizedException('Token abgelaufen');
-        const user = await this.userRepository.findOne({ where: { id: stored.user_id } });
+        const user = await this.userRepository.findOne({ where: { id: stored.user_id, deleted_at: (0, typeorm_2.IsNull)() } });
         if (!user)
             throw new common_1.UnauthorizedException('User nicht gefunden');
+        await this.refreshTokenRepository.update({ token_hash: stored.token_hash }, { is_revoked: true });
+        const newRawToken = this.generateRefreshToken();
+        const newTokenHash = this.hashToken(newRawToken);
+        const newRefreshToken = this.refreshTokenRepository.create({
+            user_id: user.id,
+            token_hash: newTokenHash,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        });
+        await this.refreshTokenRepository.save(newRefreshToken);
         const payload = { sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
-        return { accessToken };
+        return { accessToken, refreshToken: newRawToken };
     }
     async logout(rawToken) {
         const tokenHash = this.hashToken(rawToken);
@@ -150,7 +179,7 @@ let AuthService = class AuthService {
     async verifyEmail(token) {
         const tokenHash = this.hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { email_verification_token: tokenHash },
+            where: { email_verification_token: tokenHash, deleted_at: (0, typeorm_2.IsNull)() },
         });
         if (!user)
             throw new common_1.UnauthorizedException('Ungültiger Token');
@@ -168,7 +197,7 @@ let AuthService = class AuthService {
     async forgotPassword(email) {
         const emailHash = this.hashEmail(email);
         const user = await this.userRepository.findOne({
-            where: { email_search_hash: emailHash },
+            where: { email_search_hash: emailHash, deleted_at: (0, typeorm_2.IsNull)() },
         });
         if (!user)
             return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
@@ -184,7 +213,7 @@ let AuthService = class AuthService {
     async resetPassword(token, newPassword) {
         const tokenHash = this.hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { password_reset_token: tokenHash },
+            where: { password_reset_token: tokenHash, deleted_at: (0, typeorm_2.IsNull)() },
         });
         if (!user)
             throw new common_1.UnauthorizedException('Ungültiger Token');
@@ -205,7 +234,9 @@ exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __param(1, (0, typeorm_1.InjectRepository)(refresh_token_entity_1.RefreshToken)),
+    __param(2, (0, typeorm_1.InjectRepository)(profile_entity_1.Profile)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         jwt_1.JwtService,
         mail_service_1.MailService])

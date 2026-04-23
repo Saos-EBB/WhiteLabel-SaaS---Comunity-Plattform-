@@ -4,13 +4,16 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from './entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { Profile } from '../profile/entities/profile.entity';
 import { MailService } from '../../../common/mail/mail.service';
 export declare class AuthService {
     private readonly userRepository;
     private readonly refreshTokenRepository;
+    private readonly profileRepository;
     private readonly jwtService;
     private readonly mailService;
-    constructor(userRepository: Repository<User>, refreshTokenRepository: Repository<RefreshToken>, jwtService: JwtService, mailService: MailService);
+    constructor(userRepository: Repository<User>, refreshTokenRepository: Repository<RefreshToken>, profileRepository: Repository<Profile>, jwtService: JwtService, mailService: MailService);
+    private generateNickname;
     private hashEmail;
     private hashToken;
     private generateRefreshToken;
@@ -23,6 +26,7 @@ export declare class AuthService {
     }>;
     refresh(rawToken: string): Promise<{
         accessToken: string;
+        refreshToken: string;
     }>;
     logout(rawToken: string): Promise<{
         message: string;

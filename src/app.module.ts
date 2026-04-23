@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/core/auth/auth.module';
 import { MailModule } from './common/mail/mail.module';
+import { ProfileModule } from './modules/core/profile/profile.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -15,6 +18,7 @@ import databaseConfig from './config/database.config';
       load: [appConfig, databaseConfig],
       envFilePath: '.env',
     }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -32,6 +36,10 @@ import databaseConfig from './config/database.config';
     }),
     AuthModule,
     MailModule,
+    ProfileModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule { }

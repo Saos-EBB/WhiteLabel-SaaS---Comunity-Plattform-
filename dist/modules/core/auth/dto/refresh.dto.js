@@ -9,22 +9,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RegisterDto = void 0;
+exports.RefreshDto = void 0;
 const class_validator_1 = require("class-validator");
-class RegisterDto {
-    email;
-    password;
+class RefreshDto {
+    refreshToken;
 }
-exports.RegisterDto = RegisterDto;
-__decorate([
-    (0, class_validator_1.IsEmail)(),
-    __metadata("design:type", String)
-], RegisterDto.prototype, "email", void 0);
+exports.RefreshDto = RefreshDto;
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(8),
-    (0, class_validator_1.MaxLength)(64),
-    (0, class_validator_1.Matches)(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,64}$/, { message: 'Passwort braucht: Großbuchstabe, Kleinbuchstabe, Zahl, Sonderzeichen' }),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
-], RegisterDto.prototype, "password", void 0);
-//# sourceMappingURL=register.dto.js.map
+], RefreshDto.prototype, "refreshToken", void 0);
+//# sourceMappingURL=refresh.dto.js.map

@@ -22,8 +22,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`Paarship API läuft auf Port ${port}`);
+  await app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  await app.listen(process.env.PORT ?? 3000);
+  console.log(`Paarship API läuft auf Port ${process.env.PORT ?? 3000}`);
 }
 bootstrap();

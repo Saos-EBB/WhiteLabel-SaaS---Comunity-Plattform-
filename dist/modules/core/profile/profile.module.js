@@ -6,25 +6,22 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AuthModule = void 0;
+exports.ProfileModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
-const auth_service_1 = require("./auth.service");
-const auth_controller_1 = require("./auth.controller");
-const user_entity_1 = require("./entities/user.entity");
-const refresh_token_entity_1 = require("./entities/refresh-token.entity");
-const profile_entity_1 = require("../profile/entities/profile.entity");
-const mail_module_1 = require("../../../common/mail/mail.module");
+const profile_entity_1 = require("./entities/profile.entity");
+const profile_service_1 = require("./profile.service");
+const profile_controller_1 = require("./profile.controller");
 const jwt_guard_1 = require("../../../common/guards/jwt.guard");
-let AuthModule = class AuthModule {
+let ProfileModule = class ProfileModule {
 };
-exports.AuthModule = AuthModule;
-exports.AuthModule = AuthModule = __decorate([
+exports.ProfileModule = ProfileModule;
+exports.ProfileModule = ProfileModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, refresh_token_entity_1.RefreshToken, profile_entity_1.Profile]),
+            typeorm_1.TypeOrmModule.forFeature([profile_entity_1.Profile]),
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],
                 useFactory: (configService) => ({
@@ -33,11 +30,9 @@ exports.AuthModule = AuthModule = __decorate([
                 }),
                 inject: [config_1.ConfigService],
             }),
-            mail_module_1.MailModule,
         ],
-        controllers: [auth_controller_1.AuthController],
-        providers: [auth_service_1.AuthService, jwt_guard_1.JwtGuard],
-        exports: [auth_service_1.AuthService],
+        controllers: [profile_controller_1.ProfileController],
+        providers: [profile_service_1.ProfileService, jwt_guard_1.JwtGuard],
     })
-], AuthModule);
-//# sourceMappingURL=auth.module.js.map
+], ProfileModule);
+//# sourceMappingURL=profile.module.js.map

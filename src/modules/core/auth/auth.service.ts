@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -8,6 +8,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from './entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { Profile } from '../profile/entities/profile.entity';
 import { MailService } from '../../../common/mail/mail.service';
 
 @Injectable()
@@ -17,9 +18,19 @@ export class AuthService {
         private readonly userRepository: Repository<User>,
         @InjectRepository(RefreshToken)
         private readonly refreshTokenRepository: Repository<RefreshToken>,
+        @InjectRepository(Profile)
+        private readonly profileRepository: Repository<Profile>,
         private readonly jwtService: JwtService,
         private readonly mailService: MailService,
     ) { }
+
+    private generateNickname(email: string): string {
+        const local = email.split('@')[0];
+        const stripped = local.replace(/[^a-zA-Z0-9]/g, '');
+        const truncated = stripped.slice(0, 20);
+        const digits = Math.floor(1000 + Math.random() * 9000).toString();
+        return truncated + digits;
+    }
 
     private hashEmail(email: string): string {
         const salt = process.env.EMAIL_SALT ?? '';
@@ -53,6 +64,18 @@ export class AuthService {
         });
 
         await this.userRepository.save(user);
+
+        const profile = this.profileRepository.create({
+            user_id: user.id,
+            nickname: this.generateNickname(dto.email),
+            birthdate: '1990-01-01',
+            is_published: false,
+            onboarding_completed: false,
+            updated_at: new Date(),
+        });
+        await this.profileRepository.save(profile);
+
+        await this.sendVerificationEmail(user.id, dto.email);
         return { message: 'Registrierung erfolgreich' };
     }
 
@@ -60,7 +83,7 @@ export class AuthService {
         const emailHash = this.hashEmail(dto.email);
 
         const user = await this.userRepository.findOne({
-            where: { email_search_hash: emailHash },
+            where: { email_search_hash: emailHash, deleted_at: IsNull() },
         });
 
         if (!user) throw new UnauthorizedException('Ungültige Zugangsdaten');
@@ -96,13 +119,24 @@ export class AuthService {
         if (!stored) throw new UnauthorizedException('Ungültiger Token');
         if (stored.expires_at < new Date()) throw new UnauthorizedException('Token abgelaufen');
 
-        const user = await this.userRepository.findOne({ where: { id: stored.user_id } });
+        const user = await this.userRepository.findOne({ where: { id: stored.user_id, deleted_at: IsNull() } });
         if (!user) throw new UnauthorizedException('User nicht gefunden');
+
+        await this.refreshTokenRepository.update({ token_hash: stored.token_hash }, { is_revoked: true });
+
+        const newRawToken = this.generateRefreshToken();
+        const newTokenHash = this.hashToken(newRawToken);
+        const newRefreshToken = this.refreshTokenRepository.create({
+            user_id: user.id,
+            token_hash: newTokenHash,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        });
+        await this.refreshTokenRepository.save(newRefreshToken);
 
         const payload = { sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
 
-        return { accessToken };
+        return { accessToken, refreshToken: newRawToken };
     }
 
     async logout(rawToken: string) {
@@ -133,7 +167,7 @@ export class AuthService {
         const tokenHash = this.hashToken(token);
 
         const user = await this.userRepository.findOne({
-            where: { email_verification_token: tokenHash },
+            where: { email_verification_token: tokenHash, deleted_at: IsNull() },
         });
 
         if (!user) throw new UnauthorizedException('Ungültiger Token');
@@ -154,7 +188,7 @@ export class AuthService {
     async forgotPassword(email: string) {
         const emailHash = this.hashEmail(email);
         const user = await this.userRepository.findOne({
-            where: { email_search_hash: emailHash },
+            where: { email_search_hash: emailHash, deleted_at: IsNull() },
         });
 
         if (!user) return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
@@ -175,7 +209,7 @@ export class AuthService {
         const tokenHash = this.hashToken(token);
 
         const user = await this.userRepository.findOne({
-            where: { password_reset_token: tokenHash },
+            where: { password_reset_token: tokenHash, deleted_at: IsNull() },
         });
 
         if (!user) throw new UnauthorizedException('Ungültiger Token');

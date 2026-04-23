@@ -13,8 +13,11 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
+const throttler_1 = require("@nestjs/throttler");
+const core_1 = require("@nestjs/core");
 const auth_module_1 = require("./modules/core/auth/auth.module");
 const mail_module_1 = require("./common/mail/mail.module");
+const profile_module_1 = require("./modules/core/profile/profile.module");
 const app_config_1 = __importDefault(require("./config/app.config"));
 const database_config_1 = __importDefault(require("./config/database.config"));
 let AppModule = class AppModule {
@@ -28,6 +31,7 @@ exports.AppModule = AppModule = __decorate([
                 load: [app_config_1.default, database_config_1.default],
                 envFilePath: '.env',
             }),
+            throttler_1.ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
             typeorm_1.TypeOrmModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 useFactory: (configService) => ({
@@ -45,6 +49,10 @@ exports.AppModule = AppModule = __decorate([
             }),
             auth_module_1.AuthModule,
             mail_module_1.MailModule,
+            profile_module_1.ProfileModule,
+        ],
+        providers: [
+            { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },
         ],
     })
 ], AppModule);
