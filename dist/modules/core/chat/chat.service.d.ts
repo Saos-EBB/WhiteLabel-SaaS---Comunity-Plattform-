@@ -19,6 +19,9 @@ export declare class ChatService {
         message: string;
     }>;
     getConversations(userId: string): Promise<Conversation[]>;
+    deleteConversation(userId: string, conversationId: string): Promise<{
+        message: string;
+    }>;
     getConversation(userId: string, conversationId: string): Promise<Conversation>;
     getMessages(userId: string, conversationId: string): Promise<{
         content: string | null;

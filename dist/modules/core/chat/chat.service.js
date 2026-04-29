@@ -101,11 +101,26 @@ let ChatService = class ChatService {
     async getConversations(userId) {
         return this.conversationRepository.find({
             where: [
-                { user_a_id: userId },
-                { user_b_id: userId },
+                { user_a_id: userId, deleted_at_a: (0, typeorm_2.IsNull)() },
+                { user_b_id: userId, deleted_at_b: (0, typeorm_2.IsNull)() },
             ],
             order: { created_at: 'DESC' },
         });
+    }
+    async deleteConversation(userId, conversationId) {
+        const conversation = await this.verifyConversationAccess(userId, conversationId);
+        const now = new Date();
+        if (conversation.user_a_id === userId) {
+            conversation.deleted_at_a = now;
+        }
+        else {
+            conversation.deleted_at_b = now;
+        }
+        if (conversation.deleted_at_a && conversation.deleted_at_b) {
+            conversation.purged_at = now;
+        }
+        await this.conversationRepository.save(conversation);
+        return { message: 'Konversation gelöscht' };
     }
     async getConversation(userId, conversationId) {
         const conversation = await this.conversationRepository.findOne({
@@ -124,6 +139,7 @@ let ChatService = class ChatService {
             where: { conversation_id: conversationId },
             order: { sent_at: 'ASC' },
         });
+        await this.messageRepository.update({ conversation_id: conversationId, sender_id: (0, typeorm_2.Not)(userId), read_at: (0, typeorm_2.IsNull)() }, { read_at: new Date() });
         return messages.map(msg => ({
             ...msg,
             content: msg.is_deleted ? null : msg.content,

@@ -69,6 +69,11 @@ was
         return this.chatService.sendMessage(req.user.sub, id, dto);
     }
 
+    @Delete('conversations/:id')
+    deleteConversation(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+        return this.chatService.deleteConversation(req.user.sub, id);
+    }
+
     @Delete('messages/:id')
     deleteMessage(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
         return this.chatService.deleteMessage(req.user.sub, id);

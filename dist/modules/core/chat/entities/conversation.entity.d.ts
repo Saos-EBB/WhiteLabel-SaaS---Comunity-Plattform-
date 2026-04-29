@@ -19,6 +19,7 @@ export declare class Conversation {
     video_enabled: boolean;
     last_message_at: Date | null;
     created_at: Date;
-    deleted_at: Date | null;
+    deleted_at_a: Date | null;
+    deleted_at_b: Date | null;
     purged_at: Date | null;
 }

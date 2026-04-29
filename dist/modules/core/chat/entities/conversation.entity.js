@@ -33,7 +33,8 @@ let Conversation = class Conversation {
     video_enabled;
     last_message_at;
     created_at;
-    deleted_at;
+    deleted_at_a;
+    deleted_at_b;
     purged_at;
 };
 exports.Conversation = Conversation;
@@ -95,7 +96,11 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
     __metadata("design:type", Object)
-], Conversation.prototype, "deleted_at", void 0);
+], Conversation.prototype, "deleted_at_a", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], Conversation.prototype, "deleted_at_b", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
     __metadata("design:type", Object)

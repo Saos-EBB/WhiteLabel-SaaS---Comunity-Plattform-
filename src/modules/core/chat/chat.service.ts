@@ -6,7 +6,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, Not } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { ContactRequest, ContactRequestStatus } from './entities/contact-request.entity';
 import { Conversation } from './entities/conversation.entity';
@@ -106,11 +106,29 @@ export class ChatService {
     async getConversations(userId: string) {
         return this.conversationRepository.find({
             where: [
-                { user_a_id: userId },
-                { user_b_id: userId },
+                { user_a_id: userId, deleted_at_a: IsNull() },
+                { user_b_id: userId, deleted_at_b: IsNull() },
             ],
             order: { created_at: 'DESC' },
         });
+    }
+
+    async deleteConversation(userId: string, conversationId: string) {
+        const conversation = await this.verifyConversationAccess(userId, conversationId);
+        const now = new Date();
+
+        if (conversation.user_a_id === userId) {
+            conversation.deleted_at_a = now;
+        } else {
+            conversation.deleted_at_b = now;
+        }
+
+        if (conversation.deleted_at_a && conversation.deleted_at_b) {
+            conversation.purged_at = now;
+        }
+
+        await this.conversationRepository.save(conversation);
+        return { message: 'Konversation gelöscht' };
     }
 
     async getConversation(userId: string, conversationId: string) {
@@ -132,6 +150,11 @@ export class ChatService {
             where: { conversation_id: conversationId },
             order: { sent_at: 'ASC' },
         });
+
+        await this.messageRepository.update(
+            { conversation_id: conversationId, sender_id: Not(userId), read_at: IsNull() },
+            { read_at: new Date() },
+        );
 
         return messages.map(msg => ({
             ...msg,

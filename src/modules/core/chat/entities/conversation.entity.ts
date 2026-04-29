@@ -53,7 +53,10 @@ export class Conversation {
     created_at!: Date;
 
     @Column({ type: 'timestamptz', nullable: true })
-    deleted_at!: Date | null;
+    deleted_at_a!: Date | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    deleted_at_b!: Date | null;
 
     @Column({ type: 'timestamptz', nullable: true })
     purged_at!: Date | null;

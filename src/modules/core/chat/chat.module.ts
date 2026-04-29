@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
+import { ChatGateway } from './chat.gateway';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { ContactRequest } from './entities/contact-request.entity';
 import { Conversation } from './entities/conversation.entity';
@@ -23,6 +24,6 @@ import { User } from '../auth/entities/user.entity';
         }),
     ],
     controllers: [ChatController],
-    providers: [ChatService, JwtGuard],
+    providers: [ChatService, JwtGuard, ChatGateway],
 })
 export class ChatModule { }

@@ -13,6 +13,7 @@ const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const chat_controller_1 = require("./chat.controller");
 const chat_service_1 = require("./chat.service");
+const chat_gateway_1 = require("./chat.gateway");
 const jwt_guard_1 = require("../../../common/guards/jwt.guard");
 const contact_request_entity_1 = require("./entities/contact-request.entity");
 const conversation_entity_1 = require("./entities/conversation.entity");
@@ -35,7 +36,7 @@ exports.ChatModule = ChatModule = __decorate([
             }),
         ],
         controllers: [chat_controller_1.ChatController],
-        providers: [chat_service_1.ChatService, jwt_guard_1.JwtGuard],
+        providers: [chat_service_1.ChatService, jwt_guard_1.JwtGuard, chat_gateway_1.ChatGateway],
     })
 ], ChatModule);
 //# sourceMappingURL=chat.module.js.map

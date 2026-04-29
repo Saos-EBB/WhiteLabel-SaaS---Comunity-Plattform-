@@ -51,6 +51,9 @@ let ChatController = class ChatController {
     sendMessage(req, id, dto) {
         return this.chatService.sendMessage(req.user.sub, id, dto);
     }
+    deleteConversation(req, id) {
+        return this.chatService.deleteConversation(req.user.sub, id);
+    }
     deleteMessage(req, id) {
         return this.chatService.deleteMessage(req.user.sub, id);
     }
@@ -126,6 +129,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, send_message_dto_1.SendMessageDto]),
     __metadata("design:returntype", void 0)
 ], ChatController.prototype, "sendMessage", null);
+__decorate([
+    (0, common_1.Delete)('conversations/:id'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], ChatController.prototype, "deleteConversation", null);
 __decorate([
     (0, common_1.Delete)('messages/:id'),
     __param(0, (0, common_1.Request)()),

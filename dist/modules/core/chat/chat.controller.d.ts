@@ -33,6 +33,9 @@ export declare class ChatController {
         sent_at: Date;
     }[]>;
     sendMessage(req: any, id: string, dto: SendMessageDto): Promise<import("./entities/message.entity").Message>;
+    deleteConversation(req: any, id: string): Promise<{
+        message: string;
+    }>;
     deleteMessage(req: any, id: string): Promise<{
         message: string;
     }>;
