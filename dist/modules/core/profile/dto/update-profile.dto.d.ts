@@ -7,4 +7,5 @@ export declare class UpdateProfileDto {
     font_size?: FontSizeOption;
     high_contrast?: boolean;
     search_radius_km?: number;
+    birthdate?: string;
 }

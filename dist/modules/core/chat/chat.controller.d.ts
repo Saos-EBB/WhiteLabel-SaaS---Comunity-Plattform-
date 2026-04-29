@@ -5,6 +5,7 @@ export declare class ChatController {
     private readonly chatService;
     constructor(chatService: ChatService);
     sendContactRequest(req: any, dto: SendContactRequestDto): Promise<import("./entities/contact-request.entity").ContactRequest>;
+    was: any;
     getIncomingRequests(req: any): Promise<import("./entities/contact-request.entity").ContactRequest[]>;
     getOutgoingRequests(req: any): Promise<import("./entities/contact-request.entity").ContactRequest[]>;
     acceptRequest(req: any, id: string): Promise<import("./entities/conversation.entity").Conversation>;

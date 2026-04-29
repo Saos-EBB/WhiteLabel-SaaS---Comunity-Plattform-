@@ -1,5 +1,6 @@
 import {
     IsBoolean,
+    IsDateString,
     IsEnum,
     IsInt,
     IsOptional,
@@ -49,4 +50,8 @@ export class UpdateProfileDto {
     @Min(1)
     @Max(500)
     search_radius_km?: number;
+
+    @IsOptional()
+    @IsDateString()
+    birthdate?: string;
 }

@@ -26,6 +26,7 @@ let ChatController = class ChatController {
     sendContactRequest(req, dto) {
         return this.chatService.sendContactRequest(req.user.sub, dto);
     }
+    was;
     getIncomingRequests(req) {
         return this.chatService.getIncomingRequests(req.user.sub);
     }

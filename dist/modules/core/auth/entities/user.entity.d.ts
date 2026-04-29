@@ -8,6 +8,7 @@ export declare class User {
     is_banned: boolean;
     vulnerable_flag: boolean;
     created_at: Date;
+    last_login: Date | null;
     deleted_at: Date | null;
     pseudonymized_at: Date | null;
     email_verified_at: Date | null;
@@ -15,4 +16,5 @@ export declare class User {
     email_verification_expires_at: Date | null;
     password_reset_token: string | null;
     password_reset_expires_at: Date | null;
+    email: Buffer | null;
 }

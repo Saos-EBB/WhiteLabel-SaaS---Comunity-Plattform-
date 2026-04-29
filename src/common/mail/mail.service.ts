@@ -9,7 +9,8 @@ export class MailService {
         const link = `${process.env.APP_URL}/auth/verify?token=${token}`;
 
         await this.resend.emails.send({
-            from: 'noreply@paarship.at',
+            from: 'onboarding@resend.dev',
+            // TODO: if managed account, use contact_email_encrypted from managed_accounts instead
             to,
             subject: 'Email bestätigen – Paarship',
             html: `
@@ -25,7 +26,8 @@ export class MailService {
         const link = `${process.env.APP_URL}/auth/reset-password?token=${token}`;
 
         await this.resend.emails.send({
-            from: 'noreply@paarship.at',
+            from: 'onboarding@resend.dev',
+            // TODO: if managed account, use contact_email_encrypted from managed_accounts instead
             to,
             subject: 'Passwort zurücksetzen – Paarship',
             html: `

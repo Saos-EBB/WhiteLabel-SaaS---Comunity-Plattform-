@@ -33,4 +33,9 @@ export declare class AuthController {
     resetPassword(dto: ResetPasswordDto): Promise<{
         message: string;
     }>;
+    devDeleteUser(body: {
+        email: string;
+    }): Promise<{
+        message: string;
+    }>;
 }

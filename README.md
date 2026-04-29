@@ -21,6 +21,27 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+## Changelog
+
+### 2026-04-29
+
+**Profile module — major expansion**
+- New entities: `Interest`, `UserInterest`, `AgbVersion`, `ConsentLog`, `ProfileSensitiveData`, `Block`
+- Interests system: `GET /profile/interests`, `GET /profile/me/interests`, `POST /profile/me/interests/:interestId`, `DELETE /profile/me/interests/:interestId`
+- Profile search: `GET /profile/search?city=&interests=` — filters by city/interests, excludes banned/deleted users and both directions of blocks
+- Profile publish: `PATCH /profile/me/publish` — only allowed after onboarding is complete
+- Sensitive data consent: `POST /profile/me/consent/sensitive-data` — records AGB consent with hashed IP
+- Sensitive data submission: `POST /profile/me/sensitive-data` — disability type stored AES-256-CBC encrypted
+- Block/unblock: `POST /profile/me/block/:userId`, `DELETE /profile/me/block/:userId`
+
+**Admin module (new)**
+- `PATCH /admin/users/:id/vulnerable-flag` — admin-only, sets the `vulnerable_flag` on a user
+
+**Auth module**
+- `GET /auth/me` — returns the current JWT user payload
+
+---
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.

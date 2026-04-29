@@ -86,6 +86,20 @@ let AuthService = class AuthService {
     hashToken(token) {
         return crypto.createHash('sha256').update(token).digest('hex');
     }
+    encryptEmail(email) {
+        const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
+        const iv = crypto.randomBytes(16);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+        const encrypted = Buffer.concat([cipher.update(email, 'utf8'), cipher.final()]);
+        return Buffer.concat([iv, encrypted]);
+    }
+    decryptEmail(data) {
+        const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
+        const iv = data.subarray(0, 16);
+        const encrypted = data.subarray(16);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+    }
     generateRefreshToken() {
         return crypto.randomBytes(64).toString('hex');
     }
@@ -100,6 +114,7 @@ let AuthService = class AuthService {
         const user = this.userRepository.create({
             email_search_hash: emailHash,
             password_hash: passwordHash,
+            email: this.encryptEmail(dto.email),
         });
         await this.userRepository.save(user);
         const profile = this.profileRepository.create({
@@ -111,7 +126,7 @@ let AuthService = class AuthService {
             updated_at: new Date(),
         });
         await this.profileRepository.save(profile);
-        await this.sendVerificationEmail(user.id, dto.email);
+        await this.sendVerificationEmail(user.id);
         return { message: 'Registrierung erfolgreich' };
     }
     async login(dto) {
@@ -124,6 +139,8 @@ let AuthService = class AuthService {
         const passwordValid = await bcrypt.compare(dto.password, user.password_hash ?? '');
         if (!passwordValid)
             throw new common_1.UnauthorizedException('Ungültige Zugangsdaten');
+        if (user.is_banned)
+            throw new common_1.ForbiddenException('Account is banned');
         const payload = { sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
         const rawRefreshToken = this.generateRefreshToken();
@@ -133,6 +150,8 @@ let AuthService = class AuthService {
             token_hash: tokenHash,
             expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
+        user.last_login = new Date();
+        await this.userRepository.save(user);
         await this.refreshTokenRepository.save(refreshToken);
         return { accessToken, refreshToken: rawRefreshToken };
     }
@@ -166,9 +185,13 @@ let AuthService = class AuthService {
         await this.refreshTokenRepository.update({ token_hash: tokenHash }, { is_revoked: true });
         return { message: 'Erfolgreich ausgeloggt' };
     }
-    async sendVerificationEmail(userId, email) {
+    async sendVerificationEmail(userId) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        const email = this.decryptEmail(user.email);
         const token = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.hashToken(token);
+        const verificationLink = `${process.env.APP_URL}/auth/verify?token=${token}`;
+        console.log('[sendVerificationEmail] to:', email, '| link:', verificationLink);
         await this.userRepository.update(userId, {
             email_verification_token: tokenHash,
             email_verification_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -179,53 +202,69 @@ let AuthService = class AuthService {
     async verifyEmail(token) {
         const tokenHash = this.hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { email_verification_token: tokenHash, deleted_at: (0, typeorm_2.IsNull)() },
+            where: {
+                email_verification_token: tokenHash,
+                email_verification_expires_at: (0, typeorm_2.MoreThan)(new Date()),
+                email_verified_at: (0, typeorm_2.IsNull)(),
+            },
         });
         if (!user)
-            throw new common_1.UnauthorizedException('Ungültiger Token');
-        if (user.email_verification_expires_at < new Date()) {
-            throw new common_1.UnauthorizedException('Token abgelaufen');
-        }
-        await this.userRepository.update(user.id, {
-            is_verified: true,
-            email_verified_at: new Date(),
-            email_verification_token: null,
-            email_verification_expires_at: null,
-        });
+            throw new common_1.NotFoundException('Token ungültig oder abgelaufen');
+        user.email_verified_at = new Date();
+        user.email_verification_token = null;
+        user.email_verification_expires_at = null;
+        user.is_verified = true;
+        await this.userRepository.save(user);
         return { message: 'Email erfolgreich bestätigt' };
     }
     async forgotPassword(email) {
+        console.log('[forgotPassword] emailHash:', this.hashEmail(email));
         const emailHash = this.hashEmail(email);
         const user = await this.userRepository.findOne({
             where: { email_search_hash: emailHash, deleted_at: (0, typeorm_2.IsNull)() },
         });
         if (!user)
-            return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
+            return { message: 'Falls die Email existiert, wurde eine Mail gesendet' };
+        console.log('[forgotPassword] User found:', user.id);
         const token = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.hashToken(token);
+        console.log('[forgotPassword] Token generated:', token);
         await this.userRepository.update(user.id, {
             password_reset_token: tokenHash,
             password_reset_expires_at: new Date(Date.now() + 60 * 60 * 1000),
         });
-        await this.mailService.sendPasswordResetEmail(email, token);
-        return { message: 'Falls die Email existiert, wurde eine Email gesendet' };
+        const contactEmail = this.decryptEmail(user.email);
+        console.log('[forgotPassword] Sending to:', contactEmail);
+        try {
+            await this.mailService.sendPasswordResetEmail(contactEmail, token);
+        }
+        catch (err) {
+            console.log('[forgotPassword] Failed to send password reset email:', err);
+        }
+        console.log('[forgotPassword] Done');
+        return { message: 'Falls die Email existiert, wurde eine Mail gesendet' };
+    }
+    async devDeleteUser(email) {
+        const emailHash = this.hashEmail(email);
+        const user = await this.userRepository.findOne({ where: { email_search_hash: emailHash } });
+        if (user)
+            await this.userRepository.remove(user);
+        return { message: 'User deleted' };
     }
     async resetPassword(token, newPassword) {
         const tokenHash = this.hashToken(token);
         const user = await this.userRepository.findOne({
-            where: { password_reset_token: tokenHash, deleted_at: (0, typeorm_2.IsNull)() },
+            where: {
+                password_reset_token: tokenHash,
+                password_reset_expires_at: (0, typeorm_2.MoreThan)(new Date()),
+            },
         });
         if (!user)
-            throw new common_1.UnauthorizedException('Ungültiger Token');
-        if (user.password_reset_expires_at < new Date()) {
-            throw new common_1.UnauthorizedException('Token abgelaufen');
-        }
-        const passwordHash = await bcrypt.hash(newPassword, 12);
-        await this.userRepository.update(user.id, {
-            password_hash: passwordHash,
-            password_reset_token: null,
-            password_reset_expires_at: null,
-        });
+            throw new common_1.NotFoundException('Token ungültig oder abgelaufen');
+        user.password_hash = await bcrypt.hash(newPassword, 12);
+        user.password_reset_token = null;
+        user.password_reset_expires_at = null;
+        await this.userRepository.save(user);
         return { message: 'Passwort erfolgreich geändert' };
     }
 };

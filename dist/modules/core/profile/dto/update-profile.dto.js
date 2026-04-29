@@ -20,6 +20,7 @@ class UpdateProfileDto {
     font_size;
     high_contrast;
     search_radius_km;
+    birthdate;
 }
 exports.UpdateProfileDto = UpdateProfileDto;
 __decorate([
@@ -66,4 +67,9 @@ __decorate([
     (0, class_validator_1.Max)(500),
     __metadata("design:type", Number)
 ], UpdateProfileDto.prototype, "search_radius_km", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], UpdateProfileDto.prototype, "birthdate", void 0);
 //# sourceMappingURL=update-profile.dto.js.map

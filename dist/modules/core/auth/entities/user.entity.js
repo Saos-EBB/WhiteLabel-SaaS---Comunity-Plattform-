@@ -21,6 +21,7 @@ let User = class User {
     is_banned;
     vulnerable_flag;
     created_at;
+    last_login;
     deleted_at;
     pseudonymized_at;
     email_verified_at;
@@ -28,6 +29,7 @@ let User = class User {
     email_verification_expires_at;
     password_reset_token;
     password_reset_expires_at;
+    email;
 };
 exports.User = User;
 __decorate([
@@ -69,6 +71,10 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
     __metadata("design:type", Object)
+], User.prototype, "last_login", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
 ], User.prototype, "deleted_at", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
@@ -94,6 +100,10 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
     __metadata("design:type", Object)
 ], User.prototype, "password_reset_expires_at", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'bytea', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "email", void 0);
 exports.User = User = __decorate([
     (0, typeorm_1.Entity)('users')
 ], User);

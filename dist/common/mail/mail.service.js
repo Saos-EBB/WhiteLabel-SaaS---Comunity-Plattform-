@@ -14,7 +14,7 @@ let MailService = class MailService {
     async sendVerificationEmail(to, token) {
         const link = `${process.env.APP_URL}/auth/verify?token=${token}`;
         await this.resend.emails.send({
-            from: 'noreply@paarship.at',
+            from: 'onboarding@resend.dev',
             to,
             subject: 'Email bestätigen – Paarship',
             html: `
@@ -28,7 +28,7 @@ let MailService = class MailService {
     async sendPasswordResetEmail(to, token) {
         const link = `${process.env.APP_URL}/auth/reset-password?token=${token}`;
         await this.resend.emails.send({
-            from: 'noreply@paarship.at',
+            from: 'onboarding@resend.dev',
             to,
             subject: 'Passwort zurücksetzen – Paarship',
             html: `

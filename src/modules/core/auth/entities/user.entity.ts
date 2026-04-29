@@ -30,6 +30,9 @@ export class User {
     created_at!: Date;
 
     @Column({ type: 'timestamptz', nullable: true })
+    last_login!: Date | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
     deleted_at!: Date | null;
 
     @Column({ type: 'timestamptz', nullable: true })
@@ -49,5 +52,8 @@ export class User {
 
     @Column({ type: 'timestamptz', nullable: true })
     password_reset_expires_at!: Date | null;
+
+    @Column({ type: 'bytea', nullable: true })
+    email!: Buffer | null;
 
 }

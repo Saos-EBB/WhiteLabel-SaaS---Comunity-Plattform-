@@ -16,6 +16,8 @@ export declare class AuthService {
     private generateNickname;
     private hashEmail;
     private hashToken;
+    private encryptEmail;
+    private decryptEmail;
     private generateRefreshToken;
     register(dto: RegisterDto): Promise<{
         message: string;
@@ -31,13 +33,16 @@ export declare class AuthService {
     logout(rawToken: string): Promise<{
         message: string;
     }>;
-    sendVerificationEmail(userId: string, email: string): Promise<{
+    sendVerificationEmail(userId: string): Promise<{
         message: string;
     }>;
     verifyEmail(token: string): Promise<{
         message: string;
     }>;
     forgotPassword(email: string): Promise<{
+        message: string;
+    }>;
+    devDeleteUser(email: string): Promise<{
         message: string;
     }>;
     resetPassword(token: string, newPassword: string): Promise<{

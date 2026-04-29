@@ -10,6 +10,7 @@ import { ChatModule } from './modules/core/chat/chat.module';
 import { NotificationsModule } from './modules/core/notifications/notifications.module';
 import { ModerationModule } from './modules/core/moderation/moderation.module';
 import { PaymentModule } from './modules/core/payment/payment.module';
+import { AdminModule } from './modules/core/admin/admin.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -45,6 +46,7 @@ import databaseConfig from './config/database.config';
     NotificationsModule,
     ModerationModule,
     PaymentModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

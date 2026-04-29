@@ -22,6 +22,7 @@ const chat_module_1 = require("./modules/core/chat/chat.module");
 const notifications_module_1 = require("./modules/core/notifications/notifications.module");
 const moderation_module_1 = require("./modules/core/moderation/moderation.module");
 const payment_module_1 = require("./modules/core/payment/payment.module");
+const admin_module_1 = require("./modules/core/admin/admin.module");
 const app_config_1 = __importDefault(require("./config/app.config"));
 const database_config_1 = __importDefault(require("./config/database.config"));
 let AppModule = class AppModule {
@@ -58,6 +59,7 @@ exports.AppModule = AppModule = __decorate([
             notifications_module_1.NotificationsModule,
             moderation_module_1.ModerationModule,
             payment_module_1.PaymentModule,
+            admin_module_1.AdminModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },

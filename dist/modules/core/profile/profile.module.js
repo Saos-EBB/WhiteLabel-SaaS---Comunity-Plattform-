@@ -12,6 +12,13 @@ const typeorm_1 = require("@nestjs/typeorm");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const profile_entity_1 = require("./entities/profile.entity");
+const user_entity_1 = require("../auth/entities/user.entity");
+const interest_entity_1 = require("./entities/interest.entity");
+const user_interest_entity_1 = require("./entities/user-interest.entity");
+const agb_version_entity_1 = require("./entities/agb-version.entity");
+const consent_log_entity_1 = require("./entities/consent-log.entity");
+const profile_sensitive_data_entity_1 = require("./entities/profile-sensitive-data.entity");
+const block_entity_1 = require("./entities/block.entity");
 const profile_service_1 = require("./profile.service");
 const profile_controller_1 = require("./profile.controller");
 const jwt_guard_1 = require("../../../common/guards/jwt.guard");
@@ -21,7 +28,7 @@ exports.ProfileModule = ProfileModule;
 exports.ProfileModule = ProfileModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([profile_entity_1.Profile]),
+            typeorm_1.TypeOrmModule.forFeature([profile_entity_1.Profile, user_entity_1.User, interest_entity_1.Interest, user_interest_entity_1.UserInterest, agb_version_entity_1.AgbVersion, consent_log_entity_1.ConsentLog, profile_sensitive_data_entity_1.ProfileSensitiveData, block_entity_1.Block]),
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],
                 useFactory: (configService) => ({

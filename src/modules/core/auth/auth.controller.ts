@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query, HttpCode, HttpStatus, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -63,6 +63,12 @@ export class AuthController {
         return this.authService.resetPassword(dto.token, dto.password);
     }
 
+    // @dev-only — must never exist in production
+    @Delete('dev/delete-user')
+    @HttpCode(HttpStatus.OK)
+    async devDeleteUser(@Body() body: { email: string }) {
+        return this.authService.devDeleteUser(body.email);
+    }
 
 
 }
