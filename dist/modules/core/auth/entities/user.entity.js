@@ -19,6 +19,8 @@ let User = class User {
     role;
     is_verified;
     is_banned;
+    ban_reason;
+    ban_expires_at;
     vulnerable_flag;
     created_at;
     last_login;
@@ -60,6 +62,14 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'boolean', default: false }),
     __metadata("design:type", Boolean)
 ], User.prototype, "is_banned", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "ban_reason", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "ban_expires_at", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'boolean', default: false }),
     __metadata("design:type", Boolean)

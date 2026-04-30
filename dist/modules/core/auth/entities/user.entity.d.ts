@@ -6,6 +6,8 @@ export declare class User {
     role: string;
     is_verified: boolean;
     is_banned: boolean;
+    ban_reason: string | null;
+    ban_expires_at: Date | null;
     vulnerable_flag: boolean;
     created_at: Date;
     last_login: Date | null;

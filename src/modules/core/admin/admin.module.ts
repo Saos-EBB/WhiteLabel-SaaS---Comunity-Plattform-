@@ -6,6 +6,8 @@ import { User } from '../auth/entities/user.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { PseudonymizationTask } from './tasks/pseudonymization.task';
 
 @Module({
     imports: [
@@ -20,6 +22,6 @@ import { JwtGuard } from '../../../common/guards/jwt.guard';
         }),
     ],
     controllers: [AdminController],
-    providers: [AdminService, JwtGuard],
+    providers: [AdminService, JwtGuard, RolesGuard, PseudonymizationTask],
 })
 export class AdminModule {}

@@ -18,12 +18,16 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const report_entity_1 = require("./entities/report.entity");
 const strike_entity_1 = require("./entities/strike.entity");
+const user_entity_1 = require("../auth/entities/user.entity");
+const create_strike_dto_1 = require("./dto/create-strike.dto");
 let ModerationService = class ModerationService {
     reportRepository;
     strikeRepository;
-    constructor(reportRepository, strikeRepository) {
+    userRepository;
+    constructor(reportRepository, strikeRepository, userRepository) {
         this.reportRepository = reportRepository;
         this.strikeRepository = strikeRepository;
+        this.userRepository = userRepository;
     }
     async createReport(reporterId, dto) {
         if (reporterId === dto.reported_user_id) {
@@ -62,13 +66,57 @@ let ModerationService = class ModerationService {
             order: { created_at: 'DESC' },
         });
     }
+    async createStrike(adminId, dto) {
+        const user = await this.userRepository.findOne({ where: { id: dto.user_id } });
+        if (!user)
+            throw new common_1.NotFoundException('Benutzer nicht gefunden');
+        const report = await this.reportRepository.findOne({ where: { id: dto.report_id } });
+        if (!report)
+            throw new common_1.NotFoundException('Meldung nicht gefunden');
+        if (dto.type === create_strike_dto_1.StrikeType.TEMP && !dto.expires_at) {
+            throw new common_1.BadRequestException('expires_at ist erforderlich bei temporärem Strike');
+        }
+        if (dto.type === create_strike_dto_1.StrikeType.PERMANENT && dto.expires_at) {
+            throw new common_1.BadRequestException('expires_at darf nicht gesetzt sein bei permanentem Strike');
+        }
+        const strike = this.strikeRepository.create({
+            user_id: dto.user_id,
+            report_id: dto.report_id,
+            issued_by: adminId,
+            type: dto.type,
+            reason: dto.reason,
+            expires_at: dto.expires_at ?? null,
+        });
+        await this.strikeRepository.save(strike);
+        if (dto.type === create_strike_dto_1.StrikeType.TEMP || dto.type === create_strike_dto_1.StrikeType.PERMANENT) {
+            user.is_banned = true;
+            user.ban_reason = dto.reason;
+            user.ban_expires_at = dto.expires_at ?? null;
+            await this.userRepository.save(user);
+        }
+        return strike;
+    }
+    async reviewReport(adminId, reportId, dto) {
+        const report = await this.reportRepository.findOne({ where: { id: reportId } });
+        if (!report)
+            throw new common_1.NotFoundException('Meldung nicht gefunden');
+        if (report.status === 'closed')
+            throw new common_1.ForbiddenException('Meldung ist bereits geschlossen');
+        report.status = dto.status;
+        report.intent_category = dto.intent_category ?? null;
+        report.reviewed_by = adminId;
+        report.reviewed_at = new Date();
+        return this.reportRepository.save(report);
+    }
 };
 exports.ModerationService = ModerationService;
 exports.ModerationService = ModerationService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(report_entity_1.Report)),
     __param(1, (0, typeorm_1.InjectRepository)(strike_entity_1.Strike)),
+    __param(2, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository])
 ], ModerationService);
 //# sourceMappingURL=moderation.service.js.map

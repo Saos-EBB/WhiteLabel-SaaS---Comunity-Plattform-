@@ -15,6 +15,8 @@ const user_entity_1 = require("../auth/entities/user.entity");
 const admin_service_1 = require("./admin.service");
 const admin_controller_1 = require("./admin.controller");
 const jwt_guard_1 = require("../../../common/guards/jwt.guard");
+const roles_guard_1 = require("../../../common/guards/roles.guard");
+const pseudonymization_task_1 = require("./tasks/pseudonymization.task");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
@@ -32,7 +34,7 @@ exports.AdminModule = AdminModule = __decorate([
             }),
         ],
         controllers: [admin_controller_1.AdminController],
-        providers: [admin_service_1.AdminService, jwt_guard_1.JwtGuard],
+        providers: [admin_service_1.AdminService, jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard, pseudonymization_task_1.PseudonymizationTask],
     })
 ], AdminModule);
 //# sourceMappingURL=admin.module.js.map

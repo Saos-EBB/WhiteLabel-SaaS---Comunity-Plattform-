@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request, NotFoundException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
 import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -66,7 +68,10 @@ export class AuthController {
     // @dev-only — must never exist in production
     @Delete('dev/delete-user')
     @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtGuard, RolesGuard)
+    @Roles('admin')
     async devDeleteUser(@Body() body: { email: string }) {
+        if (process.env.NODE_ENV !== 'development') throw new NotFoundException();
         return this.authService.devDeleteUser(body.email);
     }
 

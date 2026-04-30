@@ -108,7 +108,17 @@ export class AuthService {
         const passwordValid = await bcrypt.compare(dto.password, user.password_hash ?? '');
         if (!passwordValid) throw new UnauthorizedException('Ungültige Zugangsdaten');
 
-        if (user.is_banned) throw new ForbiddenException('Account is banned');
+        if (user.is_banned) {
+            if (user.ban_expires_at && user.ban_expires_at < new Date()) {
+                user.is_banned = false;
+                user.ban_reason = null;
+                user.ban_expires_at = null;
+                await this.userRepository.save(user);
+            } else {
+                const suffix = user.ban_expires_at ? ` bis ${user.ban_expires_at.toISOString()}` : '';
+                throw new ForbiddenException(`Ihr Account ist gesperrt${suffix}`);
+            }
+        }
 
         const payload = { sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
@@ -179,9 +189,6 @@ export class AuthService {
         const token = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.hashToken(token);
 
-        const verificationLink = `${process.env.APP_URL}/auth/verify?token=${token}`;
-        console.log('[sendVerificationEmail] to:', email, '| link:', verificationLink);
-
         await this.userRepository.update(userId, {
             email_verification_token: tokenHash,
             email_verification_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -214,7 +221,6 @@ export class AuthService {
     }
 
     async forgotPassword(email: string) {
-        console.log('[forgotPassword] emailHash:', this.hashEmail(email));
         const emailHash = this.hashEmail(email);
         const user = await this.userRepository.findOne({
             where: { email_search_hash: emailHash, deleted_at: IsNull() },
@@ -222,12 +228,8 @@ export class AuthService {
 
         if (!user) return { message: 'Falls die Email existiert, wurde eine Mail gesendet' };
 
-        console.log('[forgotPassword] User found:', user.id);
-
         const token = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.hashToken(token);
-
-        console.log('[forgotPassword] Token generated:', token);
 
         await this.userRepository.update(user.id, {
             password_reset_token: tokenHash,
@@ -235,13 +237,10 @@ export class AuthService {
         });
 
         const contactEmail = this.decryptEmail(user.email!);
-        console.log('[forgotPassword] Sending to:', contactEmail);
         try {
             await this.mailService.sendPasswordResetEmail(contactEmail, token);
-        } catch (err) {
-            console.log('[forgotPassword] Failed to send password reset email:', err);
+        } catch {
         }
-        console.log('[forgotPassword] Done');
         return { message: 'Falls die Email existiert, wurde eine Mail gesendet' };
     }
 

@@ -16,7 +16,11 @@ exports.ModerationController = void 0;
 const common_1 = require("@nestjs/common");
 const moderation_service_1 = require("./moderation.service");
 const jwt_guard_1 = require("../../../common/guards/jwt.guard");
+const roles_guard_1 = require("../../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../../common/decorators/roles.decorator");
 const create_report_dto_1 = require("./dto/create-report.dto");
+const create_review_dto_1 = require("./dto/create-review.dto");
+const create_strike_dto_1 = require("./dto/create-strike.dto");
 let ModerationController = class ModerationController {
     moderationService;
     constructor(moderationService) {
@@ -31,8 +35,14 @@ let ModerationController = class ModerationController {
     getReport(req, id) {
         return this.moderationService.getReport(req.user.sub, id);
     }
+    createStrike(req, dto) {
+        return this.moderationService.createStrike(req.user.sub, dto);
+    }
     getStrikes(req) {
         return this.moderationService.getStrikes(req.user.sub);
+    }
+    reviewReport(req, id, dto) {
+        return this.moderationService.reviewReport(req.user.sub, id, dto);
     }
 };
 exports.ModerationController = ModerationController;
@@ -46,6 +56,8 @@ __decorate([
 ], ModerationController.prototype, "createReport", null);
 __decorate([
     (0, common_1.Get)('reports'),
+    (0, common_1.UseGuards)(jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -53,6 +65,8 @@ __decorate([
 ], ModerationController.prototype, "getReports", null);
 __decorate([
     (0, common_1.Get)('reports/:id'),
+    (0, common_1.UseGuards)(jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
     __param(0, (0, common_1.Request)()),
     __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __metadata("design:type", Function),
@@ -60,12 +74,35 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ModerationController.prototype, "getReport", null);
 __decorate([
+    (0, common_1.Post)('strikes'),
+    (0, common_1.UseGuards)(jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, create_strike_dto_1.CreateStrikeDto]),
+    __metadata("design:returntype", void 0)
+], ModerationController.prototype, "createStrike", null);
+__decorate([
     (0, common_1.Get)('strikes'),
+    (0, common_1.UseGuards)(jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], ModerationController.prototype, "getStrikes", null);
+__decorate([
+    (0, common_1.Patch)('reports/:id/review'),
+    (0, common_1.UseGuards)(jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, create_review_dto_1.CreateReviewDto]),
+    __metadata("design:returntype", void 0)
+], ModerationController.prototype, "reviewReport", null);
 exports.ModerationController = ModerationController = __decorate([
     (0, common_1.Controller)('moderation'),
     (0, common_1.UseGuards)(jwt_guard_1.JwtGuard),

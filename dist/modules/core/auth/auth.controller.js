@@ -19,6 +19,8 @@ const auth_service_1 = require("./auth.service");
 const register_dto_1 = require("./dto/register.dto");
 const login_dto_1 = require("./dto/login.dto");
 const jwt_guard_1 = require("../../../common/guards/jwt.guard");
+const roles_guard_1 = require("../../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../../common/decorators/roles.decorator");
 const refresh_dto_1 = require("./dto/refresh.dto");
 const forgot_password_dto_1 = require("./dto/forgot-password.dto");
 const reset_password_dto_1 = require("./dto/reset-password.dto");
@@ -52,6 +54,8 @@ let AuthController = class AuthController {
         return this.authService.resetPassword(dto.token, dto.password);
     }
     async devDeleteUser(body) {
+        if (process.env.NODE_ENV !== 'development')
+            throw new common_1.NotFoundException();
         return this.authService.devDeleteUser(body.email);
     }
 };
@@ -124,6 +128,8 @@ __decorate([
 __decorate([
     (0, common_1.Delete)('dev/delete-user'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, common_1.UseGuards)(jwt_guard_1.JwtGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

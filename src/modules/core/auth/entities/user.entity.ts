@@ -23,6 +23,12 @@ export class User {
     @Column({ type: 'boolean', default: false })
     is_banned!: boolean;
 
+    @Column({ type: 'text', nullable: true })
+    ban_reason!: string | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    ban_expires_at!: Date | null;
+
     @Column({ type: 'boolean', default: false })
     vulnerable_flag!: boolean;
 
