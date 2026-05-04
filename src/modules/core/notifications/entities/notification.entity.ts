@@ -1,5 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 
+export type NotificationType = 'message' | 'match' | 'system' | 'ban' | 'request';
+
 @Entity('notifications')
 export class Notification {
     @PrimaryGeneratedColumn('uuid')

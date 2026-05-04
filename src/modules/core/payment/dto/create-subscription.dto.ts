@@ -1,13 +1,9 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum } from 'class-validator';
 
 export class CreateSubscriptionDto {
     @IsEnum(['monthly', 'yearly', 'lifetime'])
-    plan!: string;
+    plan!: 'monthly' | 'yearly' | 'lifetime';
 
-    @IsEnum(['paypal', 'sepa'])
-    payment_provider!: string;
-
-    @IsOptional()
-    @IsString()
-    provider_subscription_id?: string;
+    @IsEnum(['card', 'sepa_debit'])
+    payment_method!: 'card' | 'sepa_debit';
 }

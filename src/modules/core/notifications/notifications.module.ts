@@ -22,5 +22,6 @@ import { NotificationSettings } from './entities/notification-settings.entity';
     ],
     controllers: [NotificationsController],
     providers: [NotificationsService, JwtGuard],
+    exports: [NotificationsService],
 })
 export class NotificationsModule { }

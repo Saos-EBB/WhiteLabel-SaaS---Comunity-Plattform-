@@ -1,9 +1,19 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan, Between } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
+import Stripe from 'stripe';
 import { Subscription } from './entities/subscription.entity';
 import { PaymentLog } from './entities/payment-log.entity';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { StripeService } from './stripe.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const PRICE_IDS: Record<string, string> = {
+    monthly: 'price_1TRsRsCOHQFsQZnIt9XUXTFZ',
+    yearly: 'price_1TRsTFCOHQFsQZnI8DiA91Y4',
+    lifetime: 'price_1TRsTfCOHQFsQZnIqxccF4AY',
+};
 
 @Injectable()
 export class PaymentService {
@@ -12,6 +22,8 @@ export class PaymentService {
         private readonly subscriptionRepository: Repository<Subscription>,
         @InjectRepository(PaymentLog)
         private readonly paymentLogRepository: Repository<PaymentLog>,
+        private readonly stripeService: StripeService,
+        private readonly notificationsService: NotificationsService,
     ) { }
 
     async getActiveSubscription(userId: string) {
@@ -21,16 +33,16 @@ export class PaymentService {
     }
 
     async createSubscription(userId: string, dto: CreateSubscriptionDto) {
-        const subscription = this.subscriptionRepository.create({
-            user_id: userId,
-            plan: dto.plan,
-            status: 'active',
-            payment_provider: dto.payment_provider,
-            provider_subscription_id: dto.provider_subscription_id ?? null,
-            started_at: new Date(),
+        const session = await this.stripeService.stripe.checkout.sessions.create({
+            mode: dto.plan === 'lifetime' ? 'payment' : 'subscription',
+            payment_method_types: [dto.payment_method],
+            line_items: [{ price: PRICE_IDS[dto.plan], quantity: 1 }],
+            metadata: { userId, plan: dto.plan },
+            success_url: process.env.STRIPE_SUCCESS_URL ?? 'http://localhost:3000/payment/success',
+            cancel_url: process.env.STRIPE_CANCEL_URL ?? 'http://localhost:3000/payment/cancel',
         });
 
-        return this.subscriptionRepository.save(subscription);
+        return { url: session.url };
     }
 
     async cancelSubscription(userId: string, subscriptionId: string) {
@@ -52,5 +64,117 @@ export class PaymentService {
             where: { user_id: userId },
             order: { created_at: 'DESC' },
         });
+    }
+
+    async handleWebhook(sig: string, rawBody: Buffer) {
+        let event: any;
+
+        try {
+            event = this.stripeService.stripe.webhooks.constructEvent(
+                rawBody,
+                sig,
+                process.env.STRIPE_WEBHOOK_SECRET ?? '',
+            );
+        } catch (err: any) {
+            throw new BadRequestException(`Webhook-Fehler: ${err.message}`);
+        }
+
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object as any;
+                const userId = session.metadata?.userId;
+                const plan = session.metadata?.plan;
+
+                if (!userId || !plan) break;
+
+                const subscription = this.subscriptionRepository.create({
+                    user_id: userId,
+                    plan,
+                    status: 'active',
+                    payment_provider: 'stripe',
+                    provider_subscription_id: (session.subscription as string) ?? null,
+                    started_at: new Date(),
+                });
+                const savedSub = await this.subscriptionRepository.save(subscription);
+
+                const paymentLog = this.paymentLogRepository.create({
+                    user_id: userId,
+                    subscription_id: savedSub.id,
+                    amount: (session.amount_total ?? 0) / 100,
+                    currency: (session.currency ?? 'eur').toUpperCase(),
+                    status: 'success',
+                    provider_tx_id: (session.payment_intent as string) ?? (session.subscription as string) ?? 'unknown',
+                });
+                await this.paymentLogRepository.save(paymentLog);
+
+                await this.notificationsService.createNotification(
+                    userId,
+                    'system',
+                    'Dein Premium-Abo ist jetzt aktiv! Du hast Zugriff auf alle Features.',
+                );
+                break;
+            }
+
+            case 'invoice.payment_failed': {
+                const invoice = event.data.object as any;
+                const customerId = invoice.customer as string;
+
+                const sub = await this.subscriptionRepository.findOne({
+                    where: { provider_subscription_id: invoice.subscription as string },
+                });
+                if (sub) {
+                    await this.notificationsService.createNotification(
+                        sub.user_id,
+                        'system',
+                        'Deine Zahlung konnte nicht verarbeitet werden. Bitte prüfe deine Zahlungsmethode.',
+                    );
+                }
+                break;
+            }
+
+            case 'customer.subscription.deleted': {
+                const stripeSub = event.data.object as any;
+
+                await this.subscriptionRepository.update(
+                    { provider_subscription_id: stripeSub.id },
+                    { status: 'cancelled', cancelled_at: new Date() },
+                );
+                break;
+            }
+        }
+
+        return { received: true };
+    }
+
+    @Cron('0 8 * * *')
+    async handleSubscriptionExpiryCheck(): Promise<void> {
+        const now = new Date();
+        const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+        const expiringSoon = await this.subscriptionRepository.find({
+            where: { status: 'active', expires_at: Between(now, in3Days) },
+        });
+
+        for (const sub of expiringSoon) {
+            await this.notificationsService.createNotification(
+                sub.user_id,
+                'system',
+                'Dein Abo endet in 3 Tagen. Jetzt verlängern?',
+            );
+        }
+
+        const expired = await this.subscriptionRepository.find({
+            where: { status: 'active', expires_at: LessThan(now) },
+        });
+
+        for (const sub of expired) {
+            sub.status = 'expired';
+            await this.subscriptionRepository.save(sub);
+            await this.notificationsService.createNotification(
+                sub.user_id,
+                'system',
+                'Dein Abo ist abgelaufen. Premium-Features sind deaktiviert.',
+            );
+        }
     }
 }
