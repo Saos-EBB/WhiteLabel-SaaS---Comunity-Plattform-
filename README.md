@@ -38,6 +38,10 @@ npm run start:prod
 | `EMAIL_SALT` | Salt for email search hash (SHA-256) |
 | `APP_URL` | Base URL used in verification links |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USER` / `MAIL_PASS` | SMTP credentials |
+| `STRIPE_SECRET_KEY` | Stripe secret API key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `STRIPE_SUCCESS_URL` | Redirect URL after successful checkout |
+| `STRIPE_CANCEL_URL` | Redirect URL after cancelled checkout |
 
 ---
 
@@ -49,6 +53,7 @@ npm run start:prod
 - **Sensitive data**: disability type stored AES-256-CBC encrypted
 - **Rate limiting**: global 10 req/60s; login 5/60s; forgot-password & reset-password 3/60s
 - **Soft deletes**: users have `deleted_at`, excluded from all queries
+- **Global exception filter**: all errors are caught, logged via NestJS `Logger` (timestamp, method, URL, status, userId), and returned in a consistent `{ statusCode, error, message }` shape. Request body, tokens, passwords, emails, and IPs are never logged.
 
 ---
 
@@ -142,14 +147,29 @@ All moderation routes require JWT.
 
 ### Payment — `/payment`
 
-All payment routes require JWT.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/payment/subscriptions` | JWT | Get active subscription. |
+| POST | `/payment/subscriptions` | JWT | Create a Stripe Checkout session. Returns `{ url }`. |
+| DELETE | `/payment/subscriptions/:id` | JWT | Cancel a subscription. |
+| GET | `/payment/logs` | JWT + Premium | Get payment history. Requires an active premium subscription. |
+| POST | `/payment/webhook` | — (Stripe signature) | Stripe webhook receiver. Handles `checkout.session.completed`, `invoice.payment_failed`, `customer.subscription.deleted`. |
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/payment/subscriptions` | Get active subscription. |
-| POST | `/payment/subscriptions` | Create a subscription. |
-| DELETE | `/payment/subscriptions/:id` | Cancel a subscription. |
-| GET | `/payment/logs` | Get payment history. |
+**Webhook events handled:**
+
+| Event | Action |
+|---|---|
+| `checkout.session.completed` | Creates subscription + payment log. Sends system notification: *"Dein Premium-Abo ist jetzt aktiv!"* |
+| `invoice.payment_failed` | Sends system notification: *"Deine Zahlung konnte nicht verarbeitet werden."* |
+| `customer.subscription.deleted` | Sets subscription status to `cancelled`. |
+
+**Plans:** `monthly` · `yearly` · `lifetime`
+
+**Premium guard:** `@RequiresPremium()` (from `src/common/decorators/requires-premium.decorator.ts`) applies `JwtGuard` + `PremiumGuard` in one decorator. `PremiumGuard` checks for an active subscription with `expires_at IS NULL OR expires_at > NOW()`. Provided globally via `CommonModule`.
+
+**Subscription expiry cron (daily 08:00):**
+- Subscriptions expiring within 3 days → system notification: *"Dein Abo endet in 3 Tagen."*
+- Subscriptions already expired → status set to `expired` + system notification: *"Dein Abo ist abgelaufen."*
 
 ---
 
@@ -162,6 +182,16 @@ All payment routes require JWT.
 ---
 
 ## Changelog
+
+### 2026-05-04
+- Payment: Stripe webhook handlers for `checkout.session.completed` (subscription + payment log + system notification), `invoice.payment_failed` (system notification), `customer.subscription.deleted` (cancel)
+- Payment: daily cron job (08:00) — notifies users 3 days before expiry; marks expired subscriptions and notifies users
+- Payment: `GET /payment/logs` now requires active premium subscription via `@RequiresPremium()`
+- Notifications: added `createNotification(userId, type, content)` shared method; exported from `NotificationsModule`
+- Added `PremiumGuard` — checks active subscription with expiry logic; provided globally via `CommonModule`
+- Added `@RequiresPremium()` decorator — bundles `JwtGuard` + `PremiumGuard` in one decorator
+- Added global `HttpExceptionFilter` — structured error logging via NestJS `Logger`, consistent response shape
+- Added `CommonModule` (`src/common/common.module.ts`) — shared module for cross-cutting guards
 
 ### 2026-04-29
 - Profile: block/unblock (`POST /profile/me/block/:userId`, `DELETE /profile/me/block/:userId`), `Block` entity with unique constraint and CASCADE
