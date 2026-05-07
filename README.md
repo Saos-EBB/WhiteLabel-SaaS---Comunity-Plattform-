@@ -50,6 +50,8 @@ All app routes are protected. Unauthenticated users are redirected to `/login`.
 | `/requests` | Incoming and outgoing contact requests. Accept/decline. |
 | `/chat` | Conversation list. |
 | `/chat/[id]` | Conversation detail. Real-time messaging via WebSocket. |
+| `/profile` | View and edit own profile, manage interests, publish, onboarding progress. |
+| `/settings` | Accessibility (font size, high contrast, plain language), notifications, privacy, account, DSGVO. |
 
 ---
 
@@ -108,6 +110,13 @@ The socket is connected on conversation page mount and disconnected on unmount.
 ---
 
 ## Changelog
+
+### 2026-05-07 (latest)
+- `profile/page.tsx`: full profile editor — nickname/bio/city edit mode, interest add/remove, publish button, onboarding progress sidebar (desktop two-column layout)
+- `settings/page.tsx`: accessibility settings (font size, high contrast, plain language) with auto-save + live preview; notification toggles; delete account modal; DSGVO section
+- Chat list: partner nickname resolved via `GET /profile/user/:id` (parallel fetch for all conversations)
+- Chat detail: partner nickname shown in header
+- Typing indicator cleared immediately when a new message arrives
 
 ### 2026-05-07
 - Chat page: WebSocket support — real-time messages, typing indicator, read receipts, optimistic sends
