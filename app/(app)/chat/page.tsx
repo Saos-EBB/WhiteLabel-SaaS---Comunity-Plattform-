@@ -55,8 +55,9 @@ function SkeletonItem() {
 }
 
 export default function ChatPage() {
-  const userId = useAuthStore((s) => s.user?.id)
+  const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,7 +65,22 @@ export default function ChatPage() {
     async function load() {
       try {
         const res = await fetchApi<ConvEnvelope>('/chat/conversations')
-        setConversations(normalise(res))
+        const convs = normalise(res)
+        setConversations(convs)
+
+        const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+        const partnerIds = [...new Set(convs.map((c) => c.user_a_id === myId ? c.user_b_id : c.user_a_id))]
+        const profiles = await Promise.all(
+          partnerIds.map((pid) =>
+            fetchApi<{ nickname: string }>(`/profile/user/${pid}`).catch(() => null)
+          )
+        )
+        const map = new Map<string, string>()
+        partnerIds.forEach((pid, i) => {
+          const p = profiles[i]
+          if (p) map.set(pid, p.nickname)
+        })
+        setNicknames(map)
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : 'Fehler beim Laden')
@@ -76,7 +92,7 @@ export default function ChatPage() {
   }, [])
 
   function getPartnerId(conv: Conversation): string {
-    return conv.user_a_id === userId ? conv.user_b_id : conv.user_a_id
+    return conv.user_a_id === currentUserId ? conv.user_b_id : conv.user_a_id
   }
 
   return (
@@ -118,7 +134,7 @@ export default function ChatPage() {
                 <Link
                   href={`/chat/${conv.id}`}
                   className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-surface-container-low active:bg-surface-container transition-colors min-h-[72px]"
-                  aria-label={`Gespräch mit ${shortId(partnerId)}, ${relativeTime(ts)}`}
+                  aria-label={`Gespräch mit ${nicknames.get(partnerId) ?? shortId(partnerId)}, ${relativeTime(ts)}`}
                 >
                   <div
                     className="flex-shrink-0 h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center"
@@ -129,7 +145,7 @@ export default function ChatPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="font-semibold text-on-surface text-sm truncate">
-                        {shortId(partnerId)}
+                        {nicknames.get(partnerId) ?? shortId(partnerId)}
                       </p>
                       <time
                         className="text-xs text-on-surface-variant flex-shrink-0"

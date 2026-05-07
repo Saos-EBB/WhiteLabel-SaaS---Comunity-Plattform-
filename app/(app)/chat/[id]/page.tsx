@@ -161,6 +161,7 @@ export default function ConversationPage() {
   const isFirstScroll = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const [partnerTyping, setPartnerTyping] = useState(false)
+  const [partnerNickname, setPartnerNickname] = useState<string | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingEmit = useRef(0)
 
@@ -169,8 +170,16 @@ export default function ConversationPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetchApi<MsgEnvelope>(`/chat/conversations/${conversationId}/messages`)
-        setMessages(normalise(res))
+        const [msgRes, conv] = await Promise.all([
+          fetchApi<MsgEnvelope>(`/chat/conversations/${conversationId}/messages`),
+          fetchApi<{ user_a_id: string; user_b_id: string }>(`/chat/conversations/${conversationId}`),
+        ])
+        setMessages(normalise(msgRes))
+        const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+        const pid = conv.user_a_id === myId ? conv.user_b_id : conv.user_a_id
+        fetchApi<{ nickname: string }>(`/profile/user/${pid}`)
+          .then((p) => setPartnerNickname(p.nickname))
+          .catch(() => { /* header falls back to shortId */ })
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : 'Fehler beim Laden')
@@ -333,7 +342,7 @@ export default function ConversationPage() {
 
         <div className="min-w-0">
           <p className="font-semibold text-on-surface text-sm truncate">
-            {partnerId ? shortId(partnerId) : 'Gespräch'}
+            {partnerNickname ?? (partnerId ? shortId(partnerId) : 'Gespräch')}
           </p>
         </div>
       </div>
