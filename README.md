@@ -183,6 +183,9 @@ All moderation routes require JWT.
 
 ## Changelog
 
+### 2026-05-07
+- Profile: `GET /profile/search` now returns `user_id` (account UUID) alongside profile fields. Fixes frontend `isOwn` comparison in chat — `message.sender_id` is a user UUID, not a profile UUID.
+
 ### 2026-05-04
 - Payment: Stripe webhook handlers for `checkout.session.completed` (subscription + payment log + system notification), `invoice.payment_failed` (system notification), `customer.subscription.deleted` (cancel)
 - Payment: daily cron job (08:00) — notifies users 3 days before expiry; marks expired subscriptions and notifies users

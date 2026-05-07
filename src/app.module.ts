@@ -26,7 +26,7 @@ import databaseConfig from './config/database.config';
       load: [appConfig, databaseConfig],
       envFilePath: '.env',
     }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

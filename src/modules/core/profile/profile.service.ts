@@ -171,7 +171,7 @@ export class ProfileService {
         const qb = this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id'])
+            .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id'])
             // Nur published, nicht gebannt, nicht gelöscht, nicht der eigene User
             .where('p.is_published = true')
             .andWhere('u.is_banned = false')

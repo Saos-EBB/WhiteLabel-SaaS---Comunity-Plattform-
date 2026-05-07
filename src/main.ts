@@ -12,7 +12,8 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.NODE_ENV === 'production'
       ? 'https://deine-app.com'
-      : '*',
+      : 'http://localhost:3001',
+    credentials: true,
   });
 
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -28,6 +29,6 @@ async function bootstrap() {
   await app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   await app.listen(process.env.PORT ?? 3000);
-  console.log(`Paarship API läuft auf Port ${process.env.PORT ?? 3000}`);
+  console.log(`XXX API läuft auf Port ${process.env.PORT ?? 3000}`);
 }
 bootstrap();
