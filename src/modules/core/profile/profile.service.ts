@@ -167,6 +167,19 @@ export class ProfileService {
 
 
 
+    async getProfileByUserId(userId: string): Promise<{ nickname: string; photo_id: string | null }> {
+        const profile = await this.profileRepo
+            .createQueryBuilder('p')
+            .innerJoin('p.user', 'u')
+            .select(['p.nickname', 'p.photo_id'])
+            .where('p.user_id = :userId', { userId })
+            .andWhere('u.deleted_at IS NULL')
+            .getOne();
+
+        if (!profile) throw new NotFoundException('Profil nicht gefunden');
+        return { nickname: profile.nickname, photo_id: profile.photo_id ?? null };
+    }
+
     async searchProfiles(requestingUserId: string, city?: string, interestIds?: string[]): Promise<Partial<Profile>[]> {
         const qb = this.profileRepo
             .createQueryBuilder('p')

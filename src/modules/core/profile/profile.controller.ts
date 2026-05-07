@@ -99,6 +99,12 @@ export class ProfileController {
         return this.profileService.unblockUser(req.user.sub, userId);
     }
 
+    @Get('user/:userId')
+    @UseGuards(JwtGuard)
+    getProfileByUserId(@Param('userId') userId: string) {
+        return this.profileService.getProfileByUserId(userId);
+    }
+
     @Get(':nickname')
     getPublicProfile(@Param('nickname') nickname: string) {
         return this.profileService.getPublicProfile(nickname);
