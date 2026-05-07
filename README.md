@@ -95,6 +95,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
 | POST | `/profile/me/block/:userId` | JWT | Block a user. |
 | DELETE | `/profile/me/block/:userId` | JWT | Unblock a user. |
+| GET | `/profile/user/:userId` | JWT | Get nickname and photo_id for any account UUID. Used by frontend to resolve partner names in chat. |
 | GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). |
 
 ---
@@ -182,6 +183,9 @@ All moderation routes require JWT.
 ---
 
 ## Changelog
+
+### 2026-05-07 (latest)
+- Profile: added `GET /profile/user/:userId` — looks up nickname + photo_id by account UUID. Required for frontend chat nickname resolution.
 
 ### 2026-05-07
 - Profile: `GET /profile/search` now returns `user_id` (account UUID) alongside profile fields. Fixes frontend `isOwn` comparison in chat — `message.sender_id` is a user UUID, not a profile UUID.
