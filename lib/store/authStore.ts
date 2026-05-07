@@ -1,7 +1,9 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-interface User {
+export interface User {
   id: string
+  user_id?: string
   email: string
   [key: string]: unknown
 }
@@ -14,15 +16,23 @@ interface AuthState {
   logout: () => void
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: null,
-  user: null,
-  setAccessToken: (token) => set({ accessToken: token }),
-  setUser: (user) => set({ user }),
-  logout: () => {
-    set({ accessToken: null, user: null })
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      accessToken: null,
+      user: null,
+      setAccessToken: (token) => set({ accessToken: token }),
+      setUser: (user) => set({ user }),
+      logout: () => {
+        set({ accessToken: null, user: null })
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+      },
+    }),
+    {
+      name: 'xxx-auth',
+      partialize: (state) => ({ accessToken: state.accessToken }),
     }
-  },
-}))
+  )
+)
