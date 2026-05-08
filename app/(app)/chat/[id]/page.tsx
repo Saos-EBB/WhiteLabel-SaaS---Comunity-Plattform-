@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { ChevronLeft, Send, User, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
-import { connect, disconnect, getSocket } from '@/lib/socket'
+import { connect, getSocket } from '@/lib/socket'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +146,7 @@ export default function ConversationPage() {
   const conversationId = params.id
 
   const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
+  const accessToken   = useAuthStore((s) => s.accessToken)
 
   const [messages, setMessages] = useState<LocalMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -162,6 +163,8 @@ export default function ConversationPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null)
+  // Ref so the socket closure always reads the current nickname without re-subscribing
+  const partnerNicknameRef = useRef<string | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingEmit = useRef(0)
 
@@ -178,7 +181,7 @@ export default function ConversationPage() {
         const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
         const pid = conv.user_a_id === myId ? conv.user_b_id : conv.user_a_id
         fetchApi<{ nickname: string }>(`/profile/user/${pid}`)
-          .then((p) => setPartnerNickname(p.nickname))
+          .then((p) => { setPartnerNickname(p.nickname); partnerNicknameRef.current = p.nickname })
           .catch(() => { /* header falls back to shortId */ })
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
@@ -193,12 +196,14 @@ export default function ConversationPage() {
   // ── Socket ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const sock = connect()
+    if (!currentUserId || !accessToken) return
+
+    const sock = connect(accessToken)
 
     sock.emit('join_conversation', conversationId)
     sock.emit('read_messages', conversationId)
 
-    sock.on('new_message', (msg: Message) => {
+    function onNewMessage(msg: Message) {
       if (msg.conversation_id !== conversationId) return
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
       setPartnerTyping(false)
@@ -215,23 +220,25 @@ export default function ConversationPage() {
         if (prev.some((m) => m.id === msg.id)) return prev
         return [...prev, msg]
       })
-    })
+    }
 
-    sock.on('user_typing', ({ userId, conversationId: cid }: { userId: string; conversationId: string }) => {
+    function onUserTyping({ userId, conversationId: cid }: { userId: string; conversationId: string }) {
       const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
       if (cid !== conversationId || userId === myId) return
       setPartnerTyping(true)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000)
-    })
+    }
+
+    sock.on('new_message', onNewMessage)
+    sock.on('user_typing', onUserTyping)
 
     return () => {
-      sock.off('new_message')
-      sock.off('user_typing')
+      sock.off('new_message', onNewMessage)
+      sock.off('user_typing', onUserTyping)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-      disconnect()
     }
-  }, [conversationId])
+  }, [conversationId, currentUserId, accessToken])
 
   // ── Auto-scroll ────────────────────────────────────────────────────────────
 

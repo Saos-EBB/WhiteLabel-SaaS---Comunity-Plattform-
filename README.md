@@ -1,6 +1,6 @@
 # XXX — Frontend
 
-Next.js 15 app (App Router) for the XXX platform. Connects to the XXX NestJS backend at `http://localhost:3000`.
+Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backend at `http://localhost:3000`.
 
 ---
 
@@ -8,11 +8,12 @@ Next.js 15 app (App Router) for the XXX platform. Connects to the XXX NestJS bac
 
 | | |
 |---|---|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16.2.4 (App Router) |
 | Styling | Tailwind CSS v4 |
-| State | Zustand (auth store, JWT) |
-| Real-time | Socket.io client |
-| Icons | Lucide React |
+| Language | TypeScript |
+| State | Zustand |
+| Real-time | socket.io-client |
+| Icons | lucide-react |
 
 ---
 
@@ -20,16 +21,14 @@ Next.js 15 app (App Router) for the XXX platform. Connects to the XXX NestJS bac
 
 ```bash
 npm install
-npm run dev
+npm run dev -- --port 3001
 ```
 
-App runs on `http://localhost:3001` (or the next available port).
-
-The backend must be running on `http://localhost:3000`.
+App runs on `http://localhost:3001`. The backend must be running on `http://localhost:3000`.
 
 ---
 
-## Pages
+## Screens
 
 ### Auth — `(auth)`
 
@@ -46,86 +45,91 @@ All app routes are protected. Unauthenticated users are redirected to `/login`.
 | Route | Description |
 |---|---|
 | `/dashboard` | Home screen after login. |
-| `/discover` | Browse published profiles. Filter by city (text) or interest (dropdown). Connect button sends a contact request. |
-| `/requests` | Incoming and outgoing contact requests. Accept/decline. |
+| `/discover` | Browse published profiles. Filter by city or interest. Connect button sends a contact request. |
+| `/requests` | Incoming and outgoing contact requests. Accept / decline. |
 | `/chat` | Conversation list. |
-| `/chat/[id]` | Conversation detail. Real-time messaging via WebSocket. |
-| `/profile` | View and edit own profile, manage interests, publish, onboarding progress. |
-| `/settings` | Accessibility (font size, high contrast, plain language), notifications, privacy, account, DSGVO. |
+| `/chat/[id]` | Real-time conversation via WebSocket. |
+| `/notifications` | Full notification center with type filters. |
+| `/profile` | View and edit own profile, manage interests, publish. |
+| `/settings` | Accessibility, notifications, privacy, account, DSGVO. |
+| `/onboarding` | Profile setup wizard (required before accessing the app). |
 
 ---
 
-## Key features
+## Auth
 
-### Auth
-- JWT access token stored in Zustand memory (not persisted to localStorage).
-- `accessToken` persisted to localStorage via Zustand `persist` middleware.
-- `AuthProvider` (`components/AuthProvider.tsx`) fetches `/profile/me` once on mount and populates `user` in the store. Uses a `hasFetched` ref to prevent double-calls in React StrictMode.
-- Automatic token refresh on 401 — `fetchApi` retries the original request with a fresh token before giving up.
-
-### Chat
-- Message history loaded on mount via `GET /chat/conversations/:id/messages`.
-- Real-time via Socket.io (`lib/socket.ts`): singleton connection, JWT passed as `auth.token`.
-- **Events emitted:** `join_conversation`, `send_message`, `typing` (debounced, max 1/2s), `read_messages`.
-- **Events received:** `new_message` (appended or replaces optimistic), `user_typing` (typing indicator shown for 3s then hidden).
-- Optimistic message send: message appears immediately with a pending indicator, replaced by the confirmed message from the `new_message` event.
-- Typing indicator: bouncing-dots bubble, hidden immediately when a message arrives.
-- Own messages right-aligned (dark bubble), incoming left-aligned (green bubble).
-- Long-press or right-click own message to delete.
-
-### Discover
-- Calls `GET /profile/search` on mount.
-- Profile cards show nickname, age (calculated from birthdate), and city.
-- "Verbinden" button posts to `POST /chat/requests` with the profile's `user_id` as `receiver_id`.
+- JWT access token (15 min) stored in Zustand + persisted to `localStorage` via `persist` middleware.
+- Refresh token stored as httpOnly cookie; rotated automatically by `fetchApi` on 401.
+- `AuthProvider` (`components/AuthProvider.tsx`) fetches `/profile/me` on mount, populates the user store, applies accessibility settings, and establishes the global WebSocket connection.
 
 ---
 
-## Auth store
+## WebSocket
 
-`lib/store/authStore.ts` — Zustand store.
+The socket is established globally in `AuthProvider` once the user profile loads. This means real-time notifications work on every page, not just the chat page.
 
-| Field | Type | Persisted |
-|---|---|---|
-| `accessToken` | `string \| null` | Yes (localStorage) |
-| `user` | `User \| null` | No (memory only) |
-
-`User` shape (from `/profile/me`): `id` (profile UUID), `user_id` (account UUID), `email`, plus any other fields returned by the API.
-
-> `sender_id` on messages is the account UUID. Always use `user.user_id` (not `user.id`) for `isOwn` comparisons.
-
----
-
-## Socket
-
-`lib/socket.ts` — singleton Socket.io client.
+**Module:** `lib/socket.ts` — singleton Socket.io client.
 
 ```ts
-connect()     // creates socket with auth token, returns it (no-op if already connected)
-disconnect()  // tears down the socket
-getSocket()   // returns the current Socket | null
+connect(token)  // creates socket with auth token; no-op if already connected
+disconnect()    // tears down the socket
+getSocket()     // returns the current Socket | null
+reconnect(token) // force-reconnects with a new token
 ```
 
-The socket is connected on conversation page mount and disconnected on unmount.
+**Global listener** (`AuthProvider`): `new_message` → fires a bell notification for any incoming message across all conversations.
+
+**Chat page listeners** (`app/(app)/chat/[id]/page.tsx`):
+
+| Emitted | Received |
+|---|---|
+| `join_conversation` | `new_message` |
+| `send_message` | `user_typing` |
+| `typing` | |
+| `read_messages` | |
+
+Cleanup uses named handler references (`sock.off('event', handler)`) so the chat page never removes the global AuthProvider listener on unmount.
+
+---
+
+## Notifications
+
+- **Store:** `lib/store/notificationStore.ts` (Zustand)
+- **Sources:**
+  - Backend `/notifications` polled every 30 s
+  - Real-time `new_message` socket events (via global AuthProvider listener)
+  - New pending contact requests polled every 30 s in `TopNav`
+- **`_local` flag:** client-generated notifications are marked `_local: true` and skip the `PATCH /notifications/:id/read` call — they have no backend record.
+- **Bell badge:** glows and pulses when `unreadCount > 0`.
+
+---
+
+## Key notes
+
+- `sender_id` on messages is the account UUID. Always use `user.user_id` (not `user.id`) for `isOwn` comparisons.
+- Optimistic message send: message appears immediately with a pending indicator, replaced by the confirmed message on `new_message`.
 
 ---
 
 ## Changelog
 
-### 2026-05-07 (latest)
-- `profile/page.tsx`: full profile editor — nickname/bio/city edit mode, interest add/remove, publish button, onboarding progress sidebar (desktop two-column layout)
-- `settings/page.tsx`: accessibility settings (font size, high contrast, plain language) with auto-save + live preview; notification toggles; delete account modal; DSGVO section
-- Chat list: partner nickname resolved via `GET /profile/user/:id` (parallel fetch for all conversations)
-- Chat detail: partner nickname shown in header
-- Typing indicator cleared immediately when a new message arrives
+### 2026-05-08 (latest)
+- WebSocket moved to global `AuthProvider` — real-time notifications on all pages
+- Notification center (`/notifications`) with type filters and mark-as-read
+- Bell badge in `TopNav`: glow + pulse on unread, dropdown preview of last 5
+- `setNotifications` merges `_local` entries instead of overwriting them
+- Debug console.log statements removed from socket, store, and chat modules
+
+### 2026-05-07
+- `profile/page.tsx`: full profile editor — nickname/bio/city edit mode, interest add/remove, publish button, onboarding progress sidebar
+- `settings/page.tsx`: accessibility settings with auto-save + live preview; notification toggles; delete account modal; DSGVO section
+- Chat list: partner nickname resolved via `GET /profile/user/:id`
+- Chat detail: partner nickname shown in header; typing indicator cleared on new message
 
 ### 2026-05-07
 - Chat page: WebSocket support — real-time messages, typing indicator, read receipts, optimistic sends
-- Chat page: message alignment fixed (own right, incoming left); `isOwn` now uses `user.user_id` (account UUID) not `user.id` (profile UUID)
-- Chat page: guard against rendering messages before `currentUserId` is hydrated (prevents all-left-aligned flash on reload)
-- `AuthProvider`: fixed double-fetch — now runs once on mount with `hasFetched` ref (React StrictMode-safe)
-- `lib/socket.ts`: new singleton Socket.io client module
-- `lib/store/authStore.ts`: added `user_id?: string` to `User` interface
-- Discover page: contact request now sends `user_id` (account UUID) as `receiver_id`, not profile `id`
+- `isOwn` now uses `user.user_id` (account UUID) not `user.id` (profile UUID)
+- `AuthProvider`: fixed double-fetch with `hasFetched` ref (React StrictMode-safe)
 
-### 2026-05-04 (`c084690`)
-- Initial setup: Next.js, Tailwind v4, navigation, auth flow (login/register/verify), Zustand auth store, dashboard, discover page, chat list, requests page
+### 2026-05-04
+- Initial setup: Next.js, Tailwind v4, navigation, auth flow, Zustand auth store, dashboard, discover, chat, requests
