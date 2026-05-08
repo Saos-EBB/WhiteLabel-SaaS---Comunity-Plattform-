@@ -182,9 +182,32 @@ All moderation routes require JWT.
 
 ---
 
+## Frontend
+
+The XXX frontend (`xxx-frontend`) runs on port 3001.
+
+- **CORS:** configured for `http://localhost:3001` with `credentials: true` on all HTTP routes and the WebSocket gateway.
+- **WebSocket Gateway:** runs on the same port as the HTTP server (3000). Uses socket.io with JWT auth (`auth.token` from the handshake).
+- **Socket events:**
+
+| Direction | Event | Payload | Description |
+|---|---|---|---|
+| Client → Server | `join_conversation` | `conversationId: string` | Subscribe to a conversation room. |
+| Client → Server | `send_message` | `{ conversationId, content, type }` | Send a message. |
+| Client → Server | `typing` | `conversationId: string` | Broadcast typing indicator to other participant. |
+| Client → Server | `read_messages` | `conversationId: string` | Mark all messages in conversation as read. |
+| Server → Client | `new_message` | `Message` | New message delivered to conversation participants. |
+| Server → Client | `user_typing` | `{ userId, conversationId }` | Typing indicator forwarded to other participant. |
+| Server → Client | `messages_read` | `{ conversationId, userId }` | Notifies that messages have been read. |
+
+---
+
 ## Changelog
 
-### 2026-05-07 (latest)
+### 2026-05-08 (latest)
+- Added Frontend + WebSocket Gateway documentation section
+
+### 2026-05-07
 - Profile: added `GET /profile/user/:userId` — looks up nickname + photo_id by account UUID. Required for frontend chat nickname resolution.
 
 ### 2026-05-07
