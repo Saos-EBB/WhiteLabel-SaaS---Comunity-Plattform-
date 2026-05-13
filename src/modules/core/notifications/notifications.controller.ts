@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Put, Body, Param, Request, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Patch, Put, Delete, Body, Param, Request, UseGuards, ParseUUIDPipe, HttpCode, HttpStatus } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
@@ -21,6 +21,12 @@ export class NotificationsController {
     @Patch(':id/read')
     markAsRead(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
         return this.notificationsService.markAsRead(req.user.sub, id);
+    }
+
+    @Delete(':id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    deleteNotification(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+        return this.notificationsService.deleteNotification(req.user.sub, id);
     }
 
     @Get('settings')

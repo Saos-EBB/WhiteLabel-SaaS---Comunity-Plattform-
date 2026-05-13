@@ -51,6 +51,16 @@ export class NotificationsService {
         return { message: 'Alle Benachrichtigungen als gelesen markiert' };
     }
 
+    async deleteNotification(userId: string, notificationId: string): Promise<void> {
+        const notification = await this.notificationRepository.findOne({
+            where: { id: notificationId, user_id: userId },
+        });
+
+        if (!notification) throw new NotFoundException('Benachrichtigung nicht gefunden');
+
+        await this.notificationRepository.remove(notification);
+    }
+
     async getSettings(userId: string) {
         let settings = await this.settingsRepository.findOne({
             where: { user_id: userId },

@@ -104,12 +104,43 @@ export class ChatService {
     }
 
     async getConversations(userId: string) {
-        return this.conversationRepository.find({
+        const conversations = await this.conversationRepository.find({
             where: [
                 { user_a_id: userId, deleted_at_a: IsNull() },
                 { user_b_id: userId, deleted_at_b: IsNull() },
             ],
             order: { created_at: 'DESC' },
+        });
+
+        if (conversations.length === 0) return [];
+
+        const ids = conversations.map(c => c.id);
+
+        const latestMessages = await this.messageRepository
+            .createQueryBuilder('msg')
+            .where('msg.conversation_id IN (:...ids)', { ids })
+            .andWhere(qb => {
+                const sub = qb
+                    .subQuery()
+                    .select('MAX(m2.sent_at)')
+                    .from(Message, 'm2')
+                    .where('m2.conversation_id = msg.conversation_id')
+                    .getQuery();
+                return `msg.sent_at = (${sub})`;
+            })
+            .getMany();
+
+        const latestByConversation = new Map(latestMessages.map(m => [m.conversation_id, m]));
+
+        return conversations.map(conv => {
+            const latest = latestByConversation.get(conv.id);
+            return {
+                ...conv,
+                last_message_content: latest && !latest.is_deleted ? latest.content : null,
+                last_message_sender_id: latest?.sender_id ?? null,
+                last_message_at: latest?.sent_at ?? null,
+                read_at: latest?.read_at ?? null,
+            };
         });
     }
 

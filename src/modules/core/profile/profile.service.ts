@@ -77,6 +77,12 @@ export class ProfileService {
         if (dto.font_size !== undefined) profile.font_size = dto.font_size;
         if (dto.high_contrast !== undefined) profile.high_contrast = dto.high_contrast;
         if (dto.search_radius_km !== undefined) profile.search_radius_km = dto.search_radius_km;
+        if (dto.is_published !== undefined) {
+            if (dto.is_published && !profile.onboarding_completed) {
+                throw new BadRequestException('Onboarding nicht abgeschlossen');
+            }
+            profile.is_published = dto.is_published;
+        }
 
         const saved = await this.profileRepo.save(profile);
         await this.checkAndCompleteOnboarding(userId);

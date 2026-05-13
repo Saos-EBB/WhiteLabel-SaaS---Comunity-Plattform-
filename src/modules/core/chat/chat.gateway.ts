@@ -14,7 +14,12 @@ import { JwtService } from '@nestjs/jwt';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageType } from './entities/message.entity';
 
-@WebSocketGateway({ cors: { origin: '*' } })
+@WebSocketGateway({
+    cors: {
+        origin: 'http://localhost:3001',
+        credentials: true,
+    },
+})
 export class ChatGateway implements OnGatewayConnection {
     @WebSocketServer()
     server!: Server;

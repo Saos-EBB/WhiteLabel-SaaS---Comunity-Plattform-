@@ -54,4 +54,8 @@ export class UpdateProfileDto {
     @IsOptional()
     @IsDateString()
     birthdate?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    is_published?: boolean;
 }
