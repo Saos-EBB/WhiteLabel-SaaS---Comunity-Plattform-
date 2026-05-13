@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ChevronLeft, Send, User, Loader2, AlertCircle, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -160,6 +161,7 @@ export default function ConversationPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const isFirstScroll = useRef(true)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null)
@@ -167,6 +169,14 @@ export default function ConversationPage() {
   const partnerNicknameRef = useRef<string | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingEmit = useRef(0)
+
+  // ── Active conversation tracking (suppresses bell notifications) ───────────
+
+  useEffect(() => {
+    const { setActiveConversationId, clearActiveConversationId } = useNotificationStore.getState()
+    setActiveConversationId(conversationId)
+    return () => { clearActiveConversationId() }
+  }, [conversationId])
 
   // ── Load messages ──────────────────────────────────────────────────────────
 
@@ -239,6 +249,19 @@ export default function ConversationPage() {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
     }
   }, [conversationId, currentUserId, accessToken])
+
+  // ── Scroll button visibility (IntersectionObserver on bottom sentinel) ─────
+
+  useEffect(() => {
+    const el = bottomRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowScrollBtn(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // ── Auto-scroll ────────────────────────────────────────────────────────────
 
@@ -409,8 +432,20 @@ export default function ConversationPage() {
             </div>
           </div>
         )}
+        <div className="h-6" aria-hidden="true" />
         <div ref={bottomRef} aria-hidden="true" />
       </div>
+
+      {/* Scroll-to-bottom button */}
+      {showScrollBtn && (
+        <button
+          onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          className="fixed bottom-36 md:bottom-20 right-4 z-10 h-10 w-10 rounded-full bg-surface-container-high border border-outline-variant shadow-md flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
+          aria-label="Nach unten scrollen"
+        >
+          <ChevronDown className="h-5 w-5" aria-hidden="true" />
+        </button>
+      )}
 
       {/* Fixed input bar — above BottomNav on mobile */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm border-t border-outline-variant px-3 py-2.5">

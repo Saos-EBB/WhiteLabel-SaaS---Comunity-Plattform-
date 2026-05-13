@@ -8,6 +8,8 @@ export interface Notification {
   content: string
   is_read: boolean
   created_at: string
+  count?: number
+  conversation_id?: string
   /** True for client-generated notifications that have no backend record. */
   _local?: true
 }
@@ -15,15 +17,21 @@ export interface Notification {
 interface NotificationState {
   notifications: Notification[]
   unreadCount: number
+  activeConversationId: string | null
   setNotifications: (notifications: Notification[]) => void
   addNotification: (notification: Notification) => void
+  addOrUpdateNotification: (notification: Notification) => void
   markRead: (id: string) => void
   markAllRead: () => void
+  removeNotification: (id: string) => void
+  setActiveConversationId: (id: string) => void
+  clearActiveConversationId: () => void
 }
 
 export const useNotificationStore = create<NotificationState>()((set) => ({
   notifications: [],
   unreadCount: 0,
+  activeConversationId: null,
   setNotifications: (incoming) =>
     set((state) => {
       const merged = [
@@ -40,6 +48,32 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
       const notifications = [notification, ...state.notifications]
       return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
     }),
+  addOrUpdateNotification: (notification) =>
+    set((state) => {
+      if (notification.type === 'message' && notification.conversation_id) {
+        const idx = state.notifications.findIndex(
+          (n) =>
+            n.type === 'message' &&
+            !n.is_read &&
+            n.conversation_id === notification.conversation_id
+        )
+        if (idx !== -1) {
+          const existing = state.notifications[idx]
+          const newCount = (existing.count ?? 1) + 1
+          const notifications = [...state.notifications]
+          notifications[idx] = {
+            ...existing,
+            count: newCount,
+            content: `${newCount} neue Nachrichten`,
+            created_at: notification.created_at,
+          }
+          return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
+        }
+      }
+      if (state.notifications.some((n) => n.id === notification.id)) return state
+      const notifications = [{ ...notification, count: 1 }, ...state.notifications]
+      return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
+    }),
   markRead: (id) =>
     set((state) => {
       const notifications = state.notifications.map((n) =>
@@ -52,4 +86,11 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
       notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
       unreadCount: 0,
     })),
+  removeNotification: (id) =>
+    set((state) => {
+      const notifications = state.notifications.filter((n) => n.id !== id)
+      return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
+    }),
+  setActiveConversationId: (id) => set({ activeConversationId: id }),
+  clearActiveConversationId: () => set({ activeConversationId: null }),
 }))

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState, type ElementType, type ReactNode } from 'react'
+import Link from 'next/link'
 import {
   User, MapPin, Calendar, FileText, Tag, Eye,
   CheckCircle, XCircle, Pencil, X, Save, Plus,
   AlertCircle, Loader2, BarChart2, Heart, MessageCircle,
-  ChevronDown,
+  ChevronDown, Settings,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 
@@ -253,13 +254,22 @@ export default function ProfilePage() {
           <h1 className="text-2xl font-bold text-on-surface">Mein Profil</h1>
 
           {!editMode ? (
-            <button
-              onClick={startEdit}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
-            >
-              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-              Bearbeiten
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/settings"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
+              >
+                <Settings className="h-3.5 w-3.5" aria-hidden="true" />
+                Einstellungen
+              </Link>
+              <button
+                onClick={startEdit}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                Bearbeiten
+              </button>
+            </div>
           ) : (
             <div className="flex gap-2">
               <button

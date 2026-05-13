@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { User, Clock, CheckCircle, XCircle, Inbox, Send } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { useNotificationStore } from '@/lib/store/notificationStore'
 
 interface ContactRequest {
   id: string
@@ -39,9 +40,11 @@ type ActionState = 'idle' | 'accepting' | 'declining' | 'accepted'
 
 function IncomingCard({
   request,
+  nickname,
   onDecline,
 }: {
   request: ContactRequest
+  nickname: string
   onDecline: (id: string) => void
 }) {
   const [state, setState] = useState<ActionState>('idle')
@@ -83,7 +86,7 @@ function IncomingCard({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-on-surface text-sm">Nutzer</p>
+          <p className="font-semibold text-on-surface text-sm">{nickname}</p>
           <time
             className="text-xs text-on-surface-variant flex-shrink-0"
             dateTime={request.created_at}
@@ -189,7 +192,7 @@ function StatusBadge({ status }: { status: ContactRequest['status'] }) {
 
 // ─── Outgoing card ────────────────────────────────────────────────────────────
 
-function OutgoingCard({ request }: { request: ContactRequest }) {
+function OutgoingCard({ request, nickname }: { request: ContactRequest; nickname: string }) {
   return (
     <li className="flex gap-3 rounded-2xl bg-surface-container border border-outline-variant p-4">
       <div
@@ -201,7 +204,7 @@ function OutgoingCard({ request }: { request: ContactRequest }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-on-surface text-sm">Nutzer</p>
+          <p className="font-semibold text-on-surface text-sm">{nickname}</p>
           <time
             className="text-xs text-on-surface-variant flex-shrink-0"
             dateTime={request.created_at}
@@ -253,6 +256,7 @@ export default function RequestsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<ContactRequest[]>([])
   const [outgoing, setOutgoing] = useState<ContactRequest[]>([])
+  const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -263,8 +267,39 @@ export default function RequestsPage() {
           fetchApi<RequestsEnvelope>('/chat/requests/incoming'),
           fetchApi<RequestsEnvelope>('/chat/requests/outgoing'),
         ])
-        setIncoming(normalise(inRes))
-        setOutgoing(normalise(outRes))
+        const incomingList = normalise(inRes)
+        const outgoingList = normalise(outRes)
+        setIncoming(incomingList)
+        setOutgoing(outgoingList)
+
+        const uniqueIds = [...new Set([
+          ...incomingList.map((r) => r.sender_id),
+          ...outgoingList.map((r) => r.receiver_id),
+        ])]
+        const profiles = await Promise.all(
+          uniqueIds.map((id) =>
+            fetchApi<{ nickname: string }>(`/profile/user/${id}`).catch(() => null)
+          )
+        )
+        const map = new Map<string, string>()
+        uniqueIds.forEach((id, i) => {
+          const p = profiles[i]
+          if (p?.nickname) map.set(id, p.nickname)
+        })
+        setNicknames(map)
+
+        // Inject a notification for each pending request not already in the store (idempotent by id)
+        for (const r of incomingList) {
+          if (r.status !== 'pending') continue
+          useNotificationStore.getState().addNotification({
+            id: r.id,
+            type: 'request',
+            content: 'Neue Kontaktanfrage',
+            is_read: false,
+            created_at: r.created_at,
+            _local: true,
+          })
+        }
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : 'Fehler beim Laden')
@@ -367,7 +402,7 @@ export default function RequestsPage() {
             ) : (
               <ul className="space-y-3" aria-label="Eingehende Anfragen">
                 {incoming.map((r) => (
-                  <IncomingCard key={r.id} request={r} onDecline={handleDecline} />
+                  <IncomingCard key={r.id} request={r} nickname={nicknames.get(r.sender_id) ?? '...'} onDecline={handleDecline} />
                 ))}
               </ul>
             )}
@@ -387,7 +422,7 @@ export default function RequestsPage() {
             ) : (
               <ul className="space-y-3" aria-label="Ausgehende Anfragen">
                 {outgoing.map((r) => (
-                  <OutgoingCard key={r.id} request={r} />
+                  <OutgoingCard key={r.id} request={r} nickname={nicknames.get(r.receiver_id) ?? '...'} />
                 ))}
               </ul>
             )}

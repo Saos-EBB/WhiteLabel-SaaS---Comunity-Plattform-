@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react'
 import {
-  Type, Eye, Globe, Bell, Shield, Trash2, Download,
+  Type, Globe, Bell, Shield, Trash2, Download,
   Check, AlertCircle, Loader2, ChevronDown, Lock,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ function Toggle({
 // ─── ToggleRow ────────────────────────────────────────────────────────────────
 
 function ToggleRow({
-  id, label, description, checked, onChange, saving,
+  id, label, description, checked, onChange, saving, disabled,
 }: {
   id: string
   label: string
@@ -70,11 +71,15 @@ function ToggleRow({
   checked: boolean
   onChange: (v: boolean) => void
   saving?: boolean
+  disabled?: boolean
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <label htmlFor={id} className="text-sm font-medium text-on-surface cursor-pointer select-none">
+        <label
+          htmlFor={id}
+          className={`text-sm font-medium cursor-pointer select-none ${disabled ? 'text-on-surface-variant' : 'text-on-surface'}`}
+        >
           {label}
         </label>
         {description && (
@@ -84,7 +89,7 @@ function ToggleRow({
       {saving ? (
         <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin flex-shrink-0" aria-hidden="true" />
       ) : (
-        <Toggle id={id} checked={checked} onChange={onChange} />
+        <Toggle id={id} checked={checked} onChange={onChange} disabled={disabled} />
       )}
     </div>
   )
@@ -125,9 +130,8 @@ export default function SettingsPage() {
 
   // Save state
   const [accessSaving, setAccessSaving]   = useState(false)
-  const [notifSaving, setNotifSaving]     = useState<keyof NotifSettings | null>(null)
-  const [publishLoading, setPublishLoading] = useState(false)
-  const [publishError, setPublishError]   = useState<string | null>(null)
+  const [notifSaving, setNotifSaving]     = useState<Set<keyof NotifSettings>>(new Set())
+  const [publishSaving, setPublishSaving] = useState(false)
 
   // Toast
   const [toast, setToast]   = useState<{ msg: string; ok: boolean } | null>(null)
@@ -187,6 +191,7 @@ export default function SettingsPage() {
         body: JSON.stringify(patch),
       })
       setProfile(updated)
+      useAccessibilityStore.getState().applySettings(updated)
       showToast('Gespeichert')
     } catch {
       setProfile(prev)
@@ -199,38 +204,43 @@ export default function SettingsPage() {
   // ── Notification toggle ────────────────────────────────────────────────────
 
   async function toggleNotif(key: keyof NotifSettings, value: boolean) {
-    if (!notif || notifSaving) return
+    if (!notif || notifSaving.has(key)) return
     const prev = notif
-    setNotif({ ...notif, [key]: value })
-    setNotifSaving(key)
+    setNotif((current) => current ? { ...current, [key]: value } : current)
+    setNotifSaving((s) => { const n = new Set(s); n.add(key); return n })
     try {
       const updated = await fetchApi<NotifSettings>('/notifications/settings', {
         method: 'PUT',
         body: JSON.stringify({ [key]: value }),
       })
-      setNotif(updated)
+      setNotif((current) => current ? { ...current, ...updated } : updated)
       showToast('Gespeichert')
     } catch {
       setNotif(prev)
       showToast('Fehler beim Speichern', false)
     } finally {
-      setNotifSaving(null)
+      setNotifSaving((s) => { const n = new Set(s); n.delete(key); return n })
     }
   }
 
   // ── Publish ────────────────────────────────────────────────────────────────
 
-  async function handlePublish() {
-    setPublishLoading(true)
-    setPublishError(null)
+  async function togglePublished(value: boolean) {
+    if (!profile || publishSaving) return
+    const prev = profile
+    setProfile({ ...profile, is_published: value })
+    setPublishSaving(true)
     try {
-      const updated = await fetchApi<Profile>('/profile/me/publish', { method: 'PATCH' })
-      setProfile((p) => p ? { ...p, ...updated } : p)
-      showToast('Profil veröffentlicht')
-    } catch (err) {
-      setPublishError(err instanceof Error ? err.message : 'Fehler beim Veröffentlichen')
+      await fetchApi('/profile/me', {
+        method: 'PUT',
+        body: JSON.stringify({ is_published: value }),
+      })
+      showToast(value ? 'Profil veröffentlicht' : 'Profil zurückgezogen')
+    } catch {
+      setProfile(prev)
+      showToast('Fehler beim Speichern', false)
     } finally {
-      setPublishLoading(false)
+      setPublishSaving(false)
     }
   }
 
@@ -417,7 +427,7 @@ export default function SettingsPage() {
                 description={desc}
                 checked={notif[key]}
                 onChange={(v) => toggleNotif(key, v)}
-                saving={notifSaving === key}
+                saving={notifSaving.has(key)}
               />
             ))}
           </div>
@@ -441,7 +451,7 @@ export default function SettingsPage() {
                 description={desc}
                 checked={notif[key]}
                 onChange={(v) => toggleNotif(key, v)}
-                saving={notifSaving === key}
+                saving={notifSaving.has(key)}
               />
             ))}
           </div>
@@ -450,34 +460,22 @@ export default function SettingsPage() {
         {/* ── 4. Privacy ──────────────────────────────────────────────────── */}
         <SectionCard title="Datenschutz & Sichtbarkeit" icon={Shield}>
 
-          {profile.is_published ? (
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary-fixed-dim animate-pulse" aria-hidden="true" />
-              <span className="text-sm font-semibold text-on-surface">
-                Profil ist öffentlich sichtbar
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-on-surface-variant">
-                {profile.onboarding_completed
-                  ? 'Dein Profil ist bereit zur Veröffentlichung.'
-                  : 'Schließe dein Onboarding ab, um dein Profil zu veröffentlichen.'}
-              </p>
-              {publishError && (
-                <p className="text-xs text-error" role="alert">{publishError}</p>
-              )}
-              <button
-                onClick={handlePublish}
-                disabled={!profile.onboarding_completed || publishLoading}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold hover:opacity-90 active:scale-95 transition-all min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {publishLoading
-                  ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  : <Eye className="h-4 w-4" aria-hidden="true" />}
-                Profil veröffentlichen
-              </button>
-            </div>
+          <ToggleRow
+            id="is-published"
+            label="Profil sichtbar"
+            description={profile.is_published
+              ? 'Öffentlich — andere Nutzer können dich finden'
+              : 'Privat — nur du siehst dein Profil'}
+            checked={profile.is_published}
+            onChange={togglePublished}
+            saving={publishSaving}
+            disabled={!profile.is_published && !profile.onboarding_completed}
+          />
+
+          {!profile.is_published && !profile.onboarding_completed && (
+            <p className="text-xs text-on-surface-variant">
+              Schließe dein Onboarding ab, um dein Profil zu veröffentlichen.
+            </p>
           )}
 
           <div className="h-px bg-outline-variant" />

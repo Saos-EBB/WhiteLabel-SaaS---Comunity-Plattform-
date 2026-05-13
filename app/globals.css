@@ -21,3 +21,15 @@
   --color-error: #ffb4ab;
   --color-error-container: #93000a;
 }
+
+.high-contrast {
+  filter: contrast(1.5);
+}
+
+.text-lg * {
+  font-size: 1.125rem !important;
+}
+
+.text-xl * {
+  font-size: 1.25rem !important;
+}

@@ -5,15 +5,7 @@ import Link from 'next/link'
 import { MessageCircle, User } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
-
-interface Conversation {
-  id: string
-  user_a_id: string
-  user_b_id: string
-  status: string
-  last_message_at: string | null
-  created_at: string
-}
+import { useConversationStore, type Conversation } from '@/lib/store/conversationStore'
 
 type ConvEnvelope = Conversation[] | { data: Conversation[] }
 
@@ -21,18 +13,13 @@ function normalise<T>(res: T[] | { data: T[] }): T[] {
   return Array.isArray(res) ? res : ((res as { data: T[] })?.data ?? [])
 }
 
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const secs = Math.floor(diff / 1000)
-  const mins = Math.floor(secs / 60)
-  const hours = Math.floor(mins / 60)
-  const days = Math.floor(hours / 24)
+function formatTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
 
-  if (secs < 60) return 'Gerade eben'
-  if (mins < 60) return `vor ${mins} Min.`
-  if (hours < 24) return `vor ${hours} Std.`
-  if (days < 7) return `vor ${days} Tag${days === 1 ? '' : 'en'}`
-  return new Date(dateStr).toLocaleDateString('de-DE')
+function getPreview(content: string | null | undefined): string {
+  if (!content) return 'Noch keine Nachrichten'
+  return content.length > 40 ? content.slice(0, 40) + '...' : content
 }
 
 function shortId(id: string): string {
@@ -56,7 +43,7 @@ function SkeletonItem() {
 
 export default function ChatPage() {
   const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
-  const [conversations, setConversations] = useState<Conversation[]>([])
+  const conversations = useConversationStore((s) => s.conversations)
   const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -66,7 +53,17 @@ export default function ChatPage() {
       try {
         const res = await fetchApi<ConvEnvelope>('/chat/conversations')
         const convs = normalise(res)
-        setConversations(convs)
+        useConversationStore.getState().setConversations(convs)
+        if (convs.length > 0) {
+          const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+          console.log('[chat] first conv:', convs[0])
+          console.log('[chat] isUnread inputs:', {
+            last_message_sender_id: convs[0].last_message_sender_id,
+            currentUserId: myId,
+            read_at: convs[0].read_at,
+            match: convs[0].last_message_sender_id === myId,
+          })
+        }
 
         const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
         const partnerIds = [...new Set(convs.map((c) => c.user_a_id === myId ? c.user_b_id : c.user_a_id))]
@@ -93,6 +90,15 @@ export default function ChatPage() {
 
   function getPartnerId(conv: Conversation): string {
     return conv.user_a_id === currentUserId ? conv.user_b_id : conv.user_a_id
+  }
+
+  function isUnread(conv: Conversation): boolean {
+    return (
+      currentUserId != null &&
+      conv.last_message_at != null &&
+      conv.last_message_sender_id !== currentUserId &&
+      conv.read_at == null
+    )
   }
 
   return (
@@ -128,13 +134,15 @@ export default function ChatPage() {
         <ul className="divide-y divide-outline-variant mt-2" aria-label="Gespräche">
           {conversations.map((conv) => {
             const partnerId = getPartnerId(conv)
-            const ts = conv.last_message_at ?? conv.created_at
+            const unread = isUnread(conv)
+            const nickname = nicknames.get(partnerId) ?? shortId(partnerId)
+            const preview = getPreview(conv.last_message_content)
             return (
               <li key={conv.id}>
                 <Link
                   href={`/chat/${conv.id}`}
                   className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-surface-container-low active:bg-surface-container transition-colors min-h-[72px]"
-                  aria-label={`Gespräch mit ${nicknames.get(partnerId) ?? shortId(partnerId)}, ${relativeTime(ts)}`}
+                  aria-label={`Gespräch mit ${nickname}${conv.last_message_at ? ', ' + formatTime(conv.last_message_at) : ''}`}
                 >
                   <div
                     className="flex-shrink-0 h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center"
@@ -144,18 +152,25 @@ export default function ChatPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="font-semibold text-on-surface text-sm truncate">
-                        {nicknames.get(partnerId) ?? shortId(partnerId)}
+                      <p className={`text-on-surface text-sm truncate ${unread ? 'font-semibold' : 'font-medium'}`}>
+                        {nickname}
                       </p>
-                      <time
-                        className="text-xs text-on-surface-variant flex-shrink-0"
-                        dateTime={ts}
-                      >
-                        {relativeTime(ts)}
-                      </time>
+                      {conv.last_message_at && (
+                        <span className="flex items-baseline gap-0.5 flex-shrink-0">
+                          <span className="text-xs text-zinc-400" aria-hidden="true">
+                            {conv.last_message_sender_id === currentUserId ? '↗' : '↙'}
+                          </span>
+                          <time
+                            className="text-xs text-on-surface-variant"
+                            dateTime={conv.last_message_at}
+                          >
+                            {formatTime(conv.last_message_at)}
+                          </time>
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-on-surface-variant mt-0.5 truncate">
-                      Gespräch starten
+                    <p className={`text-xs text-on-surface-variant mt-0.5 truncate ${unread ? 'font-semibold italic' : ''}`}>
+                      {preview}
                     </p>
                   </div>
                 </Link>

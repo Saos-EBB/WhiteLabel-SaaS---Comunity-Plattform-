@@ -7,10 +7,14 @@ import { useAuthStore, type User } from '@/lib/store/authStore'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { connect, disconnect } from '@/lib/socket'
 import { useNotificationStore } from '@/lib/store/notificationStore'
+import { useConversationStore } from '@/lib/store/conversationStore'
 
 interface MessagePayload {
   id: string
   sender_id: string
+  conversation_id: string
+  content: string
+  sent_at: string
 }
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -37,16 +41,22 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (token) {
           const sock = connect(token)
           sock.on('new_message', (msg: MessagePayload) => {
+            // Always update the conversation list regardless of sender
+            useConversationStore.getState().applyMessage(msg)
+
             const myId =
               (useAuthStore.getState().user as any)?.user_id ??
               useAuthStore.getState().user?.id
             if (msg.sender_id !== myId) {
-              useNotificationStore.getState().addNotification({
+              const store = useNotificationStore.getState()
+              if (store.activeConversationId === msg.conversation_id) return
+              store.addOrUpdateNotification({
                 id: `temp-msg-${msg.id}`,
                 type: 'message',
                 content: 'Neue Nachricht',
                 is_read: false,
                 created_at: new Date().toISOString(),
+                conversation_id: msg.conversation_id,
                 _local: true,
               })
             }
