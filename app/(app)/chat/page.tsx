@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { MessageCircle, User } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
@@ -42,6 +43,7 @@ function SkeletonItem() {
 }
 
 export default function ChatPage() {
+  const router = useRouter()
   const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
   const conversations = useConversationStore((s) => s.conversations)
   const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
@@ -54,16 +56,6 @@ export default function ChatPage() {
         const res = await fetchApi<ConvEnvelope>('/chat/conversations')
         const convs = normalise(res)
         useConversationStore.getState().setConversations(convs)
-        if (convs.length > 0) {
-          const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
-          console.log('[chat] first conv:', convs[0])
-          console.log('[chat] isUnread inputs:', {
-            last_message_sender_id: convs[0].last_message_sender_id,
-            currentUserId: myId,
-            read_at: convs[0].read_at,
-            match: convs[0].last_message_sender_id === myId,
-          })
-        }
 
         const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
         const partnerIds = [...new Set(convs.map((c) => c.user_a_id === myId ? c.user_b_id : c.user_a_id))]
@@ -135,13 +127,14 @@ export default function ChatPage() {
           {conversations.map((conv) => {
             const partnerId = getPartnerId(conv)
             const unread = isUnread(conv)
-            const nickname = nicknames.get(partnerId) ?? shortId(partnerId)
+            const realNickname = nicknames.get(partnerId)
+            const nickname = realNickname ?? shortId(partnerId)
             const preview = getPreview(conv.last_message_content)
             return (
               <li key={conv.id}>
-                <Link
-                  href={`/chat/${conv.id}`}
-                  className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-surface-container-low active:bg-surface-container transition-colors min-h-[72px]"
+                <div
+                  onClick={() => router.push(`/chat/${conv.id}`)}
+                  className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-surface-container-low active:bg-surface-container transition-colors min-h-[72px] cursor-pointer"
                   aria-label={`Gespräch mit ${nickname}${conv.last_message_at ? ', ' + formatTime(conv.last_message_at) : ''}`}
                 >
                   <div
@@ -152,9 +145,19 @@ export default function ChatPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className={`text-on-surface text-sm truncate ${unread ? 'font-semibold' : 'font-medium'}`}>
-                        {nickname}
-                      </p>
+                      {realNickname ? (
+                        <Link
+                          href={`/profile/${realNickname}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-on-surface text-sm truncate hover:underline cursor-pointer ${unread ? 'font-semibold' : 'font-medium'}`}
+                        >
+                          {nickname}
+                        </Link>
+                      ) : (
+                        <span className={`text-on-surface text-sm truncate ${unread ? 'font-semibold' : 'font-medium'}`}>
+                          {nickname}
+                        </span>
+                      )}
                       {conv.last_message_at && (
                         <span className="flex items-baseline gap-0.5 flex-shrink-0">
                           <span className="text-xs text-zinc-400" aria-hidden="true">
@@ -173,7 +176,7 @@ export default function ChatPage() {
                       {preview}
                     </p>
                   </div>
-                </Link>
+                </div>
               </li>
             )
           })}

@@ -28,8 +28,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const { accessToken, setUser } = useAuthStore.getState()
     if (!accessToken) return
 
-    const { accessToken: token } = useAuthStore.getState()
-
     fetchApi<User>('/profile/me')
       .then((user) => {
         setUser(user)
@@ -38,30 +36,27 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           router.push('/onboarding')
         }
 
-        if (token) {
-          const sock = connect(token)
-          sock.on('new_message', (msg: MessagePayload) => {
-            // Always update the conversation list regardless of sender
-            useConversationStore.getState().applyMessage(msg)
+        const sock = connect(accessToken)
+        sock.on('new_message', (msg: MessagePayload) => {
+          useConversationStore.getState().applyMessage(msg)
 
-            const myId =
-              (useAuthStore.getState().user as any)?.user_id ??
-              useAuthStore.getState().user?.id
-            if (msg.sender_id !== myId) {
-              const store = useNotificationStore.getState()
-              if (store.activeConversationId === msg.conversation_id) return
-              store.addOrUpdateNotification({
-                id: `temp-msg-${msg.id}`,
-                type: 'message',
-                content: 'Neue Nachricht',
-                is_read: false,
-                created_at: new Date().toISOString(),
-                conversation_id: msg.conversation_id,
-                _local: true,
-              })
-            }
-          })
-        }
+          const myId =
+            (useAuthStore.getState().user as any)?.user_id ??
+            useAuthStore.getState().user?.id
+          if (msg.sender_id !== myId) {
+            const store = useNotificationStore.getState()
+            if (store.activeConversationId === msg.conversation_id) return
+            store.addOrUpdateNotification({
+              id: `temp-msg-${msg.id}`,
+              type: 'message',
+              content: 'Neue Nachricht',
+              is_read: false,
+              created_at: new Date().toISOString(),
+              conversation_id: msg.conversation_id,
+              _local: true,
+            })
+          }
+        })
       })
       .catch((err: unknown) => {
         // fetchApi already handles 401 → refresh → logout() + redirect to /login

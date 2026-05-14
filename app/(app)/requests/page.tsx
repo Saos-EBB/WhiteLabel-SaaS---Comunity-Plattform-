@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { User, Clock, CheckCircle, XCircle, Inbox, Send } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useNotificationStore } from '@/lib/store/notificationStore'
@@ -86,7 +87,7 @@ function IncomingCard({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-on-surface text-sm">{nickname}</p>
+          <Link href={`/profile/${nickname}`} className="font-semibold text-on-surface text-sm hover:underline cursor-pointer">{nickname}</Link>
           <time
             className="text-xs text-on-surface-variant flex-shrink-0"
             dateTime={request.created_at}
@@ -204,7 +205,7 @@ function OutgoingCard({ request, nickname }: { request: ContactRequest; nickname
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-on-surface text-sm">{nickname}</p>
+          <Link href={`/profile/${nickname}`} className="font-semibold text-on-surface text-sm hover:underline cursor-pointer">{nickname}</Link>
           <time
             className="text-xs text-on-surface-variant flex-shrink-0"
             dateTime={request.created_at}

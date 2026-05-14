@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 
@@ -77,7 +78,10 @@ function ProfileCard({ profile }: { profile: Profile }) {
       <div className="p-3 sm:p-4 flex flex-col gap-3 flex-1">
         <div>
           <p className="font-semibold text-on-surface text-sm sm:text-base leading-tight">
-            {profile.nickname}, {age}
+            <Link href={`/profile/${profile.nickname}`} className="hover:underline cursor-pointer">
+              {profile.nickname}
+            </Link>
+            {`, ${age}`}
           </p>
           {profile.city && (
             <div className="flex items-center gap-1 mt-1">

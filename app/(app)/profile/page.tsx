@@ -256,6 +256,13 @@ export default function ProfilePage() {
           {!editMode ? (
             <div className="flex items-center gap-2">
               <Link
+                href={`/profile/${profile.nickname}`}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
+              >
+                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                Außenansicht
+              </Link>
+              <Link
                 href="/settings"
                 className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
               >
