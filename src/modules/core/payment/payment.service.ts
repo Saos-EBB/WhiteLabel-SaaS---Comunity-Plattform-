@@ -56,7 +56,22 @@ export class PaymentService {
         subscription.status = 'cancelled';
         subscription.cancelled_at = new Date();
 
-        return this.subscriptionRepository.save(subscription);
+        const saved = await this.subscriptionRepository.save(subscription);
+
+        if (subscription.provider_subscription_id) {
+            try {
+                await this.stripeService.stripe.subscriptions.cancel(
+                    subscription.provider_subscription_id,
+                );
+            } catch (err: any) {
+                console.error(
+                    `[PaymentService] Stripe cancel failed for sub ${subscription.provider_subscription_id}:`,
+                    err?.message,
+                );
+            }
+        }
+
+        return saved;
     }
 
     async getPaymentLogs(userId: string) {
