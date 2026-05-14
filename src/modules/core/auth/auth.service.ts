@@ -45,7 +45,9 @@ export class AuthService {
     }
 
     private encryptEmail(email: string): Buffer {
-        const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
+        const rawKey = process.env.APP_ENCRYPTION_KEY;
+        if (!rawKey) throw new Error('APP_ENCRYPTION_KEY is not set');
+        const key = Buffer.from(rawKey, 'hex');
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
         const encrypted = Buffer.concat([cipher.update(email, 'utf8'), cipher.final()]);
@@ -53,7 +55,9 @@ export class AuthService {
     }
 
     private decryptEmail(data: Buffer): string {
-        const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
+        const rawKey = process.env.APP_ENCRYPTION_KEY;
+        if (!rawKey) throw new Error('APP_ENCRYPTION_KEY is not set');
+        const key = Buffer.from(rawKey, 'hex');
         const iv = data.subarray(0, 16);
         const encrypted = data.subarray(16);
         const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
@@ -123,14 +127,13 @@ export class AuthService {
         const payload = { sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
 
-        // Refresh Token generieren und speichern
         const rawRefreshToken = this.generateRefreshToken();
         const tokenHash = this.hashToken(rawRefreshToken);
 
         const refreshToken = this.refreshTokenRepository.create({
             user_id: user.id,
             token_hash: tokenHash,
-            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 Tage
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
 
         user.last_login = new Date();
@@ -184,7 +187,8 @@ export class AuthService {
 
     async sendVerificationEmail(userId: string) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
-        const email = this.decryptEmail(user!.email!);
+        if (!user?.email) throw new NotFoundException('User nicht gefunden');
+        const email = this.decryptEmail(user.email);
 
         const token = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.hashToken(token);

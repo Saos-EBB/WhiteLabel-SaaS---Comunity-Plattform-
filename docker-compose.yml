@@ -28,6 +28,8 @@ services:
       - XXX_db
     networks:
       - XXX_network
+    volumes:
+      - XXX_pgadmin_data:/var/lib/pgadmin
 
   nestjs:
     build:
@@ -53,6 +55,7 @@ services:
 
 volumes:
   XXX_pgdata:
+  XXX_pgadmin_data:
 
 networks:
   XXX_network:

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -9,8 +9,6 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-
-// TESTED !!! 
 
 @Controller('auth')
 export class AuthController {
@@ -48,6 +46,7 @@ export class AuthController {
 
     @Get('verify')
     async verifyEmail(@Query('token') token: string) {
+        if (!token) throw new BadRequestException('Token fehlt');
         return this.authService.verifyEmail(token);
     }
 

@@ -141,6 +141,10 @@ export class ChatService {
                 last_message_at: latest?.sent_at ?? null,
                 read_at: latest?.read_at ?? null,
             };
+        }).sort((a, b) => {
+            const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+            const tb = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+            return tb - ta;
         });
     }
 

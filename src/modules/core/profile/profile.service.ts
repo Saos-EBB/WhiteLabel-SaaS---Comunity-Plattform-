@@ -41,7 +41,9 @@ export class ProfileService {
     ) { }
 
     private encryptField(value: string): Buffer {
-        const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
+        const rawKey = process.env.APP_ENCRYPTION_KEY;
+        if (!rawKey) throw new Error('APP_ENCRYPTION_KEY is not set');
+        const key = Buffer.from(rawKey, 'hex');
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
         const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
@@ -191,12 +193,10 @@ export class ProfileService {
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
             .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id'])
-            // Nur published, nicht gebannt, nicht gelöscht, nicht der eigene User
             .where('p.is_published = true')
             .andWhere('u.is_banned = false')
             .andWhere('u.deleted_at IS NULL')
             .andWhere('p.user_id != :requestingUserId', { requestingUserId })
-            // Blockierte User ausblenden (beide Richtungen)
             .andWhere(`
             NOT EXISTS (
                 SELECT 1 FROM blocks b
@@ -298,4 +298,4 @@ export class ProfileService {
         await this.blockRepo.delete({ id: existing.id });
     }
 
-}//Quack!!
+}
