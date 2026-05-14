@@ -79,12 +79,20 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 
 ---
 
+### Media — `/media`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/media/upload/profile-photo` | JWT | Upload a profile photo. Accepts `multipart/form-data` with field `file` (JPEG, PNG, WebP, max 5 MB). Resizes to max 800×800 and converts to WebP via sharp. Saves to `uploads/profiles/`, stores a `MediaUpload` record, updates `profile.photo_id`. Returns `{ file_url, id }`. |
+
+---
+
 ### Profile — `/profile`
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
-| GET | `/profile/me` | JWT | Get own profile. |
+| GET | `/profile/me` | JWT | Get own profile. Includes `photo_url` (full URL from `media_uploads`, or `null`). |
 | PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings). Triggers onboarding check. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
@@ -204,7 +212,11 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 
 ## Changelog
 
-### 2026-05-08 (latest)
+### 2026-05-14 (latest)
+- Media: new `MediaModule` — `POST /media/upload/profile-photo` accepts JPEG/PNG/WebP up to 5 MB, resizes to 800×800, converts to WebP via sharp, stores file under `uploads/profiles/`, saves a `MediaUpload` record, and updates `profile.photo_id`
+- Profile: `GET /profile/me` now returns `photo_url` (resolved from `media_uploads.file_url` via `photo_id`); `null` when no photo set
+
+### 2026-05-08
 - Added Frontend + WebSocket Gateway documentation section
 
 ### 2026-05-07

@@ -62,6 +62,21 @@ export class ProfileService {
         return profile;
     }
 
+    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null }> {
+        const profile = await this.getOwnProfile(userId);
+
+        let photo_url: string | null = null;
+        if (profile.photo_id) {
+            const rows = await this.profileRepo.manager.query<{ file_url: string }[]>(
+                'SELECT file_url FROM media_uploads WHERE id = $1',
+                [profile.photo_id],
+            );
+            photo_url = rows[0]?.file_url ?? null;
+        }
+
+        return { ...profile, photo_url };
+    }
+
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {
         const profile = await this.getOwnProfile(userId);
 

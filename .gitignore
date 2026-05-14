@@ -11,3 +11,5 @@ dist/
 docker-compose.prod.yml
 
 *.exe
+
+uploads/

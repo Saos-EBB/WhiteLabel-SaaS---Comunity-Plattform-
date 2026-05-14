@@ -29,7 +29,7 @@ export class ProfileController {
     @Get('me')
     @UseGuards(JwtGuard)
     getOwnProfile(@Request() req: any) {
-        return this.profileService.getOwnProfile(req.user.sub);
+        return this.profileService.getOwnProfileWithPhoto(req.user.sub);
     }
 
     @Put('me')
