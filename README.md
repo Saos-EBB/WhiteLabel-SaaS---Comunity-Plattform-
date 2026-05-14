@@ -26,6 +26,8 @@ npm run dev -- --port 3001
 
 App runs on `http://localhost:3001`. The backend must be running on `http://localhost:3000`.
 
+`next.config.ts` proxies `/uploads/:path*` → `http://localhost:3000/uploads/:path*` so profile photos load without CORS issues.
+
 ---
 
 ## Screens
@@ -50,7 +52,7 @@ All app routes are protected. Unauthenticated users are redirected to `/login`.
 | `/chat` | Conversation list. |
 | `/chat/[id]` | Real-time conversation via WebSocket. |
 | `/notifications` | Full notification center with type filters. |
-| `/profile` | View and edit own profile, manage interests, publish. |
+| `/profile` | View and edit own profile, manage interests, publish. Clickable avatar uploads a profile photo (JPEG/PNG/WebP, max 5 MB). Photo is displayed immediately after upload and restored on page refresh. |
 | `/settings` | Accessibility, notifications, privacy, account, DSGVO. |
 | `/onboarding` | Profile setup wizard (required before accessing the app). |
 
@@ -112,6 +114,13 @@ Cleanup uses named handler references (`sock.off('event', handler)`) so the chat
 ---
 
 ## Changelog
+
+### 2026-05-14 (latest)
+- Profile: clickable avatar triggers hidden file input — uploads to `POST /media/upload/profile-photo` as `multipart/form-data`
+- Profile: client-side validation before upload — rejects non-image MIME types and files over 5 MB
+- Profile: photo displayed immediately after successful upload; restored on page refresh via `photo_url` from `GET /profile/me`
+- Profile: `photo_url` typed in `Profile` interface; pathname extracted from full URL so Next.js proxy handles the request
+- `next.config.ts`: rewrite rule proxies `/uploads/*` to `http://localhost:3000/uploads/*` (avoids cross-origin image load)
 
 ### 2026-05-08 (latest)
 - WebSocket moved to global `AuthProvider` — real-time notifications on all pages

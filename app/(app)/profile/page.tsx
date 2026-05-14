@@ -1,14 +1,17 @@
 'use client'
 
-import { useEffect, useState, type ElementType, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   User, MapPin, Calendar, FileText, Tag, Eye,
   CheckCircle, XCircle, Pencil, X, Save, Plus,
   AlertCircle, Loader2, BarChart2, Heart, MessageCircle,
-  ChevronDown, Settings,
+  ChevronDown, Settings, Camera,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store/authStore'
+
+const API_ORIGIN = 'http://localhost:3000'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +23,7 @@ interface Profile {
   city: string | null
   bio: string | null
   photo_id: string | null
+  photo_url: string | null
   onboarding_completed: boolean
   is_published: boolean
   lang_simple: boolean
@@ -101,6 +105,11 @@ export default function ProfilePage() {
   const [selectedInterestId, setSelectedInterestId] = useState('')
   const [interestLoading, setInterestLoading]       = useState<string | null>(null)
 
+  const fileInputRef                              = useRef<HTMLInputElement>(null)
+  const [photoUploading, setPhotoUploading]       = useState(false)
+  const [photoError, setPhotoError]               = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl]                   = useState<string | null>(null)
+
   // ── Load ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -112,6 +121,9 @@ export default function ProfilePage() {
           fetchApi<IEnvelope>('/profile/interests'),
         ])
         setProfile(prof)
+        if (prof.photo_url) {
+          try { setPhotoUrl(new URL(prof.photo_url).pathname) } catch { setPhotoUrl(prof.photo_url) }
+        }
         setUserInterests(normalise(ui))
         setAllInterests(normalise(ai))
       } catch (err) {
@@ -186,6 +198,80 @@ export default function ProfilePage() {
       // silent
     } finally {
       setInterestLoading(null)
+    }
+  }
+
+  // ── Photo upload ───────────────────────────────────────────────────────────
+
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setPhotoError('Nur JPEG, PNG und WebP erlaubt')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('Datei zu groß. Maximal 5 MB erlaubt.')
+      return
+    }
+
+    setPhotoUploading(true)
+    setPhotoError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      // fetchApi forces Content-Type: application/json; multipart needs the browser to set it
+      const token = useAuthStore.getState().accessToken
+      const authHeader = (t: string | null): HeadersInit =>
+        t ? { Authorization: `Bearer ${t}` } : {}
+
+      const uploadUrl = `${API_ORIGIN}/api/v1/media/upload/profile-photo`
+
+      let res = await fetch(uploadUrl, {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeader(token),
+        body: formData,
+      })
+
+      if (res.status === 401) {
+        const refreshRes = await fetch(`${API_ORIGIN}/api/v1/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+        if (!refreshRes.ok) {
+          useAuthStore.getState().logout()
+          return
+        }
+        const { accessToken: newToken } = await refreshRes.json() as { accessToken: string }
+        useAuthStore.getState().setAccessToken(newToken)
+        res = await fetch(uploadUrl, {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeader(newToken),
+          body: formData,
+        })
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string }
+        throw new Error(body.message ?? 'Fehler beim Hochladen')
+      }
+
+      const data = await res.json() as { file_url: string; id: string }
+      console.log('[handlePhotoSelect] upload response:', data)
+      const url = new URL(data.file_url)
+      setPhotoUrl(url.pathname)
+      console.log('photoUrl set to:', url.pathname)
+      setProfile((prev) => prev ? { ...prev, photo_id: data.id } : prev)
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Fehler beim Hochladen')
+    } finally {
+      setPhotoUploading(false)
     }
   }
 
@@ -317,12 +403,43 @@ export default function ProfilePage() {
             {/* ── Profile header ─────────────────────────────────────────── */}
             <SectionCard title="Profil" icon={User}>
               <div className="flex items-start gap-4">
-                {/* Avatar placeholder */}
-                <div
-                  className="flex-shrink-0 h-20 w-20 rounded-full bg-surface-container-high flex items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <User className="h-9 w-9 text-outline" />
+                {/* Avatar — click to upload */}
+                <div className="flex-shrink-0 flex flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={photoUploading}
+                    className="h-20 w-20 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden relative group focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim disabled:cursor-not-allowed"
+                    aria-label="Profilbild ändern"
+                  >
+                    {photoUrl ? (
+                      <img src={photoUrl} alt="Profilbild" className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="h-9 w-9 text-outline" aria-hidden="true" />
+                    )}
+                    {photoUploading ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
+                        <Loader2 className="h-5 w-5 text-white animate-spin" aria-hidden="true" />
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="h-5 w-5 text-white" aria-hidden="true" />
+                      </div>
+                    )}
+                  </button>
+                  {photoError && (
+                    <p className="text-xs text-error text-center max-w-[80px]" role="alert">
+                      {photoError}
+                    </p>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handlePhotoSelect}
+                    aria-hidden="true"
+                  />
                 </div>
 
                 <div className="flex-1 min-w-0 space-y-3">
