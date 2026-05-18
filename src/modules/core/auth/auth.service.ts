@@ -6,9 +6,12 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ConsentItemDto } from './dto/consent.dto';
 import { User } from './entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { Profile } from '../profile/entities/profile.entity';
+import { AgbVersion } from '../profile/entities/agb-version.entity';
+import { ConsentLog } from '../profile/entities/consent-log.entity';
 import { MailService } from '../../../common/mail/mail.service';
 
 @Injectable()
@@ -20,6 +23,10 @@ export class AuthService {
         private readonly refreshTokenRepository: Repository<RefreshToken>,
         @InjectRepository(Profile)
         private readonly profileRepository: Repository<Profile>,
+        @InjectRepository(AgbVersion)
+        private readonly agbVersionRepository: Repository<AgbVersion>,
+        @InjectRepository(ConsentLog)
+        private readonly consentLogRepository: Repository<ConsentLog>,
         private readonly jwtService: JwtService,
         private readonly mailService: MailService,
     ) { }
@@ -33,7 +40,8 @@ export class AuthService {
     }
 
     private hashEmail(email: string): string {
-        const salt = process.env.EMAIL_SALT ?? '';
+        if (!process.env.EMAIL_SALT) throw new Error('EMAIL_SALT env var is not set');
+        const salt = process.env.EMAIL_SALT;
         return crypto
             .createHash('sha256')
             .update(email.toLowerCase().trim() + salt)
@@ -141,7 +149,14 @@ export class AuthService {
 
         await this.refreshTokenRepository.save(refreshToken);
 
-        return { accessToken, refreshToken: rawRefreshToken };
+        const currentVersions = await this.agbVersionRepository.find({ where: { is_current: true } });
+        const acceptedLogs = await this.consentLogRepository.find({
+            where: { user_id: user.id, accepted: true },
+        });
+        const acceptedVersionIds = new Set(acceptedLogs.map((l) => l.agb_version_id));
+        const needsConsent = currentVersions.some((v) => !acceptedVersionIds.has(v.id));
+
+        return { accessToken, rawRefreshToken, needsConsent };
     }
 
     async refresh(rawToken: string) {
@@ -171,7 +186,7 @@ export class AuthService {
         const payload = { sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
 
-        return { accessToken, refreshToken: newRawToken };
+        return { accessToken, rawRefreshToken: newRawToken };
     }
 
     async logout(rawToken: string) {
@@ -276,7 +291,35 @@ export class AuthService {
         return { message: 'Passwort erfolgreich geändert' };
     }
 
+    async getAgbVersions(): Promise<AgbVersion[]> {
+        return this.agbVersionRepository.find({ where: { is_current: true } });
+    }
 
+    async createConsents(
+        userId: string,
+        consents: ConsentItemDto[],
+        ip: string,
+    ): Promise<{ success: true }> {
+        const ipHash = crypto.createHash('sha256').update(ip).digest('hex');
+        const now = new Date();
 
+        const entries = consents.map((c) =>
+            this.consentLogRepository.create({
+                user_id: userId,
+                agb_version_id: c.agb_version_id,
+                accepted: c.accepted,
+                accepted_at: now,
+                ip_hash: ipHash,
+                withdrawn_at: null,
+                withdraw_reason: null,
+            }),
+        );
 
+        await this.consentLogRepository.upsert(entries, {
+            conflictPaths: ['user_id', 'agb_version_id'],
+            skipUpdateIfNoValuesChanged: false,
+        });
+
+        return { success: true };
+    }
 }

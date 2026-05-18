@@ -26,38 +26,46 @@ npm run start:prod
 
 ## Environment
 
+Copy `.env.example` to `.env` and fill in all values.
+
 | Variable | Description |
 |---|---|
-| `DATABASE_HOST` | Postgres host |
-| `DATABASE_PORT` | Postgres port |
-| `DATABASE_NAME` | Database name |
-| `DATABASE_USER` | Database user |
-| `DATABASE_PASSWORD` | Database password |
+| `DB_HOST` | Postgres host |
+| `DB_PORT` | Postgres port (default `5432`) |
+| `DB_NAME` | Database name |
+| `DB_USER` | Database user |
+| `DB_PASSWORD` | Database password |
 | `JWT_SECRET` | Secret for signing JWTs |
 | `APP_ENCRYPTION_KEY` | 32-byte hex key for AES-256-CBC (email, sensitive data) |
 | `EMAIL_SALT` | Salt for email search hash (SHA-256) |
-| `APP_URL` | Base URL used in verification links |
-| `MAIL_HOST` / `MAIL_PORT` / `MAIL_USER` / `MAIL_PASS` | SMTP credentials |
+| `APP_URL` | Base URL used in verification email links |
+| `CORS_ORIGIN` | Allowed CORS origin (e.g. `http://localhost:3001`) — **required** |
+| `RESEND_API_KEY` | Resend API key for transactional email |
 | `STRIPE_SECRET_KEY` | Stripe secret API key |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable API key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `STRIPE_SUCCESS_URL` | Redirect URL after successful checkout |
 | `STRIPE_CANCEL_URL` | Redirect URL after cancelled checkout |
+| `PORT` | HTTP server port (default `3000`) |
 
 ---
 
 ## Security
 
 - **JWT**: access token 15 min, refresh token 30 days (single-use rotation, stored as SHA-256 hash)
+- **Refresh token cookie**: `refreshToken` HttpOnly cookie — never exposed to JavaScript
 - **Passwords**: bcrypt cost 12
 - **Email**: stored AES-256-CBC encrypted, looked up via SHA-256 hash
 - **Sensitive data**: disability type stored AES-256-CBC encrypted
-- **Rate limiting**: global 10 req/60s; login 5/60s; forgot-password & reset-password 3/60s
+- **Rate limiting**: global 100 req/60s; login 5/60s; forgot-password & reset-password 3/60s
 - **Soft deletes**: users have `deleted_at`, excluded from all queries
 - **Global exception filter**: all errors are caught, logged via NestJS `Logger` (timestamp, method, URL, status, userId), and returned in a consistent `{ statusCode, error, message }` shape. Request body, tokens, passwords, emails, and IPs are never logged.
 
 ---
 
 ## API Reference
+
+All routes are prefixed with `/api/v1` (e.g. `/api/v1/auth/login`).
 
 All protected routes require `Authorization: Bearer <accessToken>`.
 
@@ -68,14 +76,16 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/register` | — | Register with email + password. Creates profile, sends verification email. |
-| POST | `/auth/login` | — | Login. Returns `accessToken` (15 min) + `refreshToken` (30 days). Blocked if `is_banned`. |
-| POST | `/auth/refresh` | — | Rotate refresh token. Old token is revoked. |
-| POST | `/auth/logout` | — | Revoke refresh token. |
+| POST | `/auth/login` | — | Login. Returns `{ accessToken, needsConsent }`. Sets `refreshToken` HttpOnly cookie (30 days). Blocked if `is_banned`. |
+| POST | `/auth/refresh` | — (cookie) | Rotate refresh token using `refreshToken` cookie. Old token is revoked. Returns `{ accessToken }` + new cookie. |
+| POST | `/auth/logout` | — (cookie) | Revoke refresh token from cookie and clear cookie. |
 | GET | `/auth/me` | JWT | Returns current JWT payload (`sub`, `role`). |
 | GET | `/auth/verify?token=` | — | Verify email address via token from email link. |
 | POST | `/auth/forgot-password` | — | Send password reset email. Always returns same message (no email enumeration). |
 | POST | `/auth/reset-password` | — | Reset password with token. Token valid 1 hour. |
-| DELETE | `/auth/dev/delete-user` | — | **Dev only — remove before production.** Hard-delete user by email. |
+| GET | `/auth/agb-versions` | — | List all current AGB/privacy policy versions. Used by frontend to display consent. |
+| POST | `/auth/consent` | JWT | Bulk upsert consent logs. Body: `{ consents: [{ agb_version_id, accepted }] }`. |
+| DELETE | `/auth/dev/delete-user` | JWT (admin) | **Dev only — remove before production.** Hard-delete user by email. |
 
 ---
 
@@ -212,7 +222,16 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 
 ## Changelog
 
-### 2026-05-14 (latest)
+### 2026-05-18 (latest)
+- Auth: refresh token moved to HttpOnly cookie — `POST /auth/login` sets cookie + returns `needsConsent` flag; `POST /auth/refresh` reads/rotates cookie; `POST /auth/logout` clears cookie
+- Auth: new `GET /auth/agb-versions` (public) — returns all current AGB/privacy versions
+- Auth: new `POST /auth/consent` (JWT) — bulk upsert consent logs (`{ consents: [{ agb_version_id, accepted }] }`)
+- Auth: `AgbSeedService` seeds AGB v1.0 + Privacy v1.0 on application bootstrap
+- Added `.env.example`
+- Fixed env var names: `DATABASE_*` → `DB_*`; replaced SMTP vars with `RESEND_API_KEY`; added `CORS_ORIGIN`, `STRIPE_PUBLISHABLE_KEY`
+- API global prefix changed to `/api/v1`
+
+### 2026-05-14
 - Media: new `MediaModule` — `POST /media/upload/profile-photo` accepts JPEG/PNG/WebP up to 5 MB, resizes to 800×800, converts to WebP via sharp, stores file under `uploads/profiles/`, saves a `MediaUpload` record, and updates `profile.photo_id`
 - Profile: `GET /profile/me` now returns `photo_url` (resolved from `media_uploads.file_url` via `photo_id`); `null` when no photo set
 

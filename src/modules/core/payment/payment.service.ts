@@ -85,10 +85,12 @@ export class PaymentService {
         let event: any;
 
         try {
+            if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error('STRIPE_WEBHOOK_SECRET env var is not set');
+            const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
             event = this.stripeService.stripe.webhooks.constructEvent(
                 rawBody,
                 sig,
-                process.env.STRIPE_WEBHOOK_SECRET ?? '',
+                webhookSecret,
             );
         } catch (err: any) {
             throw new BadRequestException(`Webhook-Fehler: ${err.message}`);

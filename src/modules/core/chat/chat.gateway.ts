@@ -16,7 +16,7 @@ import { Message, MessageType } from './entities/message.entity';
 
 @WebSocketGateway({
     cors: {
-        origin: 'http://localhost:3001',
+        origin: process.env.CORS_ORIGIN ?? '',
         credentials: true,
     },
 })

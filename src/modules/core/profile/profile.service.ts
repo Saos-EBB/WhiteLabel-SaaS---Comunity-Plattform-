@@ -174,7 +174,7 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string): Promise<Partial<Profile>> {
+    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -185,7 +185,35 @@ export class ProfileService {
             .getOne();
 
         if (!profile) throw new NotFoundException('Profil nicht gefunden');
-        return profile;
+
+        let photo_url: string | null = null;
+        if (profile.photo_id) {
+            const rows = await this.profileRepo.manager.query<{ file_url: string }[]>(
+                'SELECT file_url FROM media_uploads WHERE id = $1',
+                [profile.photo_id],
+            );
+            photo_url = rows[0]?.file_url ?? null;
+        }
+
+        return { ...profile, photo_url };
+    }
+
+    async getPublicProfileInterests(nickname: string): Promise<UserInterest[]> {
+        const profile = await this.profileRepo
+            .createQueryBuilder('p')
+            .innerJoin('p.user', 'u')
+            .select(['p.user_id'])
+            .where('p.nickname = :nickname', { nickname })
+            .andWhere('p.is_published = true')
+            .andWhere('u.deleted_at IS NULL')
+            .getOne();
+
+        if (!profile) throw new NotFoundException('Profil nicht gefunden');
+
+        return this.userInterestRepo.find({
+            where: { user_id: profile.user_id },
+            relations: ['interest'],
+        });
     }
 
 
@@ -203,7 +231,7 @@ export class ProfileService {
         return { nickname: profile.nickname, photo_id: profile.photo_id ?? null };
     }
 
-    async searchProfiles(requestingUserId: string, city?: string, interestIds?: string[]): Promise<Partial<Profile>[]> {
+    async searchProfiles(requestingUserId: string, city?: string, interestIds?: string[]): Promise<(Partial<Profile> & { photo_url: string | null; interests: { id: string; name_de: string; category: string | null }[] })[]> {
         const qb = this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -234,7 +262,44 @@ export class ProfileService {
         `, { interestIds });
         }
 
-        return qb.getMany();
+        const profiles = await qb.getMany();
+
+        const photoIds = profiles
+            .map(p => p.photo_id)
+            .filter((id): id is string => id !== null);
+
+        const urlMap: Record<string, string> = {};
+        if (photoIds.length > 0) {
+            const rows = await this.profileRepo.manager.query<{ id: string; file_url: string }[]>(
+                'SELECT id, file_url FROM media_uploads WHERE id = ANY($1)',
+                [photoIds],
+            );
+            for (const row of rows) urlMap[row.id] = row.file_url;
+        }
+
+        const userIds = profiles.map(p => p.user_id);
+
+        type InterestRow = { user_id: string; id: string; name_de: string; category: string | null };
+        const interestRows = userIds.length > 0
+            ? await this.profileRepo.manager.query<InterestRow[]>(
+                  `SELECT ui.user_id, i.id, i.name_de, i.category
+                   FROM user_interests ui
+                   JOIN interests i ON i.id = ui.interest_id
+                   WHERE ui.user_id = ANY($1)`,
+                  [userIds],
+              )
+            : [];
+
+        const interestsMap: Record<string, { id: string; name_de: string; category: string | null }[]> = {};
+        for (const row of interestRows) {
+            (interestsMap[row.user_id] ??= []).push({ id: row.id, name_de: row.name_de, category: row.category });
+        }
+
+        return profiles.map(p => ({
+            ...p,
+            photo_url: p.photo_id ? (urlMap[p.photo_id] ?? null) : null,
+            interests: interestsMap[p.user_id] ?? [],
+        }));
     }
 
 

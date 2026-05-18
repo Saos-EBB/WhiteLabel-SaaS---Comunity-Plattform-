@@ -9,8 +9,6 @@ import { Profile } from '../profile/entities/profile.entity';
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
-console.log('[MediaService] Sharp loaded:', typeof sharp);
-
 @Injectable()
 export class MediaService {
     constructor(
@@ -25,13 +23,11 @@ export class MediaService {
         file: Express.Multer.File,
     ): Promise<{ file_url: string; id: string }> {
         try {
-            console.log('[MediaService] uploadProfilePhoto reached, userId:', userId);
             if (file.size > MAX_SIZE_BYTES) {
                 throw new BadRequestException('Datei zu groß. Maximal 5 MB erlaubt.');
             }
 
             const uploadDir = path.join(process.cwd(), 'uploads', 'profiles');
-            console.log('[MediaService] uploadDir:', uploadDir);
             fs.mkdirSync(uploadDir, { recursive: true });
 
             const filename = `${userId}-${Date.now()}.webp`;
@@ -61,10 +57,8 @@ export class MediaService {
 
             await this.profileRepository.update({ user_id: userId }, { photo_id: saved.id });
 
-            console.log('[MediaService] success, returning:', { file_url: fileUrl, id: saved.id });
             return { file_url: fileUrl, id: saved.id };
         } catch (err) {
-            console.error('[MediaService] uploadProfilePhoto failed:', err);
             throw err;
         }
     }

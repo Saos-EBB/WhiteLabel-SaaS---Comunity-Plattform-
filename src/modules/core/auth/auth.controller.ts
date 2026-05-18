@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request, Req, Res, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -6,9 +7,17 @@ import { LoginDto } from './dto/login.dto';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
-import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ConsentDto } from './dto/consent.dto';
+
+const REFRESH_COOKIE_OPTIONS = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: '/',
+};
 
 @Controller('auth')
 export class AuthController {
@@ -22,20 +31,29 @@ export class AuthController {
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { ttl: 60000, limit: 5 } })
-    async login(@Body() dto: LoginDto) {
-        return this.authService.login(dto);
+    async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+        const { accessToken, rawRefreshToken, needsConsent } = await this.authService.login(dto);
+        res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
+        return { accessToken, needsConsent };
     }
 
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
-    async refresh(@Body() dto: RefreshDto) {
-        return this.authService.refresh(dto.refreshToken);
+    async refresh(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+        const token: string | undefined = req.cookies?.refreshToken;
+        if (!token) throw new UnauthorizedException('Kein Refresh-Token vorhanden');
+        const { accessToken, rawRefreshToken } = await this.authService.refresh(token);
+        res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
+        return { accessToken };
     }
 
     @Post('logout')
     @HttpCode(HttpStatus.OK)
-    async logout(@Body() dto: RefreshDto) {
-        return this.authService.logout(dto.refreshToken);
+    async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+        const token: string | undefined = req.cookies?.refreshToken;
+        if (token) await this.authService.logout(token);
+        res.clearCookie('refreshToken', { path: '/' });
+        return { message: 'Erfolgreich ausgeloggt' };
     }
 
     @Get('me')
@@ -64,6 +82,19 @@ export class AuthController {
         return this.authService.resetPassword(dto.token, dto.password);
     }
 
+    @Get('agb-versions')
+    async getAgbVersions() {
+        return this.authService.getAgbVersions();
+    }
+
+    @Post('consent')
+    @UseGuards(JwtGuard)
+    @HttpCode(HttpStatus.OK)
+    async createConsents(@Req() req: any, @Body() dto: ConsentDto) {
+        const ip: string = req.ip ?? '0.0.0.0';
+        return this.authService.createConsents(req.user.sub, dto.consents, ip);
+    }
+
     // @dev-only — must never exist in production
     @Delete('dev/delete-user')
     @HttpCode(HttpStatus.OK)
@@ -73,6 +104,4 @@ export class AuthController {
         if (process.env.NODE_ENV !== 'development') throw new NotFoundException();
         return this.authService.devDeleteUser(body.email);
     }
-
-
 }

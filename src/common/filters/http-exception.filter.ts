@@ -27,7 +27,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             : HttpStatus[status];
 
         this.logger.error(
-            `${new Date().toISOString()} | ${request.method} ${request.url} | ${status} | userId:${(request['user'] as any)?.sub ?? 'unauthenticated'} | ${Array.isArray(message) ? message.join(', ') : message}`,
+            `${new Date().toISOString()} | ${request.method} ${request.url.split('?')[0]} | ${status} | userId:${(request['user'] as any)?.sub ?? 'unauthenticated'} | ${Array.isArray(message) ? message.join(', ') : message}`,
         );
 
         response.status(status).json({

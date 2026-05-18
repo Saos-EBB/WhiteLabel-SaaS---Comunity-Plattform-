@@ -12,7 +12,7 @@
 | Datenbank | PostgreSQL 16 + PostGIS 3.4 |
 | Verschlüsselung | pgcrypto (AES-256), bcrypt (Backend), SHA-256+Salt |
 | Container | Docker + pgAdmin 4 |
-| Geplant Backend | Node.js / NestJS (TBD) |
+| Backend | Node.js / NestJS |
 
 ---
 
@@ -196,7 +196,7 @@ SELECT pgp_sym_decrypt(email, current_setting('app.encryption_key')) FROM users 
 - [ ] `app.encryption_key` Secret Management einrichten
 - [ ] Schema einspielen: `docker exec -i paarship_db psql -U paarship_user -d paarship < schema_v2.sql`
 - [ ] Seed mit realistischen Testdaten
-- [ ] Backend aufsetzen (NestJS / Express TBD)
+- [x] Backend aufsetzen (NestJS) — siehe `/XXX`
 - [ ] Row-Level Security für `profile_sensitive_data` und `vulnerable_flag`
 - [ ] DSGVO Lösch-Cronjob implementieren
 - [ ] FUTURE-Tabellen ins SQL aufnehmen wenn Feature gebaut wird

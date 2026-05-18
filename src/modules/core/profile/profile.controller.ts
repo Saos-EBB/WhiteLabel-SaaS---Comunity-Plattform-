@@ -105,6 +105,11 @@ export class ProfileController {
         return this.profileService.getProfileByUserId(userId);
     }
 
+    @Get(':nickname/interests')
+    getPublicProfileInterests(@Param('nickname') nickname: string) {
+        return this.profileService.getPublicProfileInterests(nickname);
+    }
+
     @Get(':nickname')
     getPublicProfile(@Param('nickname') nickname: string) {
         return this.profileService.getPublicProfile(nickname);
