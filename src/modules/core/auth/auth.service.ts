@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, MoreThan } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -293,6 +293,15 @@ export class AuthService {
 
     async getAgbVersions(): Promise<AgbVersion[]> {
         return this.agbVersionRepository.find({ where: { is_current: true } });
+    }
+
+    async deleteAccount(userId: string): Promise<{ message: string }> {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User nicht gefunden');
+        if (user.deleted_at) throw new BadRequestException('Account bereits gelöscht');
+        user.deleted_at = new Date();
+        await this.userRepository.save(user);
+        return { message: 'Account erfolgreich gelöscht' };
     }
 
     async createConsents(

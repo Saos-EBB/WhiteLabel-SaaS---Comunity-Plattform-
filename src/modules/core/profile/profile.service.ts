@@ -239,6 +239,8 @@ export class ProfileService {
             .where('p.is_published = true')
             .andWhere('u.is_banned = false')
             .andWhere('u.deleted_at IS NULL')
+            .andWhere('u.enhanced_protection = false')
+            .andWhere('u.vulnerable_flag = false')
             .andWhere('p.user_id != :requestingUserId', { requestingUserId })
             .andWhere(`
             NOT EXISTS (

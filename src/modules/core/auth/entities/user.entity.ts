@@ -32,6 +32,9 @@ export class User {
     @Column({ type: 'boolean', default: false })
     vulnerable_flag!: boolean;
 
+    @Column({ type: 'boolean', default: false })
+    enhanced_protection!: boolean;
+
     @CreateDateColumn()
     created_at!: Date;
 

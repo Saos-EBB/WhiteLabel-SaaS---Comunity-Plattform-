@@ -58,7 +58,9 @@ Copy `.env.example` to `.env` and fill in all values.
 - **Email**: stored AES-256-CBC encrypted, looked up via SHA-256 hash
 - **Sensitive data**: disability type stored AES-256-CBC encrypted
 - **Rate limiting**: global 100 req/60s; login 5/60s; forgot-password & reset-password 3/60s
-- **Soft deletes**: users have `deleted_at`, excluded from all queries
+- **Soft deletes**: users have `deleted_at`, excluded from all queries; `DELETE /auth/account` sets it (DSGVO Art. 17)
+- **Enhanced protection**: users with `enhanced_protection = true` are excluded from all search/discover results at DB level
+- **Vulnerable flag**: users with `vulnerable_flag = true` are excluded from all search/discover results at DB level (caretaker exemption planned)
 - **Global exception filter**: all errors are caught, logged via NestJS `Logger` (timestamp, method, URL, status, userId), and returned in a consistent `{ statusCode, error, message }` shape. Request body, tokens, passwords, emails, and IPs are never logged.
 
 ---
@@ -85,6 +87,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | POST | `/auth/reset-password` | — | Reset password with token. Token valid 1 hour. |
 | GET | `/auth/agb-versions` | — | List all current AGB/privacy policy versions. Used by frontend to display consent. |
 | POST | `/auth/consent` | JWT | Bulk upsert consent logs. Body: `{ consents: [{ agb_version_id, accepted }] }`. |
+| DELETE | `/auth/account` | JWT | Soft-delete own account (DSGVO Art. 17). Sets `deleted_at`. Clears `refreshToken` cookie. Idempotent — returns 400 if already deleted. |
 | DELETE | `/auth/dev/delete-user` | JWT (admin) | **Dev only — remove before production.** Hard-delete user by email. |
 
 ---
@@ -108,7 +111,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
 | POST | `/profile/me/interests/:interestId` | JWT | Add an interest. Triggers onboarding check. |
 | DELETE | `/profile/me/interests/:interestId` | JWT | Remove an interest. |
-| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city (partial, case-insensitive) and/or interest IDs. Excludes banned, deleted, self, and blocked users (both directions). |
+| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city (partial, case-insensitive) and/or interest IDs. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. |
 | POST | `/profile/me/consent/sensitive-data` | JWT | Record AGB consent for sensitive data collection. Returns consent log ID. IP is SHA-256 hashed. |
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
 | POST | `/profile/me/block/:userId` | JWT | Block a user. |
@@ -222,7 +225,13 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 
 ## Changelog
 
-### 2026-05-18 (latest)
+### 2026-05-19 (latest)
+- Auth: new `DELETE /auth/account` (JWT) — DSGVO Art. 17 soft-delete. Sets `deleted_at`, clears `refreshToken` cookie. Returns 400 if already deleted.
+- Chat (WebSocket): `typing` event now verifies sender is a member of the conversation before emitting — prevents any authenticated user from sending typing indicators to arbitrary conversations
+- Profile: `GET /profile/search` now excludes users with `enhanced_protection = true` or `vulnerable_flag = true` at the database level (WHERE clause, not JS filter)
+- User entity: added `enhanced_protection` column mapping (boolean, default false)
+
+### 2026-05-18
 - Auth: refresh token moved to HttpOnly cookie — `POST /auth/login` sets cookie + returns `needsConsent` flag; `POST /auth/refresh` reads/rotates cookie; `POST /auth/logout` clears cookie
 - Auth: new `GET /auth/agb-versions` (public) — returns all current AGB/privacy versions
 - Auth: new `POST /auth/consent` (JWT) — bulk upsert consent logs (`{ consents: [{ agb_version_id, accepted }] }`)

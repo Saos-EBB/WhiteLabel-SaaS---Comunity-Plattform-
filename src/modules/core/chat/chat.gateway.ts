@@ -112,12 +112,21 @@ for (const conv of conversations) {
     }
 
     @SubscribeMessage('typing')
-    handleTyping(
+    async handleTyping(
         @ConnectedSocket() client: Socket,
         @MessageBody() conversationId: string,
     ) {
         const userId = this.extractUserId(client);
         if (!userId) return;
+
+        const conversation = await this.conversationRepo.findOne({
+            where: [
+                { id: conversationId, user_a_id: userId, deleted_at_a: IsNull() },
+                { id: conversationId, user_b_id: userId, deleted_at_b: IsNull() },
+            ],
+        });
+
+        if (!conversation) return;
 
         client.to(conversationId).emit('user_typing', { userId, conversationId });
     }

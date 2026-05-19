@@ -95,6 +95,15 @@ export class AuthController {
         return this.authService.createConsents(req.user.sub, dto.consents, ip);
     }
 
+    @Delete('account')
+    @UseGuards(JwtGuard)
+    @HttpCode(HttpStatus.OK)
+    async deleteAccount(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+        const result = await this.authService.deleteAccount(req.user.sub);
+        res.clearCookie('refreshToken', { path: '/' });
+        return result;
+    }
+
     // @dev-only — must never exist in production
     @Delete('dev/delete-user')
     @HttpCode(HttpStatus.OK)
