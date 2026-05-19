@@ -7,6 +7,29 @@ export enum FontSizeOption {
     XL = 'xl',
 }
 
+export enum GenderOption {
+    MALE          = 'male',
+    FEMALE        = 'female',
+    NON_BINARY    = 'non_binary',
+    DIVERSE       = 'diverse',
+    NOT_SPECIFIED = 'not_specified',
+}
+
+export enum LookingForOption {
+    FRIENDSHIP   = 'friendship',
+    RELATIONSHIP = 'relationship',
+    EXCHANGE     = 'exchange',
+    ALL          = 'all',
+}
+
+export enum StatusMessageOption {
+    AVAILABLE        = 'available',
+    LOOKING_FOR_CHAT = 'looking_for_chat',
+    LOOKING_FOR_DATE = 'looking_for_date',
+    BUSY             = 'busy',
+    DO_NOT_DISTURB   = 'do_not_disturb',
+}
+
 @Entity('profiles')
 export class Profile {
     @PrimaryGeneratedColumn('uuid')
@@ -55,6 +78,21 @@ export class Profile {
 
     @Column({ type: 'boolean', default: false })
     onboarding_completed!: boolean;
+
+    @Column({ type: 'enum', enum: GenderOption, nullable: true, default: null })
+    gender!: GenderOption | null;
+
+    @Column({ type: 'enum', enum: LookingForOption, nullable: true, default: null })
+    looking_for!: LookingForOption | null;
+
+    @Column({ type: 'timestamptz', nullable: true, default: null })
+    last_active_at!: Date | null;
+
+    @Column({ type: 'boolean', default: true })
+    status_visible!: boolean;
+
+    @Column({ type: 'enum', enum: StatusMessageOption, nullable: true, default: null })
+    status_message!: StatusMessageOption | null;
 
     @Column({ type: 'timestamptz' })
     updated_at!: Date;

@@ -11,7 +11,7 @@ import {
     Min,
     MinLength,
 } from 'class-validator';
-import { FontSizeOption } from '../entities/profile.entity';
+import { FontSizeOption, GenderOption, LookingForOption, StatusMessageOption } from '../entities/profile.entity';
 
 export class UpdateProfileDto {
     @IsOptional()
@@ -58,4 +58,20 @@ export class UpdateProfileDto {
     @IsOptional()
     @IsBoolean()
     is_published?: boolean;
+
+    @IsOptional()
+    @IsEnum(GenderOption)
+    gender?: GenderOption;
+
+    @IsOptional()
+    @IsEnum(LookingForOption)
+    looking_for?: LookingForOption;
+
+    @IsOptional()
+    @IsBoolean()
+    status_visible?: boolean;
+
+    @IsOptional()
+    @IsEnum(StatusMessageOption)
+    status_message?: StatusMessageOption;
 }

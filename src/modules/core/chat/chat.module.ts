@@ -10,10 +10,11 @@ import { ContactRequest } from './entities/contact-request.entity';
 import { Conversation } from './entities/conversation.entity';
 import { Message } from './entities/message.entity';
 import { User } from '../auth/entities/user.entity';
+import { Profile } from '../profile/entities/profile.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([ContactRequest, Conversation, Message, User]),
+        TypeOrmModule.forFeature([ContactRequest, Conversation, Message, User, Profile]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({

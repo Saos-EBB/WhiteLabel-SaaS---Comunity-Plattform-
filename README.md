@@ -106,18 +106,18 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
 | GET | `/profile/me` | JWT | Get own profile. Includes `photo_url` (full URL from `media_uploads`, or `null`). |
-| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings). Triggers onboarding check. |
+| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings, `status_visible`, `status_message`). Triggers onboarding check. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
 | POST | `/profile/me/interests/:interestId` | JWT | Add an interest. Triggers onboarding check. |
 | DELETE | `/profile/me/interests/:interestId` | JWT | Remove an interest. |
-| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city (partial, case-insensitive) and/or interest IDs. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. |
+| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online` (true only when `status_visible = true` AND active in last 15 min). |
 | POST | `/profile/me/consent/sensitive-data` | JWT | Record AGB consent for sensitive data collection. Returns consent log ID. IP is SHA-256 hashed. |
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
 | POST | `/profile/me/block/:userId` | JWT | Block a user. |
 | DELETE | `/profile/me/block/:userId` | JWT | Unblock a user. |
 | GET | `/profile/user/:userId` | JWT | Get nickname and photo_id for any account UUID. Used by frontend to resolve partner names in chat. |
-| GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). |
+| GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). Returns `is_online`, `status_visible`, `status_message`, `last_active_at`. |
 
 ---
 
@@ -132,7 +132,7 @@ All chat routes require JWT.
 | GET | `/chat/requests/outgoing` | List outgoing pending contact requests. |
 | PATCH | `/chat/requests/:id/accept` | Accept a contact request. Creates conversation. |
 | PATCH | `/chat/requests/:id/decline` | Decline a contact request. |
-| GET | `/chat/conversations` | List own conversations. |
+| GET | `/chat/conversations` | List own conversations. Each entry includes `partner_is_online`, `partner_status_visible`, `partner_status_message`, `partner_last_active_at`. |
 | GET | `/chat/conversations/:id` | Get a single conversation. |
 | GET | `/chat/conversations/:id/messages` | Get messages for a conversation. |
 | POST | `/chat/conversations/:id/messages` | Send a message in a conversation. |
@@ -226,6 +226,13 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-19 (latest)
+- Profile: new `status_visible` (boolean, default `true`) and `status_message` (enum: `available` · `looking_for_chat` · `looking_for_date` · `busy` · `do_not_disturb`, nullable) columns on `profiles` (migration `003_status_fields.sql`)
+- Profile: `PUT /profile/me` accepts `status_visible` and `status_message`
+- Profile: `GET /profile/search` returns `status_visible`, `status_message`; `is_online` is now `true` only when `status_visible = true` AND `last_active_at > NOW() - 15min` (previously only the time check)
+- Profile: `GET /profile/:nickname` returns `is_online`, `status_visible`, `status_message`, `last_active_at`
+- Chat: `GET /chat/conversations` returns `partner_is_online`, `partner_status_visible`, `partner_status_message`, `partner_last_active_at` for each conversation; `ChatModule` now injects `ProfileRepository`
+
+### 2026-05-19
 - Auth: new `DELETE /auth/account` (JWT) — DSGVO Art. 17 soft-delete. Sets `deleted_at`, clears `refreshToken` cookie. Returns 400 if already deleted.
 - Chat (WebSocket): `typing` event now verifies sender is a member of the conversation before emitting — prevents any authenticated user from sending typing indicators to arbitrary conversations
 - Profile: `GET /profile/search` now excludes users with `enhanced_protection = true` or `vulnerable_flag = true` at the database level (WHERE clause, not JS filter)

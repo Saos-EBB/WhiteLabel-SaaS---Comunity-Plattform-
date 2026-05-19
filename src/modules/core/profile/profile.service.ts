@@ -88,6 +88,7 @@ export class ProfileService {
         }
 
         if (dto.nickname !== undefined) profile.nickname = dto.nickname;
+        if (dto.birthdate !== undefined) profile.birthdate = dto.birthdate;
         if (dto.bio !== undefined) profile.bio = dto.bio;
         if (dto.city !== undefined) profile.city = dto.city;
         if (dto.lang_simple !== undefined) profile.lang_simple = dto.lang_simple;
@@ -100,6 +101,10 @@ export class ProfileService {
             }
             profile.is_published = dto.is_published;
         }
+        if (dto.gender !== undefined) profile.gender = dto.gender;
+        if (dto.looking_for !== undefined) profile.looking_for = dto.looking_for;
+        if (dto.status_visible !== undefined) profile.status_visible = dto.status_visible;
+        if (dto.status_message !== undefined) profile.status_message = dto.status_message;
 
         const saved = await this.profileRepo.save(profile);
         await this.checkAndCompleteOnboarding(userId);
@@ -174,11 +179,11 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null }> {
+    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id'])
+            .select(['p.id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
             .where('p.nickname = :nickname', { nickname })
             .andWhere('p.is_published = true')
             .andWhere('u.deleted_at IS NULL')
@@ -195,7 +200,10 @@ export class ProfileService {
             photo_url = rows[0]?.file_url ?? null;
         }
 
-        return { ...profile, photo_url };
+        const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000);
+        const is_online = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
+
+        return { ...profile, photo_url, is_online };
     }
 
     async getPublicProfileInterests(nickname: string): Promise<UserInterest[]> {
@@ -231,11 +239,20 @@ export class ProfileService {
         return { nickname: profile.nickname, photo_id: profile.photo_id ?? null };
     }
 
-    async searchProfiles(requestingUserId: string, city?: string, interestIds?: string[]): Promise<(Partial<Profile> & { photo_url: string | null; interests: { id: string; name_de: string; category: string | null }[] })[]> {
+    async searchProfiles(
+        requestingUserId: string,
+        city?: string,
+        interestIds?: string[],
+        gender?: string,
+        lookingFor?: string,
+        minAge?: number,
+        maxAge?: number,
+        onlineOnly?: boolean,
+    ): Promise<(Partial<Profile> & { photo_url: string | null; is_online: boolean; interests: { id: string; name_de: string; category: string | null }[] })[]> {
         const qb = this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id'])
+            .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id', 'p.gender', 'p.looking_for', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
             .where('p.is_published = true')
             .andWhere('u.is_banned = false')
             .andWhere('u.deleted_at IS NULL')
@@ -264,7 +281,28 @@ export class ProfileService {
         `, { interestIds });
         }
 
+        if (gender) {
+            qb.andWhere('p.gender = :gender', { gender });
+        }
+
+        if (lookingFor) {
+            qb.andWhere('p.looking_for = :lookingFor', { lookingFor });
+        }
+
+        if (minAge !== undefined) {
+            qb.andWhere("EXTRACT(YEAR FROM AGE(p.birthdate::date)) >= :minAge", { minAge });
+        }
+
+        if (maxAge !== undefined) {
+            qb.andWhere("EXTRACT(YEAR FROM AGE(p.birthdate::date)) <= :maxAge", { maxAge });
+        }
+
+        if (onlineOnly) {
+            qb.andWhere("p.last_active_at > NOW() - INTERVAL '15 minutes'");
+        }
+
         const profiles = await qb.getMany();
+        const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000);
 
         const photoIds = profiles
             .map(p => p.photo_id)
@@ -300,6 +338,7 @@ export class ProfileService {
         return profiles.map(p => ({
             ...p,
             photo_url: p.photo_id ? (urlMap[p.photo_id] ?? null) : null,
+            is_online: p.status_visible && p.last_active_at !== null && p.last_active_at > onlineThreshold,
             interests: interestsMap[p.user_id] ?? [],
         }));
     }

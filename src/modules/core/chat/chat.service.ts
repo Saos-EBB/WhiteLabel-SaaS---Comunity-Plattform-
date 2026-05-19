@@ -11,6 +11,7 @@ import { User } from '../auth/entities/user.entity';
 import { ContactRequest, ContactRequestStatus } from './entities/contact-request.entity';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageType } from './entities/message.entity';
+import { Profile } from '../profile/entities/profile.entity';
 import { SendContactRequestDto } from './dto/send-contact-request.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 
@@ -25,6 +26,8 @@ export class ChatService {
         private readonly conversationRepository: Repository<Conversation>,
         @InjectRepository(Message)
         private readonly messageRepository: Repository<Message>,
+        @InjectRepository(Profile)
+        private readonly profileRepository: Repository<Profile>,
     ) { }
 
     async sendContactRequest(senderId: string, dto: SendContactRequestDto) {
@@ -116,30 +119,49 @@ export class ChatService {
 
         const ids = conversations.map(c => c.id);
 
-        const latestMessages = await this.messageRepository
-            .createQueryBuilder('msg')
-            .where('msg.conversation_id IN (:...ids)', { ids })
-            .andWhere(qb => {
-                const sub = qb
-                    .subQuery()
-                    .select('MAX(m2.sent_at)')
-                    .from(Message, 'm2')
-                    .where('m2.conversation_id = msg.conversation_id')
-                    .getQuery();
-                return `msg.sent_at = (${sub})`;
-            })
-            .getMany();
+        const partnerUserIds = [...new Set(conversations.map(c => c.user_a_id === userId ? c.user_b_id : c.user_a_id))];
+
+        const [latestMessages, partnerProfiles] = await Promise.all([
+            this.messageRepository
+                .createQueryBuilder('msg')
+                .where('msg.conversation_id IN (:...ids)', { ids })
+                .andWhere(qb => {
+                    const sub = qb
+                        .subQuery()
+                        .select('MAX(m2.sent_at)')
+                        .from(Message, 'm2')
+                        .where('m2.conversation_id = msg.conversation_id')
+                        .getQuery();
+                    return `msg.sent_at = (${sub})`;
+                })
+                .getMany(),
+            this.profileRepository
+                .createQueryBuilder('p')
+                .select(['p.user_id', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
+                .where('p.user_id IN (:...partnerUserIds)', { partnerUserIds })
+                .getMany(),
+        ]);
 
         const latestByConversation = new Map(latestMessages.map(m => [m.conversation_id, m]));
+        const profileByUserId = new Map(partnerProfiles.map(p => [p.user_id, p]));
+        const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000);
 
         return conversations.map(conv => {
             const latest = latestByConversation.get(conv.id);
+            const partnerUserId = conv.user_a_id === userId ? conv.user_b_id : conv.user_a_id;
+            const partner = profileByUserId.get(partnerUserId);
+            const is_online = !!partner?.status_visible && partner.last_active_at !== null && partner.last_active_at > onlineThreshold;
+
             return {
                 ...conv,
                 last_message_content: latest && !latest.is_deleted ? latest.content : null,
                 last_message_sender_id: latest?.sender_id ?? null,
                 last_message_at: latest?.sent_at ?? null,
                 read_at: latest?.read_at ?? null,
+                partner_last_active_at: partner?.last_active_at ?? null,
+                partner_status_visible: partner?.status_visible ?? null,
+                partner_status_message: partner?.status_message ?? null,
+                partner_is_online: is_online,
             };
         }).sort((a, b) => {
             const ta = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
