@@ -53,7 +53,7 @@ All app routes are protected. Unauthenticated users are redirected to `/login`.
 | `/chat/[id]` | Real-time conversation via WebSocket. |
 | `/notifications` | Full notification center with type filters. |
 | `/profile` | View and edit own profile, manage interests, publish. Clickable avatar uploads a profile photo (JPEG/PNG/WebP, max 5 MB). Photo is displayed immediately after upload and restored on page refresh. |
-| `/settings` | Accessibility, notifications, privacy, account, DSGVO. |
+| `/settings` | Accessibility, notifications, privacy, account (logout + delete account), DSGVO. |
 | `/onboarding` | Profile setup wizard (required before accessing the app). |
 
 ---
@@ -115,7 +115,11 @@ Cleanup uses named handler references (`sock.off('event', handler)`) so the chat
 
 ## Changelog
 
-### 2026-05-14 (latest)
+### 2026-05-19 (latest)
+- Settings: "Abmelden" (logout) button added to the Konto section — calls `POST /auth/logout` to clear the HttpOnly cookie, then clears Zustand store and redirects to `/login`; logout still succeeds if the backend request fails
+- Settings: "Konto löschen" now functional — calls `DELETE /auth/account`, on success clears auth store and redirects to `/login`; shows inline error on failure with loading spinner during the request
+
+### 2026-05-14
 - Profile: clickable avatar triggers hidden file input — uploads to `POST /media/upload/profile-photo` as `multipart/form-data`
 - Profile: client-side validation before upload — rejects non-image MIME types and files over 5 MB
 - Profile: photo displayed immediately after successful upload; restored on page refresh via `photo_url` from `GET /profile/me`

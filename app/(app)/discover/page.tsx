@@ -5,6 +5,12 @@ import Link from 'next/link'
 import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 
+interface ProfileInterest {
+  id: string
+  name_de: string
+  category: string | null
+}
+
 interface Profile {
   id: string
   user_id: string
@@ -13,6 +19,8 @@ interface Profile {
   city: string
   bio: string | null
   photo_id: string | null
+  photo_url: string | null
+  interests: ProfileInterest[]
   onboarding_completed: boolean
   is_published: boolean
 }
@@ -66,12 +74,16 @@ function ProfileCard({ profile }: { profile: Profile }) {
       className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden flex flex-col"
       aria-label={`Profil von ${profile.nickname}, ${age} Jahre`}
     >
-      {/* Image placeholder */}
+      {/* Photo or placeholder */}
       <div
-        className="aspect-[3/4] bg-surface-container-high flex items-center justify-center"
+        className="aspect-[3/4] bg-surface-container-high flex items-center justify-center overflow-hidden"
         aria-hidden="true"
       >
-        <Users className="h-10 w-10 text-outline" />
+        {profile.photo_url ? (
+          <img src={profile.photo_url.replace('http://localhost:3000', '')} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <Users className="h-10 w-10 text-outline" />
+        )}
       </div>
 
       {/* Info */}
@@ -90,6 +102,19 @@ function ProfileCard({ profile }: { profile: Profile }) {
             </div>
           )}
         </div>
+
+        {profile.interests.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {profile.interests.slice(0, 3).map((i) => (
+              <span
+                key={i.id}
+                className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-medium"
+              >
+                {i.name_de}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="mt-auto space-y-2">
           {status === 'sent' ? (

@@ -12,23 +12,40 @@ interface PublicProfile {
   bio: string | null
   city: string | null
   photo_id: string | null
+  photo_url: string | null
+}
+
+interface Interest {
+  id: string
+  name_de: string
+  name_en: string | null
+  category: string | null
+}
+
+interface UserInterest {
+  id: string
+  user_id: string
+  interest_id: string
+  interest: Interest
 }
 
 export default function PublicProfilePage() {
   const { nickname } = useParams<{ nickname: string }>()
 
-  const [profile, setProfile]         = useState<PublicProfile | null>(null)
+  const [profile, setProfile]           = useState<PublicProfile | null>(null)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
-  const [loading, setLoading]         = useState(true)
-  const [notFound, setNotFound]       = useState(false)
-  const [error, setError]             = useState<string | null>(null)
+  const [interests, setInterests]       = useState<UserInterest[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [notFound, setNotFound]         = useState(false)
+  const [error, setError]               = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       try {
-        const [pubResult, ownResult] = await Promise.allSettled([
+        const [pubResult, ownResult, interestsResult] = await Promise.allSettled([
           fetchApi<PublicProfile>(`/profile/${encodeURIComponent(nickname)}`),
           fetchApi<{ nickname: string }>('/profile/me'),
+          fetchApi<UserInterest[]>(`/profile/${encodeURIComponent(nickname)}/interests`),
         ])
 
         if (pubResult.status === 'rejected') {
@@ -46,6 +63,10 @@ export default function PublicProfilePage() {
 
         if (ownResult.status === 'fulfilled') {
           setIsOwnProfile(ownResult.value.nickname === nickname)
+        }
+
+        if (interestsResult.status === 'fulfilled') {
+          setInterests(interestsResult.value)
         }
       } finally {
         setLoading(false)
@@ -101,12 +122,16 @@ export default function PublicProfilePage() {
 
           {/* Avatar */}
           <div
-            className="h-28 w-28 rounded-full bg-primary-fixed-dim flex items-center justify-center flex-shrink-0"
+            className="h-28 w-28 rounded-full bg-primary-fixed-dim flex items-center justify-center flex-shrink-0 overflow-hidden"
             aria-hidden="true"
           >
-            <span className="text-4xl font-bold text-on-primary-container select-none">
-              {initial}
-            </span>
+            {profile.photo_url ? (
+              <img src={profile.photo_url.replace('http://localhost:3000', '')} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-4xl font-bold text-on-primary-container select-none">
+                {initial}
+              </span>
+            )}
           </div>
 
           {/* Nickname + city */}
@@ -136,6 +161,20 @@ export default function PublicProfilePage() {
         {profile.bio && (
           <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5">
             <p className="text-sm leading-relaxed text-on-surface">{profile.bio}</p>
+          </div>
+        )}
+
+        {/* Interests */}
+        {interests.length > 0 && (
+          <div className="flex flex-wrap gap-2" aria-label="Interessen">
+            {interests.map((ui) => (
+              <span
+                key={ui.interest_id}
+                className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm font-medium"
+              >
+                {ui.interest.name_de}
+              </span>
+            ))}
           </div>
         )}
 

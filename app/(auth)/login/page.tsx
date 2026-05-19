@@ -4,9 +4,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/authStore'
+import { fetchApi } from '@/lib/api'
 
 interface LoginResponse {
   accessToken: string
+  needsConsent: boolean
   user?: { id: string; email: string; [key: string]: unknown }
 }
 
@@ -25,25 +27,16 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('http://localhost:3000/api/v1/auth/login', {
+      const data = await fetchApi<LoginResponse>('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ email, password }),
       })
 
-      const data = await res.json() as LoginResponse & { message?: string }
-
-      if (!res.ok) {
-        setError(data.message ?? 'Anmeldung fehlgeschlagen')
-        return
-      }
-
       setAccessToken(data.accessToken)
       if (data.user) setUser(data.user)
-      router.push('/dashboard')
-    } catch {
-      setError('Verbindungsfehler. Bitte versuche es erneut.')
+      router.push(data.needsConsent ? '/consent' : '/dashboard')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen')
     } finally {
       setLoading(false)
     }

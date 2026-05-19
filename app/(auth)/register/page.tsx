@@ -1,14 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { fetchApi } from '@/lib/api'
 
 export default function RegisterPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -23,22 +25,14 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('http://localhost:3000/api/v1/auth/register', {
+      await fetchApi('/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
 
-      const data = await res.json() as { message?: string }
-
-      if (!res.ok) {
-        setError(data.message ?? 'Registrierung fehlgeschlagen')
-        return
-      }
-
-      setSuccess(true)
-    } catch {
-      setError('Verbindungsfehler. Bitte versuche es erneut.')
+      router.push('/login?registered=1')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registrierung fehlgeschlagen')
     } finally {
       setLoading(false)
     }
@@ -46,25 +40,6 @@ export default function RegisterPage() {
 
   const inputClass =
     'w-full min-h-[52px] rounded-xl bg-surface-container px-4 py-3 text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim border border-outline-variant'
-
-  if (success) {
-    return (
-      <div className="text-center">
-        <div className="rounded-2xl bg-surface-container p-8">
-          <p className="text-4xl mb-3" aria-hidden>✉️</p>
-          <h2 className="text-xl font-bold text-on-surface mb-2">Fast geschafft!</h2>
-          <p className="text-on-surface-variant text-sm">
-            Bitte bestätige deine E-Mail
-          </p>
-        </div>
-        <p className="mt-6 text-sm text-on-surface-variant">
-          <Link href="/login" className="text-primary-fixed-dim font-medium hover:underline">
-            Zurück zum Login
-          </Link>
-        </p>
-      </div>
-    )
-  }
 
   return (
     <>

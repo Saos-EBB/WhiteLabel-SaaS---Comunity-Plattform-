@@ -4,14 +4,12 @@ import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'r
 import Link from 'next/link'
 import {
   User, MapPin, Calendar, FileText, Tag, Eye,
-  CheckCircle, XCircle, Pencil, X, Save, Plus,
+  CheckCircle, XCircle, Pencil, X, Save,
   AlertCircle, Loader2, BarChart2, Heart, MessageCircle,
-  ChevronDown, Settings, Camera,
+  Settings, Camera,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
-
-const API_ORIGIN = 'http://localhost:3000'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +32,9 @@ interface Profile {
 
 interface Interest {
   id: string
-  name: string
+  name_de: string
+  name_en: string | null
+  category: string | null
 }
 
 interface UserInterest {
@@ -102,13 +102,14 @@ export default function ProfilePage() {
   const [publishLoading, setPublishLoading] = useState(false)
   const [publishError, setPublishError]     = useState<string | null>(null)
 
-  const [selectedInterestId, setSelectedInterestId] = useState('')
-  const [interestLoading, setInterestLoading]       = useState<string | null>(null)
+  const [interestLoading, setInterestLoading] = useState<string | null>(null)
 
-  const fileInputRef                              = useRef<HTMLInputElement>(null)
-  const [photoUploading, setPhotoUploading]       = useState(false)
-  const [photoError, setPhotoError]               = useState<string | null>(null)
-  const [photoUrl, setPhotoUrl]                   = useState<string | null>(null)
+  const fileInputRef                                  = useRef<HTMLInputElement>(null)
+  const [photoUploading, setPhotoUploading]           = useState(false)
+  const [photoError, setPhotoError]                   = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl]                       = useState<string | null>(null)
+  const [pendingPhotoFile, setPendingPhotoFile]       = useState<File | null>(null)
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null)
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -126,7 +127,10 @@ export default function ProfilePage() {
         }
         setUserInterests(normalise(ui))
         setAllInterests(normalise(ai))
+        console.log('[INTERESTS] all:', normalise(ai))
+        console.log('[INTERESTS] user:', normalise(ui))
       } catch (err) {
+        console.error('[LOAD ERROR]', err)
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : 'Fehler beim Laden')
       } finally {
@@ -172,16 +176,21 @@ export default function ProfilePage() {
 
   // ── Interests ──────────────────────────────────────────────────────────────
 
-  async function handleAddInterest() {
-    if (!selectedInterestId) return
-    setInterestLoading(selectedInterestId)
+  async function handleToggleInterest(interestId: string) {
+    if (interestLoading) return
+    setInterestLoading(interestId)
+    const isSelected = userInterests.some((ui) => ui.interest_id === interestId)
     try {
-      const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${selectedInterestId}`, { method: 'POST' })
-      setUserInterests(normalise(updated))
-      setSelectedInterestId('')
-      // Refresh profile so onboarding_completed reflects new interest count
-      const refreshed = await fetchApi<Profile>('/profile/me')
-      setProfile(refreshed)
+      if (isSelected) {
+        const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${interestId}`, { method: 'DELETE' })
+        setUserInterests(normalise(updated))
+      } else {
+        const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${interestId}`, { method: 'POST' })
+        setUserInterests(normalise(updated))
+        // Refresh profile so onboarding_completed reflects new interest count
+        const refreshed = await fetchApi<Profile>('/profile/me')
+        setProfile(refreshed)
+      }
     } catch {
       // silent — user can retry
     } finally {
@@ -189,21 +198,9 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleRemoveInterest(interestId: string) {
-    setInterestLoading(interestId)
-    try {
-      const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${interestId}`, { method: 'DELETE' })
-      setUserInterests(normalise(updated))
-    } catch {
-      // silent
-    } finally {
-      setInterestLoading(null)
-    }
-  }
-
   // ── Photo upload ───────────────────────────────────────────────────────────
 
-  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -217,45 +214,35 @@ export default function ProfilePage() {
       return
     }
 
+    setPhotoError(null)
+    if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview)
+    const preview = URL.createObjectURL(file)
+    setPendingPhotoFile(file)
+    setPendingPhotoPreview(preview)
+  }
+
+  async function handlePhotoSave() {
+    if (!pendingPhotoFile) return
+
     setPhotoUploading(true)
     setPhotoError(null)
 
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', pendingPhotoFile)
 
-      // fetchApi forces Content-Type: application/json; multipart needs the browser to set it
-      const token = useAuthStore.getState().accessToken
-      const authHeader = (t: string | null): HeadersInit =>
-        t ? { Authorization: `Bearer ${t}` } : {}
+      // Pre-refresh so the token is fresh — fetchApi cannot handle multipart (browser must set boundary)
+      const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
+      useAuthStore.getState().setAccessToken(freshToken)
 
-      const uploadUrl = `${API_ORIGIN}/api/v1/media/upload/profile-photo`
+      const uploadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/media/upload/profile-photo`
 
-      let res = await fetch(uploadUrl, {
+      const res = await fetch(uploadUrl, {
         method: 'POST',
         credentials: 'include',
-        headers: authHeader(token),
+        headers: { Authorization: `Bearer ${freshToken}` },
         body: formData,
       })
-
-      if (res.status === 401) {
-        const refreshRes = await fetch(`${API_ORIGIN}/api/v1/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-        })
-        if (!refreshRes.ok) {
-          useAuthStore.getState().logout()
-          return
-        }
-        const { accessToken: newToken } = await refreshRes.json() as { accessToken: string }
-        useAuthStore.getState().setAccessToken(newToken)
-        res = await fetch(uploadUrl, {
-          method: 'POST',
-          credentials: 'include',
-          headers: authHeader(newToken),
-          body: formData,
-        })
-      }
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string }
@@ -263,16 +250,24 @@ export default function ProfilePage() {
       }
 
       const data = await res.json() as { file_url: string; id: string }
-      console.log('[handlePhotoSelect] upload response:', data)
       const url = new URL(data.file_url)
+      URL.revokeObjectURL(pendingPhotoPreview!)
+      setPendingPhotoFile(null)
+      setPendingPhotoPreview(null)
       setPhotoUrl(url.pathname)
-      console.log('photoUrl set to:', url.pathname)
       setProfile((prev) => prev ? { ...prev, photo_id: data.id } : prev)
     } catch (err) {
       setPhotoError(err instanceof Error ? err.message : 'Fehler beim Hochladen')
     } finally {
       setPhotoUploading(false)
     }
+  }
+
+  function handlePhotoCancel() {
+    if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview)
+    setPendingPhotoFile(null)
+    setPendingPhotoPreview(null)
+    setPhotoError(null)
   }
 
   // ── Publish ────────────────────────────────────────────────────────────────
@@ -292,9 +287,13 @@ export default function ProfilePage() {
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const availableInterests = allInterests.filter(
-    (i) => !userInterests.some((ui) => ui.interest_id === i.id)
-  )
+  const selectedIds = new Set(userInterests.map((ui) => ui.interest_id))
+
+  const interestsByCategory = allInterests.reduce<Record<string, Interest[]>>((acc, i) => {
+    const cat = i.category ?? 'Sonstiges'
+    ;(acc[cat] ??= []).push(i)
+    return acc
+  }, {})
 
   const onboardingChecks = [
     { label: 'Nickname',        done: !!profile?.nickname },
@@ -403,7 +402,7 @@ export default function ProfilePage() {
             {/* ── Profile header ─────────────────────────────────────────── */}
             <SectionCard title="Profil" icon={User}>
               <div className="flex items-start gap-4">
-                {/* Avatar — click to upload */}
+                {/* Avatar — click to pick, then confirm or cancel */}
                 <div className="flex-shrink-0 flex flex-col items-center gap-1">
                   <button
                     type="button"
@@ -412,8 +411,8 @@ export default function ProfilePage() {
                     className="h-20 w-20 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden relative group focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim disabled:cursor-not-allowed"
                     aria-label="Profilbild ändern"
                   >
-                    {photoUrl ? (
-                      <img src={photoUrl} alt="Profilbild" className="h-full w-full object-cover" />
+                    {(pendingPhotoPreview ?? photoUrl) ? (
+                      <img src={pendingPhotoPreview ?? photoUrl!} alt="Profilbild" className="h-full w-full object-cover" />
                     ) : (
                       <User className="h-9 w-9 text-outline" aria-hidden="true" />
                     )}
@@ -431,6 +430,28 @@ export default function ProfilePage() {
                     <p className="text-xs text-error text-center max-w-[80px]" role="alert">
                       {photoError}
                     </p>
+                  )}
+                  {pendingPhotoFile && (
+                    <div className="flex gap-1 mt-0.5">
+                      <button
+                        type="button"
+                        onClick={handlePhotoCancel}
+                        disabled={photoUploading}
+                        className="px-2 py-1 rounded-lg text-xs text-on-surface-variant hover:bg-surface-container transition-colors disabled:opacity-50"
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePhotoSave}
+                        disabled={photoUploading}
+                        className="px-2 py-1 rounded-lg text-xs bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {photoUploading
+                          ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                          : 'Speichern'}
+                      </button>
+                    </div>
                   )}
                   <input
                     ref={fileInputRef}
@@ -540,69 +561,59 @@ export default function ProfilePage() {
 
             {/* ── Interests ──────────────────────────────────────────────── */}
             <SectionCard title="Interessen" icon={Tag}>
-              {/* Current tags */}
-              <div className="flex flex-wrap gap-2" aria-label="Deine Interessen">
-                {userInterests.length === 0 ? (
+              {editMode ? (
+                allInterests.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant italic">Keine Interessen verfügbar.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(interestsByCategory).map(([category, interests]) => (
+                      <div key={category} className="space-y-2">
+                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                          {category}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {interests.map((i) => {
+                            const selected = selectedIds.has(i.id)
+                            const pending  = interestLoading === i.id
+                            return (
+                              <button
+                                key={i.id}
+                                type="button"
+                                onClick={() => handleToggleInterest(i.id)}
+                                disabled={interestLoading !== null}
+                                aria-pressed={selected}
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+                                  selected
+                                    ? 'bg-primary-fixed-dim text-on-primary-container'
+                                    : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-50'
+                                }`}
+                              >
+                                {pending
+                                  ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                                  : i.name_de}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                userInterests.length === 0 ? (
                   <p className="text-sm text-on-surface-variant italic">Noch keine Interessen hinzugefügt.</p>
                 ) : (
-                  userInterests.map((ui) => (
-                    <span
-                      key={ui.interest_id}
-                      className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-medium"
-                    >
-                      {ui.interest.name}
-                      <button
-                        onClick={() => handleRemoveInterest(ui.interest_id)}
-                        disabled={interestLoading !== null}
-                        className="flex items-center justify-center h-4 w-4 rounded-full hover:bg-on-primary-container/20 transition-colors disabled:opacity-50"
-                        aria-label={`${ui.interest.name} entfernen`}
+                  <div className="flex flex-wrap gap-2" aria-label="Deine Interessen">
+                    {userInterests.map((ui) => (
+                      <span
+                        key={ui.interest_id}
+                        className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm font-medium"
                       >
-                        {interestLoading === ui.interest_id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <X className="h-3 w-3" aria-hidden="true" />
-                        )}
-                      </button>
-                    </span>
-                  ))
-                )}
-              </div>
-
-              {/* Add interest */}
-              {availableInterests.length > 0 && (
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <select
-                      value={selectedInterestId}
-                      onChange={(e) => setSelectedInterestId(e.target.value)}
-                      disabled={interestLoading !== null}
-                      className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer min-h-[44px] disabled:opacity-50"
-                      aria-label="Interesse auswählen"
-                    >
-                      <option value="">Interesse auswählen…</option>
-                      {availableInterests.map((i) => (
-                        <option key={i.id} value={i.id}>{i.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
-                      aria-hidden="true"
-                    />
+                        {ui.interest.name_de}
+                      </span>
+                    ))}
                   </div>
-                  <button
-                    onClick={handleAddInterest}
-                    disabled={!selectedInterestId || interestLoading !== null}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary-fixed-dim text-on-primary-container text-sm font-semibold hover:opacity-90 active:scale-95 transition-all min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Interesse hinzufügen"
-                  >
-                    {interestLoading === selectedInterestId && selectedInterestId !== '' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Plus className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    Hinzufügen
-                  </button>
-                </div>
+                )
               )}
             </SectionCard>
 

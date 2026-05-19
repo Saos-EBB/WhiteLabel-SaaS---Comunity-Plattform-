@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react'
 import {
   Type, Globe, Bell, Shield, Trash2, Download,
-  Check, AlertCircle, Loader2, ChevronDown, Lock,
+  Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
+import { useAuthStore } from '@/lib/store/authStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,7 @@ export default function SettingsPage() {
   // Delete modal
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteError, setDeleteError]         = useState<string | null>(null)
+  const [deleting, setDeleting]               = useState(false)
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -241,6 +243,32 @@ export default function SettingsPage() {
       showToast('Fehler beim Speichern', false)
     } finally {
       setPublishSaving(false)
+    }
+  }
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+
+  async function handleLogout() {
+    try {
+      await fetchApi('/auth/logout', { method: 'POST' })
+    } catch {
+      // backend unreachable — still clear local state
+    }
+    useAuthStore.getState().logout()
+  }
+
+  // ── Delete account ────────────────────────────────────────────────────────
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await fetchApi('/auth/account', { method: 'DELETE' })
+      useAuthStore.getState().logout()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Fehler beim Löschen')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -502,6 +530,15 @@ export default function SettingsPage() {
             <span className="text-xs text-on-surface-variant">Bald verfügbar</span>
           </div>
 
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[52px]"
+          >
+            <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            Abmelden
+          </button>
+
           {/* Delete account */}
           <button
             onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
@@ -566,9 +603,11 @@ export default function SettingsPage() {
 
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <button
-                onClick={() => setDeleteError('Diese Funktion ist derzeit noch nicht verfügbar.')}
-                className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 transition-all"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
+                {deleting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                 Ja, Konto löschen
               </button>
               <button

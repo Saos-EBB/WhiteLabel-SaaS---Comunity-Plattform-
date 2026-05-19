@@ -1,6 +1,6 @@
 import { useAuthStore } from './store/authStore'
 
-const BASE_URL = 'http://localhost:3000/api/v1'
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
 async function tryRefresh(): Promise<boolean> {
   try {
@@ -17,22 +17,27 @@ async function tryRefresh(): Promise<boolean> {
   }
 }
 
-function buildHeaders(token: string | null, init?: HeadersInit): Headers {
+interface FetchApiOptions extends RequestInit {
+  rawBody?: boolean
+}
+
+function buildHeaders(token: string | null, init?: HeadersInit, rawBody?: boolean): Headers {
   const headers = new Headers(init)
-  headers.set('Content-Type', 'application/json')
+  if (!rawBody) headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', `Bearer ${token}`)
   return headers
 }
 
 export async function fetchApi<T>(
   path: string,
-  options: RequestInit = {}
+  options: FetchApiOptions = {}
 ): Promise<T> {
+  const { rawBody, ...fetchOptions } = options
   const { accessToken } = useAuthStore.getState()
-  const headers = buildHeaders(accessToken, options.headers)
+  const headers = buildHeaders(accessToken, fetchOptions.headers, rawBody)
 
   let res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
+    ...fetchOptions,
     credentials: 'include',
     headers,
   })
@@ -44,9 +49,9 @@ export async function fetchApi<T>(
       throw new Error('Session expired')
     }
     const newToken = useAuthStore.getState().accessToken
-    const retryHeaders = buildHeaders(newToken, options.headers)
+    const retryHeaders = buildHeaders(newToken, fetchOptions.headers, rawBody)
     res = await fetch(`${BASE_URL}${path}`, {
-      ...options,
+      ...fetchOptions,
       credentials: 'include',
       headers: retryHeaders,
     })

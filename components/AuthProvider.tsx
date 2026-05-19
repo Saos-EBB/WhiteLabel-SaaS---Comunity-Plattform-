@@ -26,7 +26,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     hasFetched.current = true
 
     const { accessToken, setUser } = useAuthStore.getState()
-    if (!accessToken) return
+    if (!accessToken) {
+      router.replace('/login')
+      return
+    }
 
     fetchApi<User>('/profile/me')
       .then((user) => {

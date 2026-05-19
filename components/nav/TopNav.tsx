@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Sun, Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2 } from 'lucide-react'
+import { Sun, Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -336,6 +336,14 @@ export default function TopNav() {
               </div>
             )}
           </div>
+
+          <Link
+            href="/profile"
+            aria-label="Profile"
+            className="hidden md:inline-flex p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+          >
+            <User size={20} aria-hidden />
+          </Link>
 
           <div
             className="h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center"
