@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MapPin, Pencil, Loader2, AlertCircle } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 interface PublicProfile {
   id: string
@@ -13,6 +14,8 @@ interface PublicProfile {
   city: string | null
   photo_id: string | null
   photo_url: string | null
+  is_online: boolean
+  status_message: string | null
 }
 
 interface Interest {
@@ -134,7 +137,7 @@ export default function PublicProfilePage() {
             )}
           </div>
 
-          {/* Nickname + city */}
+          {/* Nickname + city + online status */}
           <div className="space-y-1.5">
             <h1 className="text-2xl font-bold text-on-surface">{profile.nickname}</h1>
             {profile.city && (
@@ -143,6 +146,13 @@ export default function PublicProfilePage() {
                 <p className="text-sm text-on-surface-variant">{profile.city}</p>
               </div>
             )}
+            <div className="flex justify-center">
+              <OnlineIndicator
+                is_online={profile.is_online}
+                status_message={profile.status_message}
+                size="md"
+              />
+            </div>
           </div>
 
           {/* Edit button — only for own profile */}

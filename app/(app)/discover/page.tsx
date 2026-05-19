@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 interface ProfileInterest {
   id: string
@@ -16,10 +17,14 @@ interface Profile {
   user_id: string
   nickname: string
   birthdate: string
-  city: string
+  city: string | null
   bio: string | null
   photo_id: string | null
   photo_url: string | null
+  is_online: boolean
+  status_message: string | null
+  gender: string | null
+  looking_for: string | null
   interests: ProfileInterest[]
   onboarding_completed: boolean
   is_published: boolean
@@ -29,21 +34,31 @@ interface ProfilesResponse {
   data: Profile[]
 }
 
-const INTERESTS = [
-  'Alle Interessen',
-  'Sport',
-  'Musik',
-  'Reisen',
-  'Kochen',
-  'Lesen',
-  'Gaming',
-  'Kunst',
-]
+const DEFAULT_FILTERS = {
+  city: '',
+  gender: '',
+  looking_for: '',
+  min_age: '',
+  max_age: '',
+  online_only: false,
+}
 
 function calcAge(birthdate: string): number {
   return Math.floor(
     (Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
   )
+}
+
+function buildQuery(f: typeof DEFAULT_FILTERS): string {
+  const params = new URLSearchParams()
+  if (f.city.trim())   params.set('city', f.city.trim())
+  if (f.gender)        params.set('gender', f.gender)
+  if (f.looking_for)   params.set('looking_for', f.looking_for)
+  if (f.min_age)       params.set('min_age', f.min_age)
+  if (f.max_age)       params.set('max_age', f.max_age)
+  if (f.online_only)   params.set('online_only', 'true')
+  const qs = params.toString()
+  return qs ? `/profile/search?${qs}` : '/profile/search'
 }
 
 type RequestStatus = 'idle' | 'loading' | 'sent' | 'error'
@@ -76,13 +91,19 @@ function ProfileCard({ profile }: { profile: Profile }) {
     >
       {/* Photo or placeholder */}
       <div
-        className="aspect-[3/4] bg-surface-container-high flex items-center justify-center overflow-hidden"
+        className="aspect-[3/4] bg-surface-container-high flex items-center justify-center overflow-hidden relative"
         aria-hidden="true"
       >
         {profile.photo_url ? (
           <img src={profile.photo_url.replace('http://localhost:3000', '')} alt="" className="h-full w-full object-cover" />
         ) : (
           <Users className="h-10 w-10 text-outline" />
+        )}
+        {profile.is_online && (
+          <span
+            className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full bg-green-400 ring-2 ring-surface-container"
+            aria-hidden="true"
+          />
         )}
       </div>
 
@@ -99,6 +120,15 @@ function ProfileCard({ profile }: { profile: Profile }) {
             <div className="flex items-center gap-1 mt-1">
               <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
               <p className="text-xs text-on-surface-variant truncate">{profile.city}</p>
+            </div>
+          )}
+          {profile.status_message && (
+            <div className="mt-1">
+              <OnlineIndicator
+                is_online={profile.is_online}
+                status_message={profile.status_message}
+                size="sm"
+              />
             </div>
           )}
         </div>
@@ -173,67 +203,161 @@ function SkeletonCard() {
 
 export default function DiscoverPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [cityFilter, setCityFilter] = useState('')
-  const [interestFilter, setInterestFilter] = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+  const [filters, setFilters]   = useState(DEFAULT_FILTERS)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetchApi<Profile[] | ProfilesResponse>('/profile/search')
-        setProfiles(Array.isArray(res) ? res : (res?.data ?? []))
-      } catch (err) {
-        if (err instanceof Error && err.message === 'Session expired') return
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden')
-      } finally {
-        setLoading(false)
-      }
+  async function loadProfiles(f: typeof DEFAULT_FILTERS) {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetchApi<Profile[] | ProfilesResponse>(buildQuery(f))
+      setProfiles(Array.isArray(res) ? res : (res?.data ?? []))
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Session expired') return
+      setError(err instanceof Error ? err.message : 'Fehler beim Laden')
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [])
+  }
+
+  useEffect(() => { loadProfiles(DEFAULT_FILTERS) }, [])
+
+  function handleApply() { loadProfiles(filters) }
+
+  function handleReset() {
+    setFilters(DEFAULT_FILTERS)
+    loadProfiles(DEFAULT_FILTERS)
+  }
 
   return (
     <main className="min-h-screen bg-background p-4 sm:p-6 pb-24 sm:pb-8 space-y-5">
 
-      {/* Header */}
+      {/* Header + filter panel */}
       <div className="space-y-3">
         <h1 className="text-2xl font-bold text-on-surface">Entdecken</h1>
 
-        {/* Filter bar */}
-        <div className="flex gap-2 sm:gap-3">
-          <div className="relative flex-1">
-            <MapPin
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
-              aria-hidden="true"
-            />
-            <input
-              type="text"
-              value={cityFilter}
-              onChange={(e) => setCityFilter(e.target.value)}
-              placeholder="Stadt"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
-              aria-label="Nach Stadt filtern"
-            />
+        <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 space-y-3">
+
+          {/* Row 1: City · Gender · Suche nach */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+
+            {/* City — full width on mobile */}
+            <div className="col-span-2 relative">
+              <MapPin
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                type="text"
+                value={filters.city}
+                onChange={(e) => setFilters(f => ({ ...f, city: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleApply()}
+                placeholder="Stadt"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
+                aria-label="Nach Stadt filtern"
+              />
+            </div>
+
+            {/* Gender */}
+            <div className="relative">
+              <select
+                value={filters.gender}
+                onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
+                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
+                aria-label="Nach Geschlecht filtern"
+              >
+                <option value="">Alle</option>
+                <option value="male">Mann</option>
+                <option value="female">Frau</option>
+                <option value="non_binary">Non-Binary</option>
+                <option value="diverse">Divers</option>
+                <option value="not_specified">Keine Angabe</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
+            </div>
+
+            {/* Looking for */}
+            <div className="relative">
+              <select
+                value={filters.looking_for}
+                onChange={(e) => setFilters(f => ({ ...f, looking_for: e.target.value }))}
+                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
+                aria-label="Nach Suchanliegen filtern"
+              >
+                <option value="">Alle</option>
+                <option value="friendship">Freundschaft</option>
+                <option value="relationship">Beziehung</option>
+                <option value="exchange">Austausch</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
+            </div>
           </div>
 
-          <div className="relative">
-            <select
-              value={interestFilter}
-              onChange={(e) => setInterestFilter(e.target.value)}
-              className="appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
-              aria-label="Nach Interessen filtern"
-            >
-              {INTERESTS.map((interest) => (
-                <option key={interest} value={interest === 'Alle Interessen' ? '' : interest}>
-                  {interest}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
-              aria-hidden="true"
+          {/* Row 2: Age range · Online toggle · Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+
+            {/* Age inputs */}
+            <input
+              type="number"
+              value={filters.min_age}
+              onChange={(e) => setFilters(f => ({ ...f, min_age: e.target.value }))}
+              placeholder="Alter von"
+              min={18}
+              max={99}
+              className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
+              aria-label="Mindestalter"
             />
+            <span className="text-on-surface-variant text-sm" aria-hidden="true">–</span>
+            <input
+              type="number"
+              value={filters.max_age}
+              onChange={(e) => setFilters(f => ({ ...f, max_age: e.target.value }))}
+              placeholder="Alter bis"
+              min={18}
+              max={99}
+              className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
+              aria-label="Höchstalter"
+            />
+
+            {/* Online toggle */}
+            <label className="flex items-center gap-2 cursor-pointer select-none ml-1">
+              <input
+                type="checkbox"
+                checked={filters.online_only}
+                onChange={(e) => setFilters(f => ({ ...f, online_only: e.target.checked }))}
+                className="sr-only"
+              />
+              <span
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
+                  filters.online_only ? 'bg-primary-fixed-dim' : 'bg-surface-container-highest'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    filters.online_only ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </span>
+              <span className="text-sm text-on-surface whitespace-nowrap">Online jetzt</span>
+            </label>
+
+            {/* Push buttons to the right */}
+            <div className="flex-1" />
+
+            <button
+              onClick={handleReset}
+              className="px-4 py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium min-h-[44px] hover:bg-surface-container-high transition-colors"
+            >
+              Zurücksetzen
+            </button>
+            <button
+              onClick={handleApply}
+              disabled={loading}
+              className="px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold min-h-[44px] hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              Filter anwenden
+            </button>
           </div>
         </div>
       </div>
@@ -258,7 +382,7 @@ export default function DiscoverPage() {
           <p className="text-on-surface font-semibold">Fehler beim Laden</p>
           <p className="text-on-surface-variant text-sm">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => loadProfiles(filters)}
             className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
           >
             Erneut versuchen

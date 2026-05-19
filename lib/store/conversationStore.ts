@@ -10,6 +10,10 @@ export interface Conversation {
   last_message_sender_id?: string | null
   read_at?: string | null
   created_at: string
+  partner_is_online?: boolean
+  partner_status_visible?: boolean | null
+  partner_status_message?: string | null
+  partner_last_active_at?: string | null
 }
 
 interface MessageUpdate {

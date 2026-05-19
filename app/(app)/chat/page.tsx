@@ -7,6 +7,7 @@ import { MessageCircle, User } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useConversationStore, type Conversation } from '@/lib/store/conversationStore'
+import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 type ConvEnvelope = Conversation[] | { data: Conversation[] }
 
@@ -137,11 +138,17 @@ export default function ChatPage() {
                   className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-surface-container-low active:bg-surface-container transition-colors min-h-[72px] cursor-pointer"
                   aria-label={`Gespräch mit ${nickname}${conv.last_message_at ? ', ' + formatTime(conv.last_message_at) : ''}`}
                 >
-                  <div
-                    className="flex-shrink-0 h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center"
-                    aria-hidden="true"
-                  >
-                    <User className="h-6 w-6 text-outline" />
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      <User className="h-6 w-6 text-outline" />
+                    </div>
+                    <span
+                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-background ${conv.partner_is_online ? 'bg-green-400' : 'bg-outline'}`}
+                      aria-hidden="true"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
@@ -175,6 +182,13 @@ export default function ChatPage() {
                     <p className={`text-xs text-on-surface-variant mt-0.5 truncate ${unread ? 'font-semibold italic' : ''}`}>
                       {preview}
                     </p>
+                    {conv.partner_status_message && (
+                      <OnlineIndicator
+                        is_online={conv.partner_is_online ?? false}
+                        status_message={conv.partner_status_message}
+                        size="sm"
+                      />
+                    )}
                   </div>
                 </div>
               </li>

@@ -53,7 +53,7 @@ All app routes are protected. Unauthenticated users are redirected to `/login`.
 | `/chat/[id]` | Real-time conversation via WebSocket. |
 | `/notifications` | Full notification center with type filters. |
 | `/profile` | View and edit own profile, manage interests, publish. Clickable avatar uploads a profile photo (JPEG/PNG/WebP, max 5 MB). Photo is displayed immediately after upload and restored on page refresh. |
-| `/settings` | Accessibility, notifications, privacy, account (logout + delete account), DSGVO. |
+| `/settings` | Accessibility, notifications, privacy (incl. online-status toggle + status dropdown), account (logout + delete account), DSGVO. |
 | `/onboarding` | Profile setup wizard (required before accessing the app). |
 
 ---
@@ -106,6 +106,28 @@ Cleanup uses named handler references (`sock.off('event', handler)`) so the chat
 
 ---
 
+## Components
+
+### `OnlineIndicator` — `components/ui/OnlineIndicator.tsx`
+
+Reusable online-status dot + optional status label.
+
+```tsx
+<OnlineIndicator is_online={true} status_message="available" size="sm" />
+```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `is_online` | `boolean` | — | Green dot when true, gray when false |
+| `status_message` | `string \| null` | `null` | Translated label shown next to dot |
+| `size` | `'sm' \| 'md'` | `'sm'` | Dot size (`h-2 w-2` vs `h-3 w-3`) |
+
+Status translations: `available` → Verfügbar · `looking_for_chat` → Suche Gespräch · `looking_for_date` → Suche Date · `busy` → Beschäftigt · `do_not_disturb` → Nicht stören.
+
+Renders an accessible `aria-label` describing the combined state.
+
+---
+
 ## Key notes
 
 - `sender_id` on messages is the account UUID. Always use `user.user_id` (not `user.id`) for `isOwn` comparisons.
@@ -116,6 +138,15 @@ Cleanup uses named handler references (`sock.off('event', handler)`) so the chat
 ## Changelog
 
 ### 2026-05-19 (latest)
+- New `OnlineIndicator` component (`components/ui/OnlineIndicator.tsx`) — green/gray dot + translated status label, accessible `aria-label`, sizes `sm`/`md`
+- Chat list (`/chat`): green/gray ring dot overlaid on avatar; status_message label shown below message preview via `OnlineIndicator`; both driven by new `partner_is_online` / `partner_status_message` fields from the conversations API
+- Chat header (`/chat/[id]`): `OnlineIndicator` shown below partner nickname; partner public profile fetched after nickname resolves to get `is_online` and `status_message`
+- Public profile (`/profile/[nickname]`): `OnlineIndicator` (size `md`) shown below city; `PublicProfile` type extended with `is_online` and `status_message`
+- Discover (`/discover`): `Profile` type extended with `status_message`; status label rendered in card info section below city when set
+- Settings (`/settings`): "Datenschutz & Sichtbarkeit" section now includes "Online-Status anzeigen" toggle (`status_visible`) and Status dropdown (`status_message`); both auto-save to `PUT /profile/me` with optimistic update + toast
+- `conversationStore`: `Conversation` type extended with `partner_is_online`, `partner_status_visible`, `partner_status_message`, `partner_last_active_at`
+
+### 2026-05-19
 - Settings: "Abmelden" (logout) button added to the Konto section — calls `POST /auth/logout` to clear the HttpOnly cookie, then clears Zustand store and redirects to `/login`; logout still succeeds if the backend request fails
 - Settings: "Konto löschen" now functional — calls `DELETE /auth/account`, on success clears auth store and redirects to `/login`; shows inline error on failure with loading spinner during the request
 

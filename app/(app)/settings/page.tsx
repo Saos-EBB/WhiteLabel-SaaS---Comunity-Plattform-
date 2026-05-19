@@ -8,6 +8,7 @@ import {
 import { fetchApi } from '@/lib/api'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { useAuthStore } from '@/lib/store/authStore'
+import { useThemeStore } from '@/lib/store/themeStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,8 @@ interface Profile {
   high_contrast: boolean
   is_published: boolean
   onboarding_completed: boolean
+  status_visible: boolean
+  status_message: string | null
 }
 
 interface NotifSettings {
@@ -129,10 +132,13 @@ export default function SettingsPage() {
   // UI-only — no backend field for interface language yet
   const [uiLang, setUiLang] = useState('de')
 
+  const { theme, toggleTheme } = useThemeStore()
+
   // Save state
   const [accessSaving, setAccessSaving]   = useState(false)
   const [notifSaving, setNotifSaving]     = useState<Set<keyof NotifSettings>>(new Set())
   const [publishSaving, setPublishSaving] = useState(false)
+  const [statusSaving, setStatusSaving]   = useState(false)
 
   // Toast
   const [toast, setToast]   = useState<{ msg: string; ok: boolean } | null>(null)
@@ -222,6 +228,28 @@ export default function SettingsPage() {
       showToast('Fehler beim Speichern', false)
     } finally {
       setNotifSaving((s) => { const n = new Set(s); n.delete(key); return n })
+    }
+  }
+
+  // ── Status ─────────────────────────────────────────────────────────────────
+
+  async function saveStatus(patch: { status_visible?: boolean; status_message?: string | null }) {
+    if (!profile || statusSaving) return
+    const prev = profile
+    setProfile({ ...profile, ...patch } as Profile)
+    setStatusSaving(true)
+    try {
+      const updated = await fetchApi<Profile>('/profile/me', {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      })
+      setProfile(updated)
+      showToast('Gespeichert')
+    } catch {
+      setProfile(prev)
+      showToast('Fehler beim Speichern', false)
+    } finally {
+      setStatusSaving(false)
     }
   }
 
@@ -332,6 +360,17 @@ export default function SettingsPage() {
 
         {/* ── 1. Visual Comfort ───────────────────────────────────────────── */}
         <SectionCard title="Visuelle Komfort" icon={Type}>
+
+          {/* Dark / Light mode */}
+          <ToggleRow
+            id="theme-mode"
+            label="Heller Modus"
+            description="Wechsle zwischen dunklem und hellem Design"
+            checked={theme === 'light'}
+            onChange={() => toggleTheme()}
+          />
+
+          <div className="h-px bg-outline-variant" />
 
           {/* Font size segmented control */}
           <div className="space-y-2">
@@ -505,6 +544,43 @@ export default function SettingsPage() {
               Schließe dein Onboarding ab, um dein Profil zu veröffentlichen.
             </p>
           )}
+
+          <div className="h-px bg-outline-variant" />
+
+          <ToggleRow
+            id="status-visible"
+            label="Online-Status anzeigen"
+            description="Andere Nutzer sehen, ob du gerade online bist"
+            checked={profile.status_visible}
+            onChange={(v) => saveStatus({ status_visible: v })}
+            saving={statusSaving}
+          />
+
+          <div className="space-y-1.5">
+            <label htmlFor="status-message" className="text-sm font-medium text-on-surface">
+              Status
+            </label>
+            <div className="relative">
+              <select
+                id="status-message"
+                value={profile.status_message ?? ''}
+                onChange={(e) => saveStatus({ status_message: e.target.value || null })}
+                disabled={statusSaving}
+                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Keine Angabe</option>
+                <option value="available">Verfügbar</option>
+                <option value="looking_for_chat">Suche Gespräch</option>
+                <option value="looking_for_date">Suche Date</option>
+                <option value="busy">Beschäftigt</option>
+                <option value="do_not_disturb">Nicht stören</option>
+              </select>
+              <ChevronDown
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
 
           <div className="h-px bg-outline-variant" />
 

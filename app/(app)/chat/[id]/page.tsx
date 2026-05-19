@@ -8,6 +8,7 @@ import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
+import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,8 @@ export default function ConversationPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null)
+  const [partnerIsOnline, setPartnerIsOnline] = useState(false)
+  const [partnerStatusMessage, setPartnerStatusMessage] = useState<string | null>(null)
   // Ref so the socket closure always reads the current nickname without re-subscribing
   const partnerNicknameRef = useRef<string | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -191,7 +194,17 @@ export default function ConversationPage() {
         const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
         const pid = conv.user_a_id === myId ? conv.user_b_id : conv.user_a_id
         fetchApi<{ nickname: string }>(`/profile/user/${pid}`)
-          .then((p) => { setPartnerNickname(p.nickname); partnerNicknameRef.current = p.nickname })
+          .then(async (p) => {
+            setPartnerNickname(p.nickname)
+            partnerNicknameRef.current = p.nickname
+            const pub = await fetchApi<{ is_online: boolean; status_message: string | null }>(
+              `/profile/${encodeURIComponent(p.nickname)}`
+            ).catch(() => null)
+            if (pub) {
+              setPartnerIsOnline(pub.is_online)
+              setPartnerStatusMessage(pub.status_message ?? null)
+            }
+          })
           .catch(() => { /* header falls back to shortId */ })
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
@@ -206,9 +219,9 @@ export default function ConversationPage() {
   // ── Socket ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!currentUserId || !accessToken) return
+    if (!accessToken) return
 
-    const sock = connect(accessToken)
+    const sock = connect()
 
     sock.emit('join_conversation', conversationId)
     sock.emit('read_messages', conversationId)
@@ -248,7 +261,7 @@ export default function ConversationPage() {
       sock.off('user_typing', onUserTyping)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
     }
-  }, [conversationId, currentUserId, accessToken])
+  }, [conversationId, accessToken])
 
   // ── Scroll button visibility (IntersectionObserver on bottom sentinel) ─────
 
@@ -374,6 +387,11 @@ export default function ConversationPage() {
           <p className="font-semibold text-on-surface text-sm truncate">
             {partnerNickname ?? (partnerId ? shortId(partnerId) : 'Gespräch')}
           </p>
+          <OnlineIndicator
+            is_online={partnerIsOnline}
+            status_message={partnerStatusMessage}
+            size="sm"
+          />
         </div>
       </div>
 
