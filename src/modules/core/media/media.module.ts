@@ -6,6 +6,7 @@ import { MediaUpload } from './entities/media-upload.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { MediaService } from './media.service';
 import { MediaController } from './media.controller';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
     imports: [
@@ -18,6 +19,7 @@ import { MediaController } from './media.controller';
             }),
             inject: [ConfigService],
         }),
+        ModerationModule,
     ],
     controllers: [MediaController],
     providers: [MediaService],

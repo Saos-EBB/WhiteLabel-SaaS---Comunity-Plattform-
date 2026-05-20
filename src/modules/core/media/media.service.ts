@@ -6,6 +6,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { MediaUpload, FileType, FileContext, ModerationStatus } from './entities/media-upload.entity';
 import { Profile } from '../profile/entities/profile.entity';
+import { ProfanityService } from '../moderation/profanity.service';
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -16,6 +17,7 @@ export class MediaService {
         private readonly mediaRepository: Repository<MediaUpload>,
         @InjectRepository(Profile)
         private readonly profileRepository: Repository<Profile>,
+        private readonly profanityService: ProfanityService,
     ) {}
 
     private validateMagicBytes(buffer: Buffer): boolean {
@@ -81,6 +83,8 @@ export class MediaService {
             const saved = await this.mediaRepository.save(media);
 
             await this.profileRepository.update({ user_id: userId }, { photo_id: saved.id });
+
+            this.profanityService.createImageTicket(userId, saved.id).catch(() => {});
 
             return { file_url: fileUrl, id: saved.id };
         } catch (err) {

@@ -64,19 +64,21 @@ export class ProfileService {
         return profile;
     }
 
-    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null }> {
+    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean }> {
         const profile = await this.getOwnProfile(userId);
 
         let photo_url: string | null = null;
+        let photo_needs_review = false;
         if (profile.photo_id) {
-            const rows = await this.profileRepo.manager.query<{ file_url: string }[]>(
-                'SELECT file_url FROM media_uploads WHERE id = $1',
+            const rows = await this.profileRepo.manager.query<{ file_url: string; needs_review: boolean }[]>(
+                'SELECT file_url, needs_review FROM media_uploads WHERE id = $1',
                 [profile.photo_id],
             );
             photo_url = rows[0]?.file_url ?? null;
+            photo_needs_review = rows[0]?.needs_review ?? false;
         }
 
-        return { ...profile, photo_url };
+        return { ...profile, photo_url, photo_needs_review };
     }
 
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {
@@ -216,11 +218,11 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean }> {
+    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
+            .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
             .where('p.nickname = :nickname', { nickname })
             .andWhere('p.is_published = true')
             .andWhere('u.deleted_at IS NULL')
@@ -229,18 +231,20 @@ export class ProfileService {
         if (!profile) throw new NotFoundException('Profil nicht gefunden');
 
         let photo_url: string | null = null;
+        let photo_needs_review = false;
         if (profile.photo_id) {
-            const rows = await this.profileRepo.manager.query<{ file_url: string }[]>(
-                'SELECT file_url FROM media_uploads WHERE id = $1',
+            const rows = await this.profileRepo.manager.query<{ file_url: string; needs_review: boolean }[]>(
+                'SELECT file_url, needs_review FROM media_uploads WHERE id = $1',
                 [profile.photo_id],
             );
             photo_url = rows[0]?.file_url ?? null;
+            photo_needs_review = rows[0]?.needs_review ?? false;
         }
 
         const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
         const is_online = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
 
-        return { ...profile, photo_url, is_online };
+        return { ...profile, photo_url, is_online, photo_needs_review };
     }
 
     async getPublicProfileInterests(nickname: string): Promise<UserInterest[]> {
@@ -285,7 +289,7 @@ export class ProfileService {
         minAge?: number,
         maxAge?: number,
         onlineOnly?: boolean,
-    ): Promise<(Partial<Profile> & { photo_url: string | null; is_online: boolean; interests: { id: string; name_de: string; category: string | null }[] })[]> {
+    ): Promise<(Partial<Profile> & { photo_url: string | null; photo_needs_review: boolean; is_online: boolean; interests: { id: string; name_de: string; category: string | null }[] })[]> {
         const qb = this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -346,12 +350,16 @@ export class ProfileService {
             .filter((id): id is string => id !== null);
 
         const urlMap: Record<string, string> = {};
+        const reviewMap: Record<string, boolean> = {};
         if (photoIds.length > 0) {
-            const rows = await this.profileRepo.manager.query<{ id: string; file_url: string }[]>(
-                'SELECT id, file_url FROM media_uploads WHERE id = ANY($1)',
+            const rows = await this.profileRepo.manager.query<{ id: string; file_url: string; needs_review: boolean }[]>(
+                'SELECT id, file_url, needs_review FROM media_uploads WHERE id = ANY($1)',
                 [photoIds],
             );
-            for (const row of rows) urlMap[row.id] = row.file_url;
+            for (const row of rows) {
+                urlMap[row.id] = row.file_url;
+                reviewMap[row.id] = row.needs_review;
+            }
         }
 
         const userIds = profiles.map(p => p.user_id);
@@ -375,6 +383,7 @@ export class ProfileService {
         return profiles.map(p => ({
             ...p,
             photo_url: p.photo_id ? (urlMap[p.photo_id] ?? null) : null,
+            photo_needs_review: p.photo_id ? (reviewMap[p.photo_id] ?? false) : false,
             is_online: p.status_visible && p.last_active_at !== null && p.last_active_at > onlineThreshold,
             interests: interestsMap[p.user_id] ?? [],
         }));

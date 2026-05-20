@@ -55,6 +55,18 @@ export class MediaUpload {
     @CreateDateColumn({ type: 'timestamptz', name: 'uploaded_at' })
     uploaded_at!: Date;
 
+    @Column({ type: 'boolean', default: true })
+    needs_review!: boolean;
+
+    @Column({ type: 'timestamptz', nullable: true, default: null })
+    reviewed_at!: Date | null;
+
+    @Column({ type: 'uuid', nullable: true, default: null })
+    reviewed_by!: string | null;
+
+    @Column({ type: 'text', nullable: true, default: null })
+    review_rejected_reason!: string | null;
+
     @Column({ type: 'timestamptz', nullable: true })
     deleted_at!: Date | null;
 

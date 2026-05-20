@@ -1,9 +1,12 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Report } from './entities/report.entity';
 import { Strike } from './entities/strike.entity';
 import { User } from '../auth/entities/user.entity';
+import { MediaUpload } from '../media/entities/media-upload.entity';
+import { Profile } from '../profile/entities/profile.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CreateStrikeDto, StrikeType } from './dto/create-strike.dto';
@@ -17,6 +20,13 @@ export class ModerationService {
         private readonly strikeRepository: Repository<Strike>,
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
+        @InjectRepository(MediaUpload)
+        private readonly mediaUploadRepository: Repository<MediaUpload>,
+        @InjectRepository(Profile)
+        private readonly profileRepository: Repository<Profile>,
+        @InjectDataSource()
+        private readonly dataSource: DataSource,
+        private readonly notificationsService: NotificationsService,
     ) { }
 
     async createReport(reporterId: string, dto: CreateReportDto) {
@@ -107,5 +117,64 @@ export class ModerationService {
         report.reviewed_at = new Date();
 
         return this.reportRepository.save(report);
+    }
+
+    async getMediaQueue(): Promise<{ id: string; file_url: string; uploaded_at: Date; uploaded_by: string; nickname: string | null }[]> {
+        return this.dataSource.query(
+            `SELECT m.id, m.file_url, m.uploaded_at, m.uploaded_by, p.nickname
+             FROM media_uploads m
+             LEFT JOIN profiles p ON p.user_id = m.uploaded_by
+             WHERE m.needs_review = true
+             ORDER BY m.uploaded_at ASC`,
+        );
+    }
+
+    async approveMedia(adminId: string, mediaId: string): Promise<void> {
+        const media = await this.mediaUploadRepository.findOne({ where: { id: mediaId } });
+        if (!media) throw new NotFoundException('Medium nicht gefunden');
+
+        await this.mediaUploadRepository.update(mediaId, {
+            needs_review: false,
+            reviewed_at: new Date(),
+            reviewed_by: adminId,
+        });
+
+        await this.dataSource.query(
+            `DELETE FROM admin_tickets WHERE type = 'image' AND status = 'open' AND context->>'media_id' = $1`,
+            [mediaId],
+        );
+
+        await this.notificationsService.createNotification(
+            media.uploaded_by,
+            'system',
+            'Dein Profilbild wurde genehmigt',
+        );
+    }
+
+    async rejectMedia(adminId: string, mediaId: string, reason: string): Promise<void> {
+        const media = await this.mediaUploadRepository.findOne({ where: { id: mediaId } });
+        if (!media) throw new NotFoundException('Medium nicht gefunden');
+
+        await this.mediaUploadRepository.update(mediaId, {
+            reviewed_at: new Date(),
+            reviewed_by: adminId,
+            review_rejected_reason: reason,
+        });
+
+        await this.dataSource.query(
+            `DELETE FROM admin_tickets WHERE type = 'image' AND status = 'open' AND context->>'media_id' = $1`,
+            [mediaId],
+        );
+
+        await this.notificationsService.createNotification(
+            media.uploaded_by,
+            'system',
+            `Dein Profilbild wurde abgelehnt: ${reason}`,
+        );
+
+        await this.profileRepository.update(
+            { user_id: media.uploaded_by, photo_id: mediaId },
+            { photo_id: null },
+        );
     }
 }

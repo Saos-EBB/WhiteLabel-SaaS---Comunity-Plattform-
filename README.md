@@ -96,7 +96,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/media/upload/profile-photo` | JWT | Upload a profile photo. Accepts `multipart/form-data` with field `file` (JPEG, PNG, WebP, max 5 MB). Resizes to max 800×800 and converts to WebP via sharp. Saves to `uploads/profiles/`, stores a `MediaUpload` record, updates `profile.photo_id`. Returns `{ file_url, id }`. |
+| POST | `/media/upload/profile-photo` | JWT | Upload a profile photo. Accepts `multipart/form-data` with field `file` (JPEG, PNG, WebP, max 5 MB). Resizes to max 800×800 and converts to WebP via sharp. Saves to `uploads/profiles/`, stores a `MediaUpload` record, updates `profile.photo_id`. Creates an `admin_tickets` row (type `image`) for moderation review. Returns `{ file_url, id }`. |
 
 ---
 
@@ -105,19 +105,19 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
-| GET | `/profile/me` | JWT | Get own profile. Includes `photo_url` (full URL from `media_uploads`, or `null`). |
+| GET | `/profile/me` | JWT | Get own profile. Includes `photo_url` and `photo_needs_review` (from `media_uploads`; both `null`/`false` when no photo set). |
 | PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings, `status_visible`, `status_message`, `profanity_filter`). Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
 | POST | `/profile/me/interests/:interestId` | JWT | Add an interest. Triggers onboarding check. |
 | DELETE | `/profile/me/interests/:interestId` | JWT | Remove an interest. |
-| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online` (true only when `status_visible = true` AND active in last 15 min). |
+| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online`, `photo_needs_review`. |
 | POST | `/profile/me/consent/sensitive-data` | JWT | Record AGB consent for sensitive data collection. Returns consent log ID. IP is SHA-256 hashed. |
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
 | POST | `/profile/me/block/:userId` | JWT | Block a user. |
 | DELETE | `/profile/me/block/:userId` | JWT | Unblock a user. |
 | GET | `/profile/user/:userId` | JWT | Get nickname and photo_id for any account UUID. Used by frontend to resolve partner names in chat. |
-| GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). Returns `is_online`, `status_visible`, `status_message`, `last_active_at`. |
+| GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). Returns `is_online`, `status_visible`, `status_message`, `last_active_at`, `photo_needs_review`. |
 
 ---
 
@@ -156,26 +156,31 @@ All notification routes require JWT.
 
 ### Moderation — `/moderation`
 
-All moderation routes require JWT.
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/moderation/reports` | Submit a report against a user or content. |
-| GET | `/moderation/reports` | Get own submitted reports. |
-| GET | `/moderation/reports/:id` | Get a single report. |
-| GET | `/moderation/strikes` | Get own strikes. |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/moderation/wordlist` | — | Returns the active profanity word list: `{ words: string[] }`. |
+| POST | `/moderation/reports` | JWT | Submit a report against a user or content. |
+| GET | `/moderation/reports` | JWT (admin) | List all reports. |
+| GET | `/moderation/reports/:id` | JWT (admin) | Get a single report. |
+| POST | `/moderation/strikes` | JWT (admin) | Issue a strike. |
+| GET | `/moderation/strikes` | JWT (admin) | List own strikes. |
+| PATCH | `/moderation/reports/:id/review` | JWT (admin) | Review/close a report. |
+| GET | `/moderation/admin/media/queue` | JWT (admin) | Returns all `media_uploads` with `needs_review = true`, ordered by upload time. Includes `id`, `file_url`, `uploaded_at`, `uploaded_by`, owner `nickname`. |
+| PATCH | `/moderation/admin/media/:id/approve` | JWT (admin) | Approve a photo: sets `needs_review = false`, records reviewer + timestamp, deletes the open `admin_ticket`, sends owner notification *"Dein Profilbild wurde genehmigt"*. |
+| PATCH | `/moderation/admin/media/:id/reject` | JWT (admin) | Reject a photo. Body: `{ reason: string }`. Records reviewer, timestamp, and reason; deletes the open `admin_ticket`; nulls `profile.photo_id` (removes photo from profile); sends owner notification *"Dein Profilbild wurde abgelehnt: {reason}"*. |
 
 **Profanity filter (`ProfanityService`, internal):**
 
-Uses `leo-profanity` with a German custom word list. Applied automatically in:
+Uses `leo-profanity` with a German + English custom word list (`PROFANITY_WORDLIST`). Applied automatically in:
 - `PUT /profile/me` — bio and `status_message` changes; nickname changes with profanity create an `admin_tickets` row (type `nickname`) for manual review
 - `POST /chat/conversations/:id/messages` (REST) and `send_message` (WebSocket) — chat messages
+- `POST /media/upload/profile-photo` — always creates an `admin_tickets` row (type `image`) for visual review
 
-Each detection inserts a row into `profanity_flags` (user_id, word, context_type, flagged_at). If a user accumulates ≥ 50 flags within 24 hours a warning is logged server-side.
+Each profanity detection inserts a row into `profanity_flags` (user_id, word, context_type, flagged_at). If a user accumulates ≥ 50 flags within 24 hours a warning is logged server-side.
 
 `profanity_filter` (boolean, default `true`) on the user's profile is a client-side preference; the server always checks and logs regardless of this setting.
 
-**New DB tables (migrations 006–007):** `admin_tickets` (type: `nickname | image | audio | other`, status: `open | reviewed | resolved | dismissed`), `profanity_flags`; `profiles.profanity_filter` column.
+**DB (migrations 006–008):** `admin_tickets` (type: `nickname | image | audio | other`, status: `open | reviewed | resolved | dismissed`), `profanity_flags`; `profiles.profanity_filter`; `media_uploads` gains `needs_review` (bool, default `true`), `reviewed_at`, `reviewed_by`, `review_rejected_reason`.
 
 ---
 
@@ -238,6 +243,15 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-20 (latest)
+- Moderation: `GET /moderation/wordlist` — public endpoint returns `{ words: string[] }` from `PROFANITY_WORDLIST`
+- Moderation: three new admin endpoints — `GET /admin/media/queue`, `PATCH /admin/media/:id/approve`, `PATCH /admin/media/:id/reject` (approve/reject sends system notification to owner; reject also nulls `profile.photo_id`)
+- Moderation: `ProfanityService.createImageTicket()` — creates `admin_tickets` row on every profile photo upload
+- Media: `POST /media/upload/profile-photo` now auto-creates an `admin_ticket` (type `image`) after save
+- Media: `media_uploads` gains `needs_review` (bool, default `true`), `reviewed_at`, `reviewed_by`, `review_rejected_reason` (migration `008_media_review.sql`)
+- Profile: `GET /profile/me`, `GET /profile/:nickname`, `GET /profile/search` all now return `photo_needs_review: boolean`
+- Profanity wordlist: renamed export `CUSTOM_WORDS_DE` → `PROFANITY_WORDLIST`; expanded with EN variants (`fuck`, `nigger`, `bitch`, etc.); removed mild words (`idiot`, `depp`, `trottel`)
+
+### 2026-05-20
 - Moderation: new `ProfanityService` — uses `leo-profanity` + German custom word list; `check()`, `blur()`, `flagUser()` (logs to `profanity_flags`), `createNicknameTicket()` (creates `admin_tickets` row)
 - Profile: new `profanity_filter` boolean column (default `true`) on `profiles`; `PUT /profile/me` accepts `profanity_filter`
 - Chat + Profile: profanity checks wired into bio, `status_message`, nickname changes, REST message send, and WebSocket `send_message`; bio/status/chat detections → `profanity_flags`; profane nickname changes → `admin_tickets`

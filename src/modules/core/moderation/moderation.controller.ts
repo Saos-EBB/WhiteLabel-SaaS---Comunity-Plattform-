@@ -6,13 +6,20 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CreateStrikeDto } from './dto/create-strike.dto';
+import { RejectMediaDto } from './dto/reject-media.dto';
+import { PROFANITY_WORDLIST } from './profanity.wordlist';
 
 @Controller('moderation')
-@UseGuards(JwtGuard)
 export class ModerationController {
     constructor(private readonly moderationService: ModerationService) { }
 
+    @Get('wordlist')
+    getWordlist(): { words: string[] } {
+        return { words: PROFANITY_WORDLIST };
+    }
+
     @Post('reports')
+    @UseGuards(JwtGuard)
     createReport(@Request() req: any, @Body() dto: CreateReportDto) {
         return this.moderationService.createReport(req.user.sub, dto);
     }
@@ -54,5 +61,30 @@ export class ModerationController {
         @Body() dto: CreateReviewDto,
     ) {
         return this.moderationService.reviewReport(req.user.sub, id, dto);
+    }
+
+    @Get('admin/media/queue')
+    @UseGuards(JwtGuard, RolesGuard)
+    @Roles('admin')
+    getMediaQueue() {
+        return this.moderationService.getMediaQueue();
+    }
+
+    @Patch('admin/media/:id/approve')
+    @UseGuards(JwtGuard, RolesGuard)
+    @Roles('admin')
+    approveMedia(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+        return this.moderationService.approveMedia(req.user.sub, id);
+    }
+
+    @Patch('admin/media/:id/reject')
+    @UseGuards(JwtGuard, RolesGuard)
+    @Roles('admin')
+    rejectMedia(
+        @Request() req: any,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: RejectMediaDto,
+    ) {
+        return this.moderationService.rejectMedia(req.user.sub, id, dto.reason);
     }
 }

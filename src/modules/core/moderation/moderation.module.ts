@@ -10,10 +10,13 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Report } from './entities/report.entity';
 import { Strike } from './entities/strike.entity';
 import { User } from '../auth/entities/user.entity';
+import { MediaUpload } from '../media/entities/media-upload.entity';
+import { Profile } from '../profile/entities/profile.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Report, Strike, User]),
+        TypeOrmModule.forFeature([Report, Strike, User, MediaUpload, Profile]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({
@@ -22,6 +25,7 @@ import { User } from '../auth/entities/user.entity';
             }),
             inject: [ConfigService],
         }),
+        NotificationsModule,
     ],
     controllers: [ModerationController],
     providers: [ModerationService, ProfanityService, JwtGuard, RolesGuard],

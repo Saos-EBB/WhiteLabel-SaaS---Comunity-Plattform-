@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import leoProfanity from 'leo-profanity';
-import { CUSTOM_WORDS_DE } from './profanity.wordlist';
+import { PROFANITY_WORDLIST } from './profanity.wordlist';
 
 @Injectable()
 export class ProfanityService {
@@ -12,7 +12,7 @@ export class ProfanityService {
         @InjectDataSource()
         private readonly dataSource: DataSource,
     ) {
-        leoProfanity.add(CUSTOM_WORDS_DE);
+        leoProfanity.add(PROFANITY_WORDLIST);
     }
 
     check(text: string): boolean {
@@ -43,6 +43,13 @@ export class ProfanityService {
         await this.dataSource.query(
             `INSERT INTO admin_tickets (type, user_id, context) VALUES ('nickname', $1, $2)`,
             [userId, JSON.stringify({ nickname })],
+        );
+    }
+
+    async createImageTicket(userId: string, mediaId: string): Promise<void> {
+        await this.dataSource.query(
+            `INSERT INTO admin_tickets (type, user_id, context) VALUES ('image', $1, $2)`,
+            [userId, JSON.stringify({ media_id: mediaId, user_id: userId })],
         );
     }
 }
