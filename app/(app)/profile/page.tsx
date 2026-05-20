@@ -68,6 +68,9 @@ export default function ProfilePage() {
 
   const [interestLoading, setInterestLoading] = useState<string | null>(null)
 
+  const originalNickname = useRef<string>('')
+  const originalGender   = useRef<string>('')
+
   const fileInputRef                                  = useRef<HTMLInputElement>(null)
   const [photoUploading, setPhotoUploading]           = useState(false)
   const [photoPickError, setPhotoPickError]           = useState<string | null>(null)
@@ -105,6 +108,8 @@ export default function ProfilePage() {
 
   function startEdit() {
     if (!profile) return
+    originalNickname.current = profile.nickname    ?? ''
+    originalGender.current   = profile.gender      ?? ''
     setDraft({
       nickname:     profile.nickname    ?? '',
       bio:          profile.bio         ?? '',
@@ -181,7 +186,12 @@ export default function ProfilePage() {
       }
       setEditMode(false)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Fehler beim Speichern')
+      const msg = err instanceof Error ? err.message : 'Fehler beim Speichern'
+      setSaveError(
+        msg.toLowerCase().includes('einmal pro jahr')
+          ? 'Änderung nicht möglich — du hast dieses Feld bereits dieses Jahr geändert.'
+          : msg
+      )
     } finally {
       setSaving(false)
     }
@@ -347,6 +357,12 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {editMode && draft.nickname !== originalNickname.current && (
+            <p className="w-full text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3 py-2 mb-1" role="alert">
+              ⚠ Achtung: Du kannst deinen Nickname nur einmal pro Jahr ändern.
+            </p>
+          )}
+
           {photoPickError && (
             <p className="text-xs text-error mb-3 self-start" role="alert">{photoPickError}</p>
           )}
@@ -363,23 +379,30 @@ export default function ProfilePage() {
           {/* ── Gender + looking_for (edit mode) ──────────────────────────── */}
           {editMode && (
             <div className="w-full space-y-3 mb-5">
-              <div className="relative">
-                <select
-                  value={draft.gender}
-                  onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
-                  className="w-full appearance-none pl-4 pr-8 py-3 rounded-2xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer"
-                  aria-label="Geschlecht"
-                >
-                  <option value="">Geschlecht — Keine Angabe</option>
-                  <option value="male">Mann</option>
-                  <option value="female">Frau</option>
-                  <option value="non_binary">Non-Binary</option>
-                  <option value="diverse">Divers</option>
-                </select>
-                <ChevronDown
-                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
-                  aria-hidden="true"
-                />
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <select
+                    value={draft.gender}
+                    onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
+                    className="w-full appearance-none pl-4 pr-8 py-3 rounded-2xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer"
+                    aria-label="Geschlecht"
+                  >
+                    <option value="">Geschlecht — Keine Angabe</option>
+                    <option value="male">Mann</option>
+                    <option value="female">Frau</option>
+                    <option value="non_binary">Non-Binary</option>
+                    <option value="diverse">Divers</option>
+                  </select>
+                  <ChevronDown
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                    aria-hidden="true"
+                  />
+                </div>
+                {draft.gender !== originalGender.current && (
+                  <p className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3 py-2" role="alert">
+                    ⚠ Achtung: Du kannst dein Geschlecht nur einmal pro Jahr ändern.
+                  </p>
+                )}
               </div>
               <div className="relative">
                 <select

@@ -44,7 +44,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     fetchApi<User>('/profile/me')
       .then((user) => {
         setUser(user)
-        useAccessibilityStore.getState().applySettings(user)
+        useAccessibilityStore.getState().applySettings({
+          font_size: user.font_size,
+          high_contrast: user.high_contrast,
+          lang_simple: user.lang_simple,
+        })
         if (!user.onboarding_completed && !window.location.pathname.startsWith('/onboarding')) {
           router.push('/onboarding')
         }
