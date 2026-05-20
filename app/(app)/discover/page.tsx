@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
-import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
+import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 
 interface ProfileInterest {
   id: string
@@ -101,7 +101,8 @@ function ProfileCard({ profile }: { profile: Profile }) {
         )}
         {profile.is_online && (
           <span
-            className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full bg-green-400 ring-2 ring-surface-container"
+            className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full ring-2 ring-surface-container"
+            style={{ backgroundColor: getStatusColor(profile.is_online, profile.status_message) }}
             aria-hidden="true"
           />
         )}

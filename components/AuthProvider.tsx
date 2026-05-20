@@ -21,6 +21,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const hasFetched = useRef(false)
   const router = useRouter()
 
+  // ── Heartbeat — keeps last_active_at fresh every 2 min ───────────────────
+  useEffect(() => {
+    const { accessToken } = useAuthStore.getState()
+    if (!accessToken) return
+    const id = setInterval(() => {
+      fetchApi('/profile/me').catch(() => { })
+    }, 2 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
   useEffect(() => {
     if (hasFetched.current) return
     hasFetched.current = true
@@ -39,7 +49,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           router.push('/onboarding')
         }
 
-        const sock = connect(accessToken)
+        const sock = connect()
         sock.on('new_message', (msg: MessagePayload) => {
           useConversationStore.getState().applyMessage(msg)
 

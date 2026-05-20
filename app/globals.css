@@ -22,6 +22,33 @@
   --color-error-container: #93000a;
 }
 
+/* ── Light mode token overrides ─────────────────────────────────────────── */
+.light {
+  --color-background:                #F5F3F7;
+  --color-surface-container-lowest:  #FAFAFE;
+  --color-surface-container-low:     #EEEAF8;
+  --color-surface-container:         #E6E0F4;
+  --color-surface-container-high:    #DBD4EE;
+  --color-surface-container-highest: #CCC4E6;
+  --color-on-surface:                #1C1433;
+  --color-on-surface-variant:        #625B71;
+  --color-primary-fixed-dim:         #7C4DFF;
+  --color-primary-container:         #EADDff;
+  --color-on-primary-container:      #21005D;
+  --color-secondary-container:       #DBD4EE;
+  --color-tertiary-fixed-dim:        #9747FF;
+  --color-outline:                   #79747E;
+  --color-outline-variant:           #CAC4D0;
+  --color-error:                     #B3261E;
+  --color-error-container:           #F9DEDC;
+}
+
+/* Smooth theme transition */
+html, body {
+  background-color: var(--color-background);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
 .high-contrast {
   filter: contrast(1.5);
 }

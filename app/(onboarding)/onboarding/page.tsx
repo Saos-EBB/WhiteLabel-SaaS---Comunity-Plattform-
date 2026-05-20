@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Check, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
+import { AlertCircle, Check, ChevronDown, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,6 +19,8 @@ interface FormData {
   birthdate: string
   city: string
   bio: string
+  gender: string
+  looking_for: string
   interestIds: string[]
 }
 
@@ -170,17 +172,25 @@ function StepBasicInfo({
   birthdate,
   city,
   bio,
+  gender,
+  lookingFor,
   onChangeBirthdate,
   onChangeCity,
   onChangeBio,
+  onChangeGender,
+  onChangeLookingFor,
   onNext,
 }: {
   birthdate: string
   city: string
   bio: string
+  gender: string
+  lookingFor: string
   onChangeBirthdate: (v: string) => void
   onChangeCity: (v: string) => void
   onChangeBio: (v: string) => void
+  onChangeGender: (v: string) => void
+  onChangeLookingFor: (v: string) => void
   onNext: () => void
 }) {
   const [touched, setTouched] = useState({ birthdate: false, city: false })
@@ -294,6 +304,58 @@ function StepBasicInfo({
         </p>
       </div>
 
+      {/* Gender */}
+      <div className="space-y-1.5">
+        <label htmlFor="gender" className="text-sm font-medium text-on-surface">
+          Geschlecht{' '}
+          <span className="text-xs text-on-surface-variant font-normal">(optional)</span>
+        </label>
+        <div className="relative">
+          <select
+            id="gender"
+            value={gender}
+            onChange={(e) => onChangeGender(e.target.value)}
+            className="w-full appearance-none rounded-2xl bg-surface-container border border-outline-variant px-4 pr-10 py-3.5 text-on-surface focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors cursor-pointer"
+          >
+            <option value="">Keine Angabe</option>
+            <option value="male">Mann</option>
+            <option value="female">Frau</option>
+            <option value="non_binary">Non-Binary</option>
+            <option value="diverse">Divers</option>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+
+      {/* Looking for */}
+      <div className="space-y-1.5">
+        <label htmlFor="looking-for" className="text-sm font-medium text-on-surface">
+          Ich suche{' '}
+          <span className="text-xs text-on-surface-variant font-normal">(optional)</span>
+        </label>
+        <div className="relative">
+          <select
+            id="looking-for"
+            value={lookingFor}
+            onChange={(e) => onChangeLookingFor(e.target.value)}
+            className="w-full appearance-none rounded-2xl bg-surface-container border border-outline-variant px-4 pr-10 py-3.5 text-on-surface focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors cursor-pointer"
+          >
+            <option value="">Keine Angabe</option>
+            <option value="friendship">Freundschaft</option>
+            <option value="relationship">Beziehung</option>
+            <option value="exchange">Austausch</option>
+            <option value="all">Alles offen</option>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant"
+            aria-hidden="true"
+          />
+        </div>
+      </div>
+
       <button
         onClick={handleNext}
         className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-base min-h-[52px] hover:opacity-90 active:scale-[0.98] transition-all"
@@ -403,10 +465,12 @@ function StepDone({ formData }: { formData: FormData }) {
       await fetchApi<unknown>('/profile/me', {
         method: 'PUT',
         body: JSON.stringify({
-          nickname: formData.nickname,
-          birthdate: formData.birthdate,
-          city: formData.city,
-          ...(formData.bio ? { bio: formData.bio } : {}),
+          nickname:   formData.nickname,
+          birthdate:  formData.birthdate,
+          city:       formData.city,
+          ...(formData.bio         ? { bio:         formData.bio }         : {}),
+          ...(formData.gender      ? { gender:      formData.gender }      : {}),
+          ...(formData.looking_for ? { looking_for: formData.looking_for } : {}),
         }),
       })
       await fetchApi<unknown>('/profile/me/publish', { method: 'PATCH' })
@@ -481,10 +545,12 @@ function StepDone({ formData }: { formData: FormData }) {
 export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>({
-    nickname: '',
-    birthdate: '',
-    city: '',
-    bio: '',
+    nickname:   '',
+    birthdate:  '',
+    city:       '',
+    bio:        '',
+    gender:     '',
+    looking_for: '',
     interestIds: [],
   })
   const [interests, setInterests] = useState<Interest[]>([])
@@ -548,9 +614,13 @@ export default function OnboardingPage() {
           birthdate={formData.birthdate}
           city={formData.city}
           bio={formData.bio}
+          gender={formData.gender}
+          lookingFor={formData.looking_for}
           onChangeBirthdate={(v) => update('birthdate', v)}
           onChangeCity={(v) => update('city', v)}
           onChangeBio={(v) => update('bio', v)}
+          onChangeGender={(v) => update('gender', v)}
+          onChangeLookingFor={(v) => update('looking_for', v)}
           onNext={next}
         />
       )}

@@ -50,5 +50,7 @@ export const config = {
     '/consent',
     '/login',
     '/register',
+    // public marketing route — no auth required
+    '/b2b/:path*',
   ],
 }

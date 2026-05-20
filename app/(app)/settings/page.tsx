@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Type, Globe, Bell, Shield, Trash2, Download,
   Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut,
@@ -13,15 +13,15 @@ import { useThemeStore } from '@/lib/store/themeStore'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FontSize = 'normal' | 'large' | 'xl'
+type SettingsTab = 'einstellungen' | 'konto'
 
 interface Profile {
-  lang_simple: boolean
+  id: string
   font_size: FontSize
   high_contrast: boolean
+  lang_simple: boolean
   is_published: boolean
   onboarding_completed: boolean
-  status_visible: boolean
-  status_message: string | null
 }
 
 interface NotifSettings {
@@ -32,6 +32,13 @@ interface NotifSettings {
   push_matches: boolean
   push_system: boolean
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TABS: { key: SettingsTab; label: string }[] = [
+  { key: 'einstellungen', label: 'Einstellungen' },
+  { key: 'konto',         label: 'Konto' },
+]
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 
@@ -99,52 +106,47 @@ function ToggleRow({
   )
 }
 
-// ─── SectionCard ─────────────────────────────────────────────────────────────
+// ─── Divider ──────────────────────────────────────────────────────────────────
 
-function SectionCard({
-  title, icon: Icon, children,
-}: {
-  title: string
-  icon: ElementType
-  children: ReactNode
-}) {
+function Divider() {
+  return <div className="h-px bg-outline-variant" />
+}
+
+// ─── SectionLabel ─────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary-fixed-dim flex-shrink-0" aria-hidden="true" />
-        <h2 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-          {title}
-        </h2>
-      </div>
+    <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
       {children}
-    </div>
+    </p>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const [profile, setProfile]   = useState<Profile | null>(null)
-  const [notif, setNotif]       = useState<NotifSettings | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [notif, setNotif]     = useState<NotifSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
 
-  // UI-only — no backend field for interface language yet
+  const [activeTab, setActiveTab] = useState<SettingsTab>('einstellungen')
+
   const [uiLang, setUiLang] = useState('de')
 
   const { theme, toggleTheme } = useThemeStore()
 
-  // Save state
   const [accessSaving, setAccessSaving]   = useState(false)
   const [notifSaving, setNotifSaving]     = useState<Set<keyof NotifSettings>>(new Set())
   const [publishSaving, setPublishSaving] = useState(false)
-  const [statusSaving, setStatusSaving]   = useState(false)
 
-  // Toast
-  const [toast, setToast]   = useState<{ msg: string; ok: boolean } | null>(null)
-  const toastTimer          = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const toastTimer        = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Delete modal
+  useEffect(() => {
+    return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
+  }, [])
+
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteError, setDeleteError]         = useState<string | null>(null)
   const [deleting, setDeleting]               = useState(false)
@@ -168,12 +170,6 @@ export default function SettingsPage() {
       }
     }
     load()
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current)
-    }
   }, [])
 
   // ── Toast ──────────────────────────────────────────────────────────────────
@@ -231,28 +227,6 @@ export default function SettingsPage() {
     }
   }
 
-  // ── Status ─────────────────────────────────────────────────────────────────
-
-  async function saveStatus(patch: { status_visible?: boolean; status_message?: string | null }) {
-    if (!profile || statusSaving) return
-    const prev = profile
-    setProfile({ ...profile, ...patch } as Profile)
-    setStatusSaving(true)
-    try {
-      const updated = await fetchApi<Profile>('/profile/me', {
-        method: 'PUT',
-        body: JSON.stringify(patch),
-      })
-      setProfile(updated)
-      showToast('Gespeichert')
-    } catch {
-      setProfile(prev)
-      showToast('Fehler beim Speichern', false)
-    } finally {
-      setStatusSaving(false)
-    }
-  }
-
   // ── Publish ────────────────────────────────────────────────────────────────
 
   async function togglePublished(value: boolean) {
@@ -274,7 +248,7 @@ export default function SettingsPage() {
     }
   }
 
-  // ── Logout ────────────────────────────────────────────────────────────────
+  // ── Logout ─────────────────────────────────────────────────────────────────
 
   async function handleLogout() {
     try {
@@ -285,7 +259,7 @@ export default function SettingsPage() {
     useAuthStore.getState().logout()
   }
 
-  // ── Delete account ────────────────────────────────────────────────────────
+  // ── Delete account ─────────────────────────────────────────────────────────
 
   async function handleDeleteAccount() {
     setDeleting(true)
@@ -358,292 +332,249 @@ export default function SettingsPage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-5">
         <h1 className="text-2xl font-bold text-on-surface">Einstellungen</h1>
 
-        {/* ── 1. Visual Comfort ───────────────────────────────────────────── */}
-        <SectionCard title="Visuelle Komfort" icon={Type}>
-
-          {/* Dark / Light mode */}
-          <ToggleRow
-            id="theme-mode"
-            label="Heller Modus"
-            description="Wechsle zwischen dunklem und hellem Design"
-            checked={theme === 'light'}
-            onChange={() => toggleTheme()}
-          />
-
-          <div className="h-px bg-outline-variant" />
-
-          {/* Font size segmented control */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-on-surface" id="font-size-label">
-              Schriftgröße
-            </p>
-            <div
-              role="group"
-              aria-labelledby="font-size-label"
-              className="flex rounded-xl overflow-hidden border border-outline-variant"
+        {/* ── Tab bar ───────────────────────────────────────────────────────── */}
+        <div className="rounded-2xl bg-surface-container border border-outline-variant p-1 flex gap-1">
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              aria-pressed={activeTab === key}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                activeTab === key
+                  ? 'bg-primary-fixed-dim text-on-primary-container'
+                  : 'text-on-surface-variant hover:bg-surface-container-high'
+              }`}
             >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Tab 1: Einstellungen ──────────────────────────────────────────── */}
+        {activeTab === 'einstellungen' && (
+          <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
+
+            {/* Sichtbarkeit */}
+            <SectionLabel><Shield className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />Sichtbarkeit</SectionLabel>
+
+            <ToggleRow
+              id="is-published"
+              label="Profil sichtbar"
+              description={profile.is_published
+                ? 'Öffentlich — andere Nutzer können dich finden'
+                : 'Privat — nur du siehst dein Profil'}
+              checked={profile.is_published}
+              onChange={togglePublished}
+              saving={publishSaving}
+              disabled={!profile.is_published && !profile.onboarding_completed}
+            />
+
+            {!profile.is_published && !profile.onboarding_completed && (
+              <p className="text-xs text-on-surface-variant">
+                Schließe dein Onboarding ab, um dein Profil zu veröffentlichen.
+              </p>
+            )}
+
+            <Divider />
+
+            {/* Benachrichtigungen */}
+            <SectionLabel><Bell className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />Benachrichtigungen</SectionLabel>
+
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">E-Mail</p>
               {([
-                { value: 'normal', label: 'Normal' },
-                { value: 'large',  label: 'Groß' },
-                { value: 'xl',     label: 'Sehr groß' },
-              ] as const).map(({ value, label }, i, arr) => (
-                <button
-                  key={value}
-                  onClick={() => profile.font_size !== value && saveAccessibility({ font_size: value })}
-                  disabled={accessSaving}
-                  aria-pressed={profile.font_size === value}
-                  className={`flex-1 py-2.5 text-sm font-medium transition-colors min-h-[44px] disabled:opacity-50 border-outline-variant ${
-                    i < arr.length - 1 ? 'border-r' : ''
-                  } ${
-                    profile.font_size === value
-                      ? 'bg-primary-fixed-dim text-on-primary-container'
-                      : 'bg-transparent text-on-surface-variant hover:bg-surface-container-high'
-                  }`}
-                >
-                  {label}
-                </button>
+                { key: 'email_messages', label: 'Neue Nachrichten', desc: 'Bei neuen Chat-Nachrichten' },
+                { key: 'email_matches',  label: 'Neue Matches',     desc: 'Bei neuen Verbindungen' },
+                { key: 'email_system',   label: 'Systemmeldungen',  desc: 'Bei wichtigen Updates' },
+              ] as const).map(({ key, label, desc }) => (
+                <ToggleRow
+                  key={key}
+                  id={key}
+                  label={label}
+                  description={desc}
+                  checked={notif[key]}
+                  onChange={(v) => toggleNotif(key, v)}
+                  saving={notifSaving.has(key)}
+                />
               ))}
             </div>
-          </div>
 
-          {/* High contrast */}
-          <ToggleRow
-            id="high-contrast"
-            label="Hoher Kontrast"
-            description="Erhöht den Farbkontrast für bessere Lesbarkeit"
-            checked={profile.high_contrast}
-            onChange={(v) => saveAccessibility({ high_contrast: v })}
-            saving={accessSaving}
-          />
-
-          {/* Live preview */}
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
-              Vorschau
-            </p>
-            <div
-              className={`rounded-xl border border-outline-variant p-4 transition-all ${
-                profile.high_contrast ? 'bg-background' : 'bg-surface-container-high'
-              }`}
-              aria-label="Vorschau der aktuellen Einstellungen"
-            >
-              <p
-                className={`leading-relaxed transition-all ${fontSizeClass[profile.font_size]} ${
-                  profile.high_contrast
-                    ? 'text-on-surface font-medium'
-                    : 'text-on-surface-variant'
-                }`}
-              >
-                Das ist ein Beispieltext. So sieht dein Text mit den aktuellen Einstellungen aus.
-              </p>
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Push</p>
+              {([
+                { key: 'push_messages', label: 'Neue Nachrichten', desc: 'Bei neuen Chat-Nachrichten' },
+                { key: 'push_matches',  label: 'Neue Matches',     desc: 'Bei neuen Verbindungen' },
+                { key: 'push_system',   label: 'Systemmeldungen',  desc: 'Bei wichtigen Updates' },
+              ] as const).map(({ key, label, desc }) => (
+                <ToggleRow
+                  key={key}
+                  id={key}
+                  label={label}
+                  description={desc}
+                  checked={notif[key]}
+                  onChange={(v) => toggleNotif(key, v)}
+                  saving={notifSaving.has(key)}
+                />
+              ))}
             </div>
-          </div>
-        </SectionCard>
 
-        {/* ── 2. Language & Communication ─────────────────────────────────── */}
-        <SectionCard title="Sprache & Kommunikation" icon={Globe}>
+            <Divider />
 
-          <ToggleRow
-            id="lang-simple"
-            label="Einfache Sprache"
-            description="Inhalte werden in leicht verständlicher Sprache angezeigt"
-            checked={profile.lang_simple}
-            onChange={(v) => saveAccessibility({ lang_simple: v })}
-            saving={accessSaving}
-          />
+            {/* Barrierefreiheit & Design */}
+            <SectionLabel><Type className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />Design & Barrierefreiheit</SectionLabel>
 
-          <div className="space-y-1.5">
-            <label htmlFor="ui-lang" className="text-sm font-medium text-on-surface">
-              Sprache der Benutzeroberfläche
-            </label>
-            <div className="relative">
-              <select
-                id="ui-lang"
-                value={uiLang}
-                onChange={(e) => setUiLang(e.target.value)}
-                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer min-h-[44px]"
-              >
-                <option value="de">Deutsch</option>
-                <option value="en">English</option>
-              </select>
-              <ChevronDown
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
-                aria-hidden="true"
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* ── 3. Notifications ────────────────────────────────────────────── */}
-        <SectionCard title="Benachrichtigungen" icon={Bell}>
-
-          {/* Email */}
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
-              E-Mail
-            </p>
-            {([
-              { key: 'email_messages', label: 'Neue Nachrichten', desc: 'Bei neuen Chat-Nachrichten' },
-              { key: 'email_matches',  label: 'Neue Matches',     desc: 'Bei neuen Verbindungen' },
-              { key: 'email_system',   label: 'Systemmeldungen',  desc: 'Bei wichtigen Updates' },
-            ] as const).map(({ key, label, desc }) => (
-              <ToggleRow
-                key={key}
-                id={key}
-                label={label}
-                description={desc}
-                checked={notif[key]}
-                onChange={(v) => toggleNotif(key, v)}
-                saving={notifSaving.has(key)}
-              />
-            ))}
-          </div>
-
-          <div className="h-px bg-outline-variant" />
-
-          {/* Push */}
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
-              Push
-            </p>
-            {([
-              { key: 'push_messages', label: 'Neue Nachrichten', desc: 'Bei neuen Chat-Nachrichten' },
-              { key: 'push_matches',  label: 'Neue Matches',     desc: 'Bei neuen Verbindungen' },
-              { key: 'push_system',   label: 'Systemmeldungen',  desc: 'Bei wichtigen Updates' },
-            ] as const).map(({ key, label, desc }) => (
-              <ToggleRow
-                key={key}
-                id={key}
-                label={label}
-                description={desc}
-                checked={notif[key]}
-                onChange={(v) => toggleNotif(key, v)}
-                saving={notifSaving.has(key)}
-              />
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* ── 4. Privacy ──────────────────────────────────────────────────── */}
-        <SectionCard title="Datenschutz & Sichtbarkeit" icon={Shield}>
-
-          <ToggleRow
-            id="is-published"
-            label="Profil sichtbar"
-            description={profile.is_published
-              ? 'Öffentlich — andere Nutzer können dich finden'
-              : 'Privat — nur du siehst dein Profil'}
-            checked={profile.is_published}
-            onChange={togglePublished}
-            saving={publishSaving}
-            disabled={!profile.is_published && !profile.onboarding_completed}
-          />
-
-          {!profile.is_published && !profile.onboarding_completed && (
-            <p className="text-xs text-on-surface-variant">
-              Schließe dein Onboarding ab, um dein Profil zu veröffentlichen.
-            </p>
-          )}
-
-          <div className="h-px bg-outline-variant" />
-
-          <ToggleRow
-            id="status-visible"
-            label="Online-Status anzeigen"
-            description="Andere Nutzer sehen, ob du gerade online bist"
-            checked={profile.status_visible}
-            onChange={(v) => saveStatus({ status_visible: v })}
-            saving={statusSaving}
-          />
-
-          <div className="space-y-1.5">
-            <label htmlFor="status-message" className="text-sm font-medium text-on-surface">
-              Status
-            </label>
-            <div className="relative">
-              <select
-                id="status-message"
-                value={profile.status_message ?? ''}
-                onChange={(e) => saveStatus({ status_message: e.target.value || null })}
-                disabled={statusSaving}
-                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">Keine Angabe</option>
-                <option value="available">Verfügbar</option>
-                <option value="looking_for_chat">Suche Gespräch</option>
-                <option value="looking_for_date">Suche Date</option>
-                <option value="busy">Beschäftigt</option>
-                <option value="do_not_disturb">Nicht stören</option>
-              </select>
-              <ChevronDown
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
-                aria-hidden="true"
-              />
-            </div>
-          </div>
-
-          <div className="h-px bg-outline-variant" />
-
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${
-                profile.onboarding_completed ? 'bg-primary-fixed-dim' : 'bg-outline'
-              }`}
-              aria-hidden="true"
+            <ToggleRow
+              id="theme-mode"
+              label="Heller Modus"
+              description="Wechsle zwischen dunklem und hellem Design"
+              checked={theme === 'light'}
+              onChange={() => toggleTheme()}
             />
-            <span className="text-sm text-on-surface">
-              Onboarding: {profile.onboarding_completed ? 'Abgeschlossen' : 'Unvollständig'}
-            </span>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-on-surface" id="font-size-label">
+                Schriftgröße
+              </p>
+              <div
+                role="group"
+                aria-labelledby="font-size-label"
+                className="flex rounded-xl overflow-hidden border border-outline-variant"
+              >
+                {([
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'large',  label: 'Groß' },
+                  { value: 'xl',     label: 'Sehr groß' },
+                ] as const).map(({ value, label }, i, arr) => (
+                  <button
+                    key={value}
+                    onClick={() => profile.font_size !== value && saveAccessibility({ font_size: value })}
+                    disabled={accessSaving}
+                    aria-pressed={profile.font_size === value}
+                    className={`flex-1 py-2.5 text-sm font-medium transition-colors min-h-[44px] disabled:opacity-50 border-outline-variant ${
+                      i < arr.length - 1 ? 'border-r' : ''
+                    } ${
+                      profile.font_size === value
+                        ? 'bg-primary-fixed-dim text-on-primary-container'
+                        : 'bg-transparent text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <ToggleRow
+              id="high-contrast"
+              label="Hoher Kontrast"
+              description="Erhöht den Farbkontrast für bessere Lesbarkeit"
+              checked={profile.high_contrast}
+              onChange={(v) => saveAccessibility({ high_contrast: v })}
+              saving={accessSaving}
+            />
+
+            <ToggleRow
+              id="lang-simple"
+              label="Einfache Sprache"
+              description="Inhalte werden in leicht verständlicher Sprache angezeigt"
+              checked={profile.lang_simple}
+              onChange={(v) => saveAccessibility({ lang_simple: v })}
+              saving={accessSaving}
+            />
+
+            <div className="space-y-1.5">
+              <label htmlFor="ui-lang" className="text-sm font-medium text-on-surface">
+                <Globe className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />
+                Sprache der Benutzeroberfläche
+              </label>
+              <div className="relative">
+                <select
+                  id="ui-lang"
+                  value={uiLang}
+                  onChange={(e) => setUiLang(e.target.value)}
+                  className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer min-h-[44px]"
+                >
+                  <option value="de">Deutsch</option>
+                  <option value="en">English</option>
+                </select>
+                <ChevronDown
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Vorschau</p>
+              <div
+                className={`rounded-xl border border-outline-variant p-4 transition-all ${
+                  profile.high_contrast ? 'bg-background' : 'bg-surface-container-high'
+                }`}
+                aria-label="Vorschau der aktuellen Einstellungen"
+              >
+                <p
+                  className={`leading-relaxed transition-all ${fontSizeClass[profile.font_size]} ${
+                    profile.high_contrast ? 'text-on-surface font-medium' : 'text-on-surface-variant'
+                  }`}
+                >
+                  Das ist ein Beispieltext. So sieht dein Text mit den aktuellen Einstellungen aus.
+                </p>
+              </div>
+            </div>
           </div>
-        </SectionCard>
+        )}
 
-        {/* ── 5. Account ──────────────────────────────────────────────────── */}
-        <SectionCard title="Konto" icon={Lock}>
+        {/* ── Tab 2: Konto ──────────────────────────────────────────────────── */}
+        {activeTab === 'konto' && (
+          <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
 
-          {/* Password change — placeholder */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]">
-            <span className="text-sm font-medium text-on-surface">Passwort ändern</span>
-            <span className="text-xs text-on-surface-variant">Bald verfügbar</span>
+            <SectionLabel><Lock className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />Konto</SectionLabel>
+
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]">
+              <span className="text-sm font-medium text-on-surface">Passwort ändern</span>
+              <span className="text-xs text-on-surface-variant">Bald verfügbar</span>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[52px]"
+            >
+              <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              Abmelden
+            </button>
+
+            <Divider />
+
+            <SectionLabel><Download className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />Datenschutz (DSGVO)</SectionLabel>
+
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]">
+              <span className="text-sm font-medium text-on-surface">Meine Daten exportieren</span>
+              <span className="text-xs text-on-surface-variant">Bald verfügbar</span>
+            </div>
+
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              Nach der Löschung deines Kontos werden deine personenbezogenen Daten für 30 Tage aufbewahrt
+              und anschließend automatisch gelöscht. Anonymisierte Statistikdaten können länger gespeichert
+              bleiben. Du hast jederzeit das Recht auf Auskunft, Berichtigung und Löschung deiner Daten
+              gemäß DSGVO Art. 15–17.
+            </p>
+
+            <Divider />
+
+            <button
+              onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-error/40 text-error text-sm font-medium hover:bg-error-container transition-colors min-h-[52px]"
+            >
+              <Trash2 className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              Konto löschen
+            </button>
           </div>
+        )}
 
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[52px]"
-          >
-            <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            Abmelden
-          </button>
-
-          {/* Delete account */}
-          <button
-            onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-error/40 text-error text-sm font-medium hover:bg-error-container transition-colors min-h-[52px]"
-          >
-            <Trash2 className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            Konto löschen
-          </button>
-        </SectionCard>
-
-        {/* ── 6. DSGVO ────────────────────────────────────────────────────── */}
-        <SectionCard title="Datenschutz (DSGVO)" icon={Download}>
-
-          {/* Data export — placeholder */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]">
-            <span className="text-sm font-medium text-on-surface">Meine Daten exportieren</span>
-            <span className="text-xs text-on-surface-variant">Bald verfügbar</span>
-          </div>
-
-          <p className="text-xs text-on-surface-variant leading-relaxed">
-            Nach der Löschung deines Kontos werden deine personenbezogenen Daten für 30 Tage aufbewahrt
-            und anschließend automatisch gelöscht. Anonymisierte Statistikdaten können länger gespeichert
-            bleiben. Du hast jederzeit das Recht auf Auskunft, Berichtigung und Löschung deiner Daten
-            gemäß DSGVO Art. 15–17.
-          </p>
-        </SectionCard>
       </div>
 
-      {/* ── Delete confirmation modal ──────────────────────────────────────── */}
+      {/* ── Delete confirmation modal ────────────────────────────────────────── */}
       {showDeleteModal && (
         <>
           <div

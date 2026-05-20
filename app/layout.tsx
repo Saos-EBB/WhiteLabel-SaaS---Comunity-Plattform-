@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { ThemeInitializer } from "@/components/ThemeInitializer";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -18,11 +19,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="de"
-      className={`${plusJakartaSans.variable} dark bg-background`}
-    >
-      <body className="min-h-screen font-sans text-on-surface">{children}</body>
+    <html lang="de" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('xxx-theme');var theme=t?JSON.parse(t).state?.theme:null;document.documentElement.classList.add(theme==='light'?'light':'dark');}catch(e){document.documentElement.classList.add('dark');}})();`,
+          }}
+        />
+      </head>
+      <body className={`${plusJakartaSans.variable} bg-background min-h-screen font-sans text-on-surface`}>
+        <ThemeInitializer />
+        {children}
+      </body>
     </html>
   );
 }

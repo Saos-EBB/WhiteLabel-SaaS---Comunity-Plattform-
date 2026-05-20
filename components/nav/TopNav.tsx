@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Sun, Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User } from 'lucide-react'
+import { Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -33,6 +33,31 @@ const TYPE_ROUTES: Record<NotificationType, string> = {
   request: '/requests',
 }
 
+// ─── Status helpers ───────────────────────────────────────────────────────────
+
+type StatusMessage = 'available' | 'looking_for_chat' | 'looking_for_date' | 'busy' | 'do_not_disturb' | null
+
+const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] = [
+  { value: 'available',        label: 'Verfügbar',      color: '#4ade80' },
+  { value: 'looking_for_chat', label: 'Suche Gespräch', color: '#60a5fa' },
+  { value: 'looking_for_date', label: 'Suche Date',     color: '#c084fc' },
+  { value: 'busy',             label: 'Beschäftigt',    color: '#f59e0b' },
+  { value: 'do_not_disturb',   label: 'Nicht stören',   color: '#f87171' },
+]
+
+function getDotColor(isAppActive: boolean, statusVisible: boolean, statusMessage: StatusMessage): string {
+  if (!isAppActive || !statusVisible) return '#52525b'
+  switch (statusMessage) {
+    case 'do_not_disturb':   return '#f87171'
+    case 'busy':             return '#f59e0b'
+    case 'looking_for_date': return '#c084fc'
+    case 'looking_for_chat': return '#60a5fa'
+    default:                 return '#4ade80' // available or null
+  }
+}
+
+// ─── relativeTime ─────────────────────────────────────────────────────────────
+
 function relativeTime(dateString: string): string {
   const diff = Date.now() - new Date(dateString).getTime()
   const mins = Math.floor(diff / 60000)
@@ -56,24 +81,59 @@ function normaliseRequests(res: IncomingEnvelope): IncomingRequest[] {
   return Array.isArray(res) ? res : (res?.data ?? [])
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'neu' | 'verlauf'>('neu')
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Tracks request IDs seen on the first poll so we only notify for genuinely new ones.
-  const seenRequestIdsRef = useRef(new Set<string>())
+  // Bell dropdown
+  const [bellOpen, setBellOpen]     = useState(false)
+  const [activeTab, setActiveTab]   = useState<'neu' | 'verlauf'>('neu')
+  const bellRef                     = useRef<HTMLDivElement>(null)
+
+  // Status dropdown
+  const [statusOpen, setStatusOpen]       = useState(false)
+  const [isAppActive, setIsAppActive]     = useState(true)
+  const [statusVisible, setStatusVisible] = useState(true)
+  const [statusMessage, setStatusMessage] = useState<StatusMessage>(null)
+  const [statusSaving, setStatusSaving]   = useState(false)
+  const statusRef                         = useRef<HTMLDivElement>(null)
+
+  const seenRequestIdsRef    = useRef(new Set<string>())
   const isFirstRequestPollRef = useRef(true)
 
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount   = useNotificationStore((s) => s.unreadCount)
+  const displayUnread = pathname.startsWith('/chat/')
+    ? notifications.filter((n) => !n.is_read && n.type !== 'message').length
+    : unreadCount
 
-  // Poll notifications + pending requests on mount and every 30 s
+  // ── Load profile status on mount ──────────────────────────────────────────
+
+  useEffect(() => {
+    fetchApi<{ status_visible: boolean; status_message: StatusMessage }>(
+      '/profile/me'
+    ).then((p) => {
+      setStatusVisible(p.status_visible)
+      setStatusMessage(p.status_message)
+    }).catch(() => {})
+  }, [])
+
+  // ── Track tab visibility ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    function onVisibilityChange() {
+      setIsAppActive(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
+
+  // ── Poll notifications + pending requests ─────────────────────────────────
+
   useEffect(() => {
     async function load() {
-      // Backend notification list — replaces store (clears temp entries too)
       try {
         const data = await fetchApi<AppNotification[]>('/notifications')
         useNotificationStore.getState().setNotifications(data)
@@ -81,28 +141,27 @@ export default function TopNav() {
         // non-critical
       }
 
-      // Incoming requests — inject a notification for each new pending entry
       try {
         const res = await fetchApi<IncomingEnvelope>('/chat/requests/incoming')
         const pending = normaliseRequests(res).filter((r) => r.status === 'pending')
 
         if (isFirstRequestPollRef.current) {
-          // Seed known IDs on first poll without generating notifications
           pending.forEach((r) => seenRequestIdsRef.current.add(r.id))
           isFirstRequestPollRef.current = false
         } else {
-          for (const r of pending) {
-            if (!seenRequestIdsRef.current.has(r.id)) {
-              seenRequestIdsRef.current.add(r.id)
-              useNotificationStore.getState().addNotification({
-                id: r.id,
-                type: 'request',
-                content: 'Neue Kontaktanfrage',
-                is_read: false,
-                created_at: r.created_at,
-                _local: true,
-              })
-            }
+          const newRequests = pending.filter((r) => !seenRequestIdsRef.current.has(r.id))
+          newRequests.forEach((r) => seenRequestIdsRef.current.add(r.id))
+          if (newRequests.length > 0 && pathname !== '/requests') {
+            const latest = newRequests[newRequests.length - 1]
+            useNotificationStore.getState().addOrUpdateNotification({
+              id: 'local-requests',
+              type: 'request',
+              content: newRequests.length === 1 ? '1 neue Kontaktanfrage' : `${newRequests.length} neue Kontaktanfragen`,
+              is_read: false,
+              created_at: latest.created_at,
+              count: newRequests.length,
+              _local: true,
+            })
           }
         }
       } catch {
@@ -115,23 +174,38 @@ export default function TopNav() {
     return () => clearInterval(id)
   }, [])
 
-  // Close dropdown on outside click
+  // ── Close bell on outside click ───────────────────────────────────────────
+
   useEffect(() => {
-    if (!open) return
+    if (!bellOpen) return
     function onOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false)
       }
     }
     document.addEventListener('mousedown', onOutside)
     return () => document.removeEventListener('mousedown', onOutside)
-  }, [open])
+  }, [bellOpen])
+
+  // ── Close status on outside click ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (!statusOpen) return
+    function onOutside(e: MouseEvent) {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
+        setStatusOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [statusOpen])
+
+  // ── Notification handlers ─────────────────────────────────────────────────
 
   function handleNotificationClick(n: AppNotification) {
-    setOpen(false)
+    setBellOpen(false)
     if (!n.is_read) {
       useNotificationStore.getState().markRead(n.id)
-      // Skip PATCH for local notifications that have no backend record
       if (!n._local) {
         fetchApi(`/notifications/${n.id}/read`, { method: 'PATCH' }).catch(() => {})
       }
@@ -159,9 +233,47 @@ export default function TopNav() {
     useNotificationStore.getState().removeNotification(n.id)
   }
 
+  // ── Status handlers ───────────────────────────────────────────────────────
+
+  async function handleSetStatus(value: StatusMessage) {
+    if (statusSaving) return
+    setStatusMessage(value)
+    setStatusSaving(true)
+    try {
+      await fetchApi('/profile/me', {
+        method: 'PUT',
+        body: JSON.stringify({ status_message: value }),
+      })
+    } catch {
+      // optimistic — ignore error silently
+    } finally {
+      setStatusSaving(false)
+    }
+    setStatusOpen(false)
+  }
+
+  async function handleToggleVisible() {
+    if (statusSaving) return
+    const next = !statusVisible
+    setStatusVisible(next)
+    setStatusSaving(true)
+    try {
+      await fetchApi('/profile/me', {
+        method: 'PUT',
+        body: JSON.stringify({ status_visible: next }),
+      })
+    } catch {
+      setStatusVisible(!next) // revert
+    } finally {
+      setStatusSaving(false)
+    }
+  }
+
   const tabNotifications = notifications
     .filter((n) => activeTab === 'neu' ? !n.is_read : n.is_read)
     .slice(0, 5)
+
+  const dotColor = getDotColor(isAppActive, statusVisible, statusMessage)
 
   return (
     <header className="sticky top-0 z-50 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant">
@@ -199,41 +311,102 @@ export default function TopNav() {
         </ul>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
-            aria-label="Toggle theme"
-            className="p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
-          >
-            <Sun size={20} aria-hidden />
-          </button>
 
-          {/* Bell with dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          {/* ── Status Dot ──────────────────────────────────────────────────── */}
+          <div className="relative" ref={statusRef}>
             <button
-              aria-label={`Benachrichtigungen${unreadCount > 0 ? `, ${unreadCount} ungelesen` : ''}`}
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
+              aria-label="Online-Status ändern"
+              aria-expanded={statusOpen}
+              onClick={() => setStatusOpen((v) => !v)}
+              className="p-2 rounded-lg hover:bg-surface-container transition-colors flex items-center justify-center"
+            >
+              <span
+                aria-hidden="true"
+                className="block h-3 w-3 rounded-full transition-colors"
+                style={{ backgroundColor: dotColor }}
+              />
+            </button>
+
+            {statusOpen && (
+              <div
+                role="dialog"
+                aria-label="Status wählen"
+                className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
+              >
+                <div className="px-4 py-3 border-b border-outline-variant">
+                  <span className="text-sm font-semibold text-on-surface">Status</span>
+                </div>
+
+                <ul>
+                  {STATUS_OPTIONS.map(({ value, label, color }) => (
+                    <li key={value ?? 'none'}>
+                      <button
+                        onClick={() => handleSetStatus(value)}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-surface-container-high ${
+                          statusMessage === value ? 'text-on-surface font-medium' : 'text-on-surface-variant'
+                        }`}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                          aria-hidden="true"
+                        />
+                        {label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="border-t border-outline-variant px-4 py-3 flex items-center justify-between gap-3">
+                  <span className="text-sm text-on-surface-variant">Unsichtbar</span>
+                  <button
+                    role="switch"
+                    aria-checked={!statusVisible}
+                    onClick={handleToggleVisible}
+                    disabled={statusSaving}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 ${
+                      !statusVisible ? 'bg-primary-fixed-dim' : 'bg-surface-container-high'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition duration-200 ${
+                        !statusVisible ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Bell ────────────────────────────────────────────────────────── */}
+          <div className="relative" ref={bellRef}>
+            <button
+              aria-label={`Benachrichtigungen${displayUnread > 0 ? `, ${displayUnread} ungelesen` : ''}`}
+              aria-expanded={bellOpen}
+              onClick={() => setBellOpen((v) => !v)}
               className={`relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors ${
-                unreadCount > 0 ? 'animate-pulse ring-2 ring-offset-1 ring-[#73db9a]' : ''
+                displayUnread > 0 ? 'animate-pulse ring-2 ring-offset-1 ring-[#73db9a]' : ''
               }`}
             >
               <Bell size={20} aria-hidden />
-              {unreadCount > 0 && (
+              {displayUnread > 0 && (
                 <span
                   aria-hidden="true"
                   className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error text-[10px] font-bold leading-none"
                 >
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                  {displayUnread > 9 ? '9+' : displayUnread}
                 </span>
               )}
             </button>
 
-            {open && (
+            {bellOpen && (
               <div
                 role="dialog"
                 aria-label="Benachrichtigungen"
                 className="absolute right-0 top-full mt-2 w-80 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
               >
-                {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
                   <span className="text-sm font-semibold text-on-surface">Benachrichtigungen</span>
                   {activeTab === 'neu' && unreadCount > 0 && (
@@ -246,7 +419,6 @@ export default function TopNav() {
                   )}
                 </div>
 
-                {/* Tabs */}
                 <div className="flex border-b border-outline-variant">
                   {(['neu', 'verlauf'] as const).map((tab) => (
                     <button
@@ -265,7 +437,6 @@ export default function TopNav() {
                   ))}
                 </div>
 
-                {/* Notification list */}
                 {tabNotifications.length === 0 ? (
                   <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
                     {activeTab === 'neu' ? 'Keine neuen Benachrichtigungen' : 'Kein Verlauf'}
@@ -293,18 +464,11 @@ export default function TopNav() {
                               aria-hidden
                             />
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className={`text-sm leading-snug truncate ${
-                                  !n.is_read ? 'text-on-surface font-medium' : 'text-on-surface-variant'
-                                }`}>
-                                  {n.content}
-                                </p>
-                                {(n.count ?? 1) > 1 && (
-                                  <span className="flex-shrink-0 rounded-full bg-primary-fixed-dim/20 px-1.5 py-0.5 text-[10px] font-bold text-primary-fixed-dim leading-none">
-                                    {n.count}
-                                  </span>
-                                )}
-                              </div>
+                              <p className={`text-sm leading-snug truncate ${
+                                !n.is_read ? 'text-on-surface font-medium' : 'text-on-surface-variant'
+                              }`}>
+                                {n.content}
+                              </p>
                               <p className="text-xs text-on-surface-variant mt-0.5">
                                 {relativeTime(n.created_at)}
                               </p>
@@ -323,11 +487,10 @@ export default function TopNav() {
                   </ul>
                 )}
 
-                {/* Footer */}
                 <div className="border-t border-outline-variant px-4 py-2.5">
                   <Link
                     href="/notifications"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setBellOpen(false)}
                     className="block text-center text-xs font-medium text-primary-fixed-dim hover:opacity-75 transition-opacity"
                   >
                     Alle anzeigen
@@ -336,6 +499,14 @@ export default function TopNav() {
               </div>
             )}
           </div>
+
+          <Link
+            href="/settings"
+            aria-label="Einstellungen"
+            className="hidden md:inline-flex p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+          >
+            <Settings size={20} aria-hidden />
+          </Link>
 
           <Link
             href="/profile"

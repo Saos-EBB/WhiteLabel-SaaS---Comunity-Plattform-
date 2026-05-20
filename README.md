@@ -14,6 +14,7 @@ Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backen
 | State | Zustand |
 | Real-time | socket.io-client |
 | Icons | lucide-react |
+| Image processing | Sharp (WebP conversion via Next.js image pipeline) |
 
 ---
 
@@ -44,17 +45,120 @@ App runs on `http://localhost:3001`. The backend must be running on `http://loca
 
 All app routes are protected. Unauthenticated users are redirected to `/login`.
 
-| Route | Description |
+#### `/dashboard`
+Home screen after login.
+
+#### `/discover`
+Browse published profiles in a 2-col (mobile) / 3-col (desktop) grid. Skeleton loading state on initial fetch.
+
+Filters: city (text, Enter to apply), gender, looking_for, age range (min/max), online-only toggle. Apply and reset buttons.
+
+Each profile card shows photo, name + age, city, up to 3 interest chips, and an `OnlineIndicator` for status. "Verbinden" button posts to `POST /chat/requests`; the card switches to "Anfrage gesendet ✓" optimistically. Nickname links to `/profile/[nickname]`.
+
+#### `/requests`
+Incoming and outgoing contact requests. Accept / decline.
+
+#### `/chat`
+Conversation list. Partner online status shown via ring dot and `OnlineIndicator` label.
+
+#### `/chat/[id]`
+Real-time conversation page.
+
+- Messages loaded from `GET /chat/conversations/:id/messages`.
+- Partner nickname resolved via `GET /profile/user/:pid`; partner online status fetched from `GET /profile/:nickname`.
+- WebSocket: emits `join_conversation`, `send_message`, `typing` (throttled to once per 2 s), `read_messages`; listens for `new_message` and `user_typing`.
+- Optimistic send: message appears immediately with a pending spinner; replaced by confirmed message on `new_message` echo.
+- Typing indicator: animated three-dot bubble, auto-hides after 3 s of silence.
+- Delete own message: long-press (mobile) or right-click → bottom sheet confirmation → `DELETE /chat/messages/:id`. Deleted messages render as "Nachricht gelöscht".
+- Scroll-to-bottom button appears when the sentinel div leaves the viewport (IntersectionObserver).
+- Suppresses the bell unread badge for `message`-type notifications while this conversation is open.
+
+**Not yet implemented:** `read_at` data exists in the message type but read receipts are not rendered in the UI.
+
+#### `/notifications`
+Full notification center.
+
+- Loads from `GET /notifications`, hydrates `notificationStore`.
+- Neu / Verlauf tabs split by `is_read`.
+- Per-notification: click marks as read (`PATCH /notifications/:id/read`), trash icon deletes (`DELETE /notifications/:id`).
+- "Alle als gelesen markieren" button in the Neu tab (`PATCH /notifications/read-all`).
+- "Alle löschen" button in the Verlauf tab.
+- Relative timestamps (gerade eben / vor N Min. / Std. / Tagen).
+- Supports types: `message`, `match`, `system`, `ban`, `request` — each with its own icon and label.
+
+#### `/profile`
+View and edit own profile.
+
+**View mode:** full-square photo (or initial-letter fallback), nickname + age overlay, city + `OnlineIndicator` overlay, bio, interest chips.
+
+**Edit mode** (activated by "Bearbeiten" button):
+- Photo: tap/click the overlay → hidden file input → client-side validation (JPEG/PNG/WebP, max 5 MB) → `POST /media/upload/profile-photo`; preview shown immediately from object URL.
+- Nickname, city (inline inputs on photo), bio (textarea, 1000 char limit with counter), gender + looking_for (selects), `is_published` toggle.
+- Interests: full list of available interests shown as toggleable chips; `POST`/`DELETE /profile/me/interests/:id` per toggle.
+- Save writes `PUT /profile/me`, then re-fetches to confirm.
+
+**Placeholder:** audio/voice message player — UI rendered at `opacity-40` with "Bald verfügbar" label, play button disabled.
+
+#### `/settings`
+
+Two tabs — **Einstellungen** and **Konto**.
+
+**Einstellungen tab:**
+- Profile visibility (`is_published`) toggle — auto-saves to `PUT /profile/me`; disabled if onboarding is not complete.
+- Notification toggles — email (messages, matches, system) and push (messages, matches, system) — auto-save to `PUT /notifications/settings`.
+- Theme toggle (dark/light) via `useThemeStore`.
+- Font size selector (Normal / Groß / Sehr groß) — auto-saves to `PUT /profile/me`.
+- High contrast and simple language toggles — auto-save to `PUT /profile/me`.
+- UI language selector (Deutsch / English) — UI only, no save wired up yet.
+- Live accessibility preview box.
+
+**Konto tab:**
+- **"Passwort ändern"** — placeholder only, shows "Bald verfügbar", no action. _(not implemented)_
+- Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
+- **"Meine Daten exportieren" (DSGVO)** — placeholder only, shows "Bald verfügbar", no action. _(not implemented)_
+- DSGVO retention notice (30-day soft-delete copy).
+- "Konto löschen" — confirmation bottom sheet → `DELETE /auth/account` → clears auth store.
+
+All saves show a toast (✓ success or ✗ error).
+
+#### `/onboarding`
+Profile setup wizard — required before the profile can be published or the app fully accessed.
+
+---
+
+## Navigation
+
+### `TopNav` — `components/nav/TopNav.tsx`
+Sticky header, visible on all app pages.
+
+- Logo → `/dashboard`.
+- Desktop nav links (Discover, Requests, Chat) with active-page highlight.
+- **Status dot:** colored circle reflecting `status_visible` + `status_message` from `/profile/me`. Clicking opens a dropdown to set one of five statuses (Verfügbar, Suche Gespräch, Suche Date, Beschäftigt, Nicht stören) or toggle "Unsichtbar"; all save to `PUT /profile/me` optimistically.
+- **Bell icon:** unread badge (count, max "9+") + pulse ring when `unreadCount > 0`. Dropdown shows last 5 notifications in Neu/Verlauf tabs; per-notification click navigates and marks read; trash deletes; "Alle als gelesen" button. Links to `/notifications` for the full view.
+- Polls `GET /notifications` and `GET /chat/requests/incoming` every 30 s; injects a `_local` notification for newly seen pending requests.
+- Settings and Profile icon links shown on desktop only.
+
+**Known gap:** user avatar in the top-right corner is a hardcoded `?` placeholder — profile photo is not loaded there.
+
+### `BottomNav` — `components/nav/BottomNav.tsx`
+Fixed bottom bar, mobile only (`md:hidden`). Six items: Home, Discover, Requests, Chat, Profile, Einstellungen. Active item gets a filled icon in the primary color.
+
+**Known gap:** no unread badge on the Chat or Requests items — the badge only appears in TopNav's bell.
+
+---
+
+## Known gaps
+
+| Area | Gap |
 |---|---|
-| `/dashboard` | Home screen after login. |
-| `/discover` | Browse published profiles. Filter by city or interest. Connect button sends a contact request. |
-| `/requests` | Incoming and outgoing contact requests. Accept / decline. |
-| `/chat` | Conversation list. |
-| `/chat/[id]` | Real-time conversation via WebSocket. |
-| `/notifications` | Full notification center with type filters. |
-| `/profile` | View and edit own profile, manage interests, publish. Clickable avatar uploads a profile photo (JPEG/PNG/WebP, max 5 MB). Photo is displayed immediately after upload and restored on page refresh. |
-| `/settings` | Accessibility, notifications, privacy (incl. online-status toggle + status dropdown), account (logout + delete account), DSGVO. |
-| `/onboarding` | Profile setup wizard (required before accessing the app). |
+| `TopNav` | Avatar placeholder (`?`) — profile photo not fetched |
+| `chat/[id]` header | Generic user icon — partner photo not loaded |
+| `BottomNav` | No unread badge on Chat or Requests tabs |
+| `chat/[id]` | `read_at` exists on messages but read receipts not rendered |
+| `settings` → Konto | "Passwort ändern" — shows "Bald verfügbar", no functionality |
+| `settings` → Konto | "Meine Daten exportieren" (DSGVO) — shows "Bald verfügbar", no functionality |
+| `profile` | Voice message player — rendered but fully disabled ("Bald verfügbar") |
+| `settings` → Einstellungen | UI language selector (de/en) — local state only, not persisted |
 
 ---
 

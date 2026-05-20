@@ -1,15 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react'
-import Link from 'next/link'
-import {
-  User, MapPin, Calendar, FileText, Tag, Eye,
-  CheckCircle, XCircle, Pencil, X, Save,
-  AlertCircle, Loader2, BarChart2, Heart, MessageCircle,
-  Settings, Camera,
-} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { MapPin, Play, Loader2, AlertCircle, Camera, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,12 +17,12 @@ interface Profile {
   bio: string | null
   photo_id: string | null
   photo_url: string | null
+  gender: string | null
+  looking_for: string | null
   onboarding_completed: boolean
   is_published: boolean
-  lang_simple: boolean
-  font_size: string
-  high_contrast: boolean
-  search_radius_km: number
+  status_visible: boolean
+  status_message: string | null
 }
 
 interface Interest {
@@ -47,42 +42,12 @@ interface UserInterest {
 type UIEnvelope = UserInterest[] | { data: UserInterest[] }
 type IEnvelope  = Interest[]     | { data: Interest[] }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function normalise<T>(res: T[] | { data: T[] }): T[] {
   return Array.isArray(res) ? res : ((res as { data: T[] })?.data ?? [])
 }
 
 function calcAge(birthdate: string): number {
-  return Math.floor(
-    (Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-  )
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('de-DE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  })
-}
-
-// ─── SectionCard ─────────────────────────────────────────────────────────────
-
-function SectionCard({
-  title, icon: Icon, children,
-}: {
-  title: string
-  icon: ElementType
-  children: ReactNode
-}) {
-  return (
-    <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary-fixed-dim flex-shrink-0" aria-hidden="true" />
-        <h2 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">{title}</h2>
-      </div>
-      {children}
-    </div>
-  )
+  return Math.floor((Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -95,23 +60,22 @@ export default function ProfilePage() {
   const [error, setError]                 = useState<string | null>(null)
 
   const [editMode, setEditMode]   = useState(false)
-  const [draft, setDraft]         = useState({ nickname: '', bio: '', city: '' })
+  const [draft, setDraft]         = useState({
+    nickname: '', bio: '', city: '', gender: '', looking_for: '', is_published: false,
+  })
   const [saving, setSaving]       = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-
-  const [publishLoading, setPublishLoading] = useState(false)
-  const [publishError, setPublishError]     = useState<string | null>(null)
 
   const [interestLoading, setInterestLoading] = useState<string | null>(null)
 
   const fileInputRef                                  = useRef<HTMLInputElement>(null)
   const [photoUploading, setPhotoUploading]           = useState(false)
-  const [photoError, setPhotoError]                   = useState<string | null>(null)
+  const [photoPickError, setPhotoPickError]           = useState<string | null>(null)
   const [photoUrl, setPhotoUrl]                       = useState<string | null>(null)
   const [pendingPhotoFile, setPendingPhotoFile]       = useState<File | null>(null)
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null)
 
-  // ── Load ───────────────────────────────────────────────────────────────────
+  // ── Load ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     async function load() {
@@ -127,10 +91,7 @@ export default function ProfilePage() {
         }
         setUserInterests(normalise(ui))
         setAllInterests(normalise(ai))
-        console.log('[INTERESTS] all:', normalise(ai))
-        console.log('[INTERESTS] user:', normalise(ui))
       } catch (err) {
-        console.error('[LOAD ERROR]', err)
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : 'Fehler beim Laden')
       } finally {
@@ -140,18 +101,30 @@ export default function ProfilePage() {
     load()
   }, [])
 
-  // ── Edit ───────────────────────────────────────────────────────────────────
+  // ── Edit ──────────────────────────────────────────────────────────────────
 
   function startEdit() {
     if (!profile) return
-    setDraft({ nickname: profile.nickname ?? '', bio: profile.bio ?? '', city: profile.city ?? '' })
+    setDraft({
+      nickname:     profile.nickname    ?? '',
+      bio:          profile.bio         ?? '',
+      city:         profile.city        ?? '',
+      gender:       profile.gender      ?? '',
+      looking_for:  profile.looking_for ?? '',
+      is_published: profile.is_published,
+    })
     setSaveError(null)
+    setPhotoPickError(null)
     setEditMode(true)
   }
 
   function cancelEdit() {
-    setEditMode(false)
+    if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview)
+    setPendingPhotoFile(null)
+    setPendingPhotoPreview(null)
+    setPhotoPickError(null)
     setSaveError(null)
+    setEditMode(false)
   }
 
   async function handleSave() {
@@ -159,13 +132,53 @@ export default function ProfilePage() {
     setSaving(true)
     setSaveError(null)
     try {
+      if (pendingPhotoFile) {
+        setPhotoUploading(true)
+        try {
+          const formData = new FormData()
+          formData.append('file', pendingPhotoFile)
+          const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
+          useAuthStore.getState().setAccessToken(freshToken)
+          const uploadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/media/upload/profile-photo`
+          const res = await fetch(uploadUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { Authorization: `Bearer ${freshToken}` },
+            body: formData,
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({})) as { message?: string }
+            throw new Error(body.message ?? 'Foto-Upload fehlgeschlagen')
+          }
+          const data = await res.json() as { file_url: string; id: string }
+          URL.revokeObjectURL(pendingPhotoPreview!)
+          setPendingPhotoFile(null)
+          setPendingPhotoPreview(null)
+          setPhotoUrl(new URL(data.file_url).pathname)
+          setProfile((prev) => prev ? { ...prev, photo_id: data.id } : prev)
+        } finally {
+          setPhotoUploading(false)
+        }
+      }
+
+      const payload: Record<string, unknown> = {
+        nickname:     draft.nickname,
+        bio:          draft.bio,
+        city:         draft.city,
+        is_published: draft.is_published,
+      }
+      if (draft.gender)      payload.gender      = draft.gender
+      if (draft.looking_for) payload.looking_for = draft.looking_for
+
       await fetchApi<Profile>('/profile/me', {
         method: 'PUT',
-        body: JSON.stringify({ nickname: draft.nickname, bio: draft.bio, city: draft.city }),
+        body: JSON.stringify(payload),
       })
-      // Re-fetch to pick up server-side onboarding_completed update
       const refreshed = await fetchApi<Profile>('/profile/me')
       setProfile(refreshed)
+      if (refreshed.photo_url) {
+        try { setPhotoUrl(new URL(refreshed.photo_url).pathname) } catch { setPhotoUrl(refreshed.photo_url) }
+      }
       setEditMode(false)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Fehler beim Speichern')
@@ -174,7 +187,7 @@ export default function ProfilePage() {
     }
   }
 
-  // ── Interests ──────────────────────────────────────────────────────────────
+  // ── Interests ────────────────────────────────────────────────────────────
 
   async function handleToggleInterest(interestId: string) {
     if (interestLoading) return
@@ -187,7 +200,6 @@ export default function ProfilePage() {
       } else {
         const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${interestId}`, { method: 'POST' })
         setUserInterests(normalise(updated))
-        // Refresh profile so onboarding_completed reflects new interest count
         const refreshed = await fetchApi<Profile>('/profile/me')
         setProfile(refreshed)
       }
@@ -198,111 +210,31 @@ export default function ProfilePage() {
     }
   }
 
-  // ── Photo upload ───────────────────────────────────────────────────────────
+  // ── Photo select ─────────────────────────────────────────────────────────
 
   function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setPhotoError('Nur JPEG, PNG und WebP erlaubt')
+      setPhotoPickError('Nur JPEG, PNG und WebP erlaubt')
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      setPhotoError('Datei zu groß. Maximal 5 MB erlaubt.')
+      setPhotoPickError('Datei zu groß. Maximal 5 MB erlaubt.')
       return
     }
-
-    setPhotoError(null)
+    setPhotoPickError(null)
     if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview)
-    const preview = URL.createObjectURL(file)
     setPendingPhotoFile(file)
-    setPendingPhotoPreview(preview)
+    setPendingPhotoPreview(URL.createObjectURL(file))
   }
 
-  async function handlePhotoSave() {
-    if (!pendingPhotoFile) return
-
-    setPhotoUploading(true)
-    setPhotoError(null)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', pendingPhotoFile)
-
-      // Pre-refresh so the token is fresh — fetchApi cannot handle multipart (browser must set boundary)
-      const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
-      useAuthStore.getState().setAccessToken(freshToken)
-
-      const uploadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/media/upload/profile-photo`
-
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${freshToken}` },
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string }
-        throw new Error(body.message ?? 'Fehler beim Hochladen')
-      }
-
-      const data = await res.json() as { file_url: string; id: string }
-      const url = new URL(data.file_url)
-      URL.revokeObjectURL(pendingPhotoPreview!)
-      setPendingPhotoFile(null)
-      setPendingPhotoPreview(null)
-      setPhotoUrl(url.pathname)
-      setProfile((prev) => prev ? { ...prev, photo_id: data.id } : prev)
-    } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : 'Fehler beim Hochladen')
-    } finally {
-      setPhotoUploading(false)
-    }
-  }
-
-  function handlePhotoCancel() {
-    if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview)
-    setPendingPhotoFile(null)
-    setPendingPhotoPreview(null)
-    setPhotoError(null)
-  }
-
-  // ── Publish ────────────────────────────────────────────────────────────────
-
-  async function handlePublish() {
-    setPublishLoading(true)
-    setPublishError(null)
-    try {
-      const updated = await fetchApi<Profile>('/profile/me/publish', { method: 'PATCH' })
-      setProfile(updated)
-    } catch (err) {
-      setPublishError(err instanceof Error ? err.message : 'Fehler beim Veröffentlichen')
-    } finally {
-      setPublishLoading(false)
-    }
-  }
-
-  // ── Derived ────────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
 
   const selectedIds = new Set(userInterests.map((ui) => ui.interest_id))
 
-  const interestsByCategory = allInterests.reduce<Record<string, Interest[]>>((acc, i) => {
-    const cat = i.category ?? 'Sonstiges'
-    ;(acc[cat] ??= []).push(i)
-    return acc
-  }, {})
-
-  const onboardingChecks = [
-    { label: 'Nickname',        done: !!profile?.nickname },
-    { label: 'Geburtsdatum',    done: !!profile?.birthdate },
-    { label: 'Stadt',           done: !!profile?.city },
-    { label: 'Mind. 1 Interesse', done: userInterests.length >= 1 },
-  ]
-
-  // ── Loading ────────────────────────────────────────────────────────────────
+  // ── Loading / error ───────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -328,405 +260,311 @@ export default function ProfilePage() {
     )
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const displayPhoto = pendingPhotoPreview ?? photoUrl
 
   return (
-    <main className="min-h-screen bg-background pb-24 md:pb-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-5">
+    <main className="min-h-screen bg-background pb-28 md:pb-8">
+      <div className="max-w-md mx-auto px-6 py-8">
+        <div className="flex flex-col items-center">
 
-        {/* Header row */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-on-surface">Mein Profil</h1>
+          {/* ── Photo ──────────────────────────────────────────────────────── */}
+          <div className="relative w-full aspect-square mb-5">
+            {displayPhoto ? (
+              <img
+                src={displayPhoto}
+                alt="Profilbild"
+                className="w-full h-full object-cover rounded-3xl"
+              />
+            ) : (
+              <div className="w-full h-full rounded-3xl bg-surface-container-high flex items-center justify-center">
+                <span className="text-8xl font-bold text-on-surface-variant select-none">
+                  {profile.nickname.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
 
-          {!editMode ? (
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/profile/${profile.nickname}`}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
-              >
-                <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                Außenansicht
-              </Link>
-              <Link
-                href="/settings"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
-              >
-                <Settings className="h-3.5 w-3.5" aria-hidden="true" />
-                Einstellungen
-              </Link>
+            {editMode && (
               <button
-                onClick={startEdit}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px]"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={saving}
+                className="absolute inset-0 rounded-3xl bg-black/40 flex items-center justify-center focus:outline-none disabled:cursor-not-allowed"
+                aria-label="Profilbild ändern"
               >
-                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                Bearbeiten
+                {photoUploading ? (
+                  <Loader2 className="h-10 w-10 text-white animate-spin" aria-hidden="true" />
+                ) : (
+                  <Camera className="h-10 w-10 text-white/80" aria-hidden="true" />
+                )}
+              </button>
+            )}
+
+            {/* Nickname + age — bottom left */}
+            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-xl">
+              {editMode ? (
+                <input
+                  type="text"
+                  value={draft.nickname}
+                  onChange={(e) => setDraft((d) => ({ ...d, nickname: e.target.value }))}
+                  maxLength={50}
+                  className="bg-transparent text-white text-xl font-bold w-32 focus:outline-none placeholder-white/50 border-b border-white/30"
+                  placeholder="Nickname"
+                  aria-label="Nickname"
+                />
+              ) : (
+                <h1 className="text-2xl font-bold text-white leading-tight">{profile.nickname}</h1>
+              )}
+              {profile.birthdate && (
+                <p className="text-sm text-white/70 mt-0.5">{calcAge(profile.birthdate)} Jahre</p>
+              )}
+            </div>
+
+            {/* Location + online — bottom right */}
+            <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm px-3 py-2 rounded-xl">
+              <div className="flex items-center gap-1.5 text-white text-sm mb-1">
+                <MapPin className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+                {editMode ? (
+                  <input
+                    type="text"
+                    value={draft.city}
+                    onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+                    maxLength={100}
+                    className="bg-transparent text-white text-sm w-20 focus:outline-none placeholder-white/50 border-b border-white/30"
+                    placeholder="Stadt"
+                    aria-label="Stadt"
+                  />
+                ) : (
+                  <span>{profile.city ?? '—'}</span>
+                )}
+              </div>
+              <OnlineIndicator
+                is_online={profile.status_visible}
+                status_message={profile.status_message}
+                size="sm"
+              />
+            </div>
+          </div>
+
+          {photoPickError && (
+            <p className="text-xs text-error mb-3 self-start" role="alert">{photoPickError}</p>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handlePhotoSelect}
+            aria-hidden="true"
+          />
+
+          {/* ── Gender + looking_for (edit mode) ──────────────────────────── */}
+          {editMode && (
+            <div className="w-full space-y-3 mb-5">
+              <div className="relative">
+                <select
+                  value={draft.gender}
+                  onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
+                  className="w-full appearance-none pl-4 pr-8 py-3 rounded-2xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer"
+                  aria-label="Geschlecht"
+                >
+                  <option value="">Geschlecht — Keine Angabe</option>
+                  <option value="male">Mann</option>
+                  <option value="female">Frau</option>
+                  <option value="non_binary">Non-Binary</option>
+                  <option value="diverse">Divers</option>
+                </select>
+                <ChevronDown
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                  aria-hidden="true"
+                />
+              </div>
+              <div className="relative">
+                <select
+                  value={draft.looking_for}
+                  onChange={(e) => setDraft((d) => ({ ...d, looking_for: e.target.value }))}
+                  className="w-full appearance-none pl-4 pr-8 py-3 rounded-2xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer"
+                  aria-label="Suche nach"
+                >
+                  <option value="">Suche nach — Keine Angabe</option>
+                  <option value="friendship">Freundschaft</option>
+                  <option value="relationship">Beziehung</option>
+                  <option value="exchange">Austausch</option>
+                  <option value="all">Alles offen</option>
+                </select>
+                <ChevronDown
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Audio player (disabled placeholder) ───────────────────────── */}
+          <div className="w-full mb-5">
+            <div className="flex items-center gap-3 px-2 opacity-40">
+              <button
+                disabled
+                className="w-10 h-10 rounded-full bg-primary-fixed-dim flex items-center justify-center shrink-0"
+                aria-label="Sprachnachricht abspielen"
+              >
+                <Play className="w-4 h-4 text-on-primary-container ml-0.5" aria-hidden="true" />
+              </button>
+              <div className="flex-1">
+                <div className="w-full bg-outline-variant rounded-full h-1 mb-1">
+                  <div className="bg-primary-fixed-dim h-1 rounded-full" style={{ width: '0%' }} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-on-surface-variant">Sprachnachricht</span>
+                  <span className="text-xs text-on-surface-variant">
+                    {editMode ? 'Upload kommt bald' : 'Bald verfügbar'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Bio ───────────────────────────────────────────────────────── */}
+          <div className="w-full bg-surface-container rounded-2xl p-6 mb-5">
+            {editMode ? (
+              <>
+                <textarea
+                  value={draft.bio}
+                  onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
+                  rows={4}
+                  maxLength={1000}
+                  className="w-full bg-transparent text-on-surface text-sm leading-relaxed text-center focus:outline-none resize-none placeholder:text-on-surface-variant"
+                  placeholder="Erzähl etwas über dich…"
+                  aria-label="Bio"
+                />
+                <p className="text-xs text-on-surface-variant text-right mt-1" aria-live="polite">
+                  {draft.bio.length}/1000
+                </p>
+              </>
+            ) : (
+              <p className={`leading-relaxed text-center ${profile.bio ? 'text-on-surface' : 'text-on-surface-variant italic text-sm'}`}>
+                {profile.bio ?? 'Noch keine Bio hinzugefügt.'}
+              </p>
+            )}
+          </div>
+
+          {/* ── Interests ─────────────────────────────────────────────────── */}
+          <div className="w-full mb-6">
+            <h3 className="text-xs font-medium text-on-surface-variant mb-3 text-center uppercase tracking-wide">
+              Interessen
+            </h3>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {editMode ? (
+                allInterests.length > 0 ? (
+                  allInterests.map((i) => {
+                    const selected = selectedIds.has(i.id)
+                    const pending  = interestLoading === i.id
+                    return (
+                      <button
+                        key={i.id}
+                        type="button"
+                        onClick={() => handleToggleInterest(i.id)}
+                        disabled={interestLoading !== null}
+                        aria-pressed={selected}
+                        className={`px-4 py-2 rounded-full text-sm transition-colors disabled:cursor-not-allowed ${
+                          selected
+                            ? 'bg-primary-fixed-dim text-on-primary-container'
+                            : 'bg-surface-container-high text-on-surface hover:opacity-80 disabled:opacity-50'
+                        }`}
+                      >
+                        {pending
+                          ? <Loader2 className="h-3 w-3 animate-spin inline" aria-hidden="true" />
+                          : i.name_de}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-on-surface-variant italic">Keine Interessen verfügbar.</p>
+                )
+              ) : (
+                userInterests.length > 0 ? (
+                  userInterests.map((ui) => (
+                    <span
+                      key={ui.interest_id}
+                      className="px-4 py-2 rounded-full bg-surface-container-high text-on-surface text-sm"
+                    >
+                      {ui.interest.name_de}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-sm text-on-surface-variant italic">Noch keine Interessen hinzugefügt.</p>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* ── is_published toggle (edit mode only) ──────────────────────── */}
+          {editMode && (
+            <div className="w-full flex items-center justify-between px-1 mb-5">
+              <div>
+                <p className="text-sm font-medium text-on-surface">Profil sichtbar</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  {draft.is_published
+                    ? 'Öffentlich — andere können dich finden'
+                    : 'Privat — nur du siehst dein Profil'}
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={draft.is_published}
+                onClick={() => setDraft((d) => ({ ...d, is_published: !d.is_published }))}
+                disabled={!profile.onboarding_completed && !draft.is_published}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+                  draft.is_published ? 'bg-primary-fixed-dim' : 'bg-surface-container-high'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition duration-200 ${
+                    draft.is_published ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
               </button>
             </div>
-          ) : (
-            <div className="flex gap-2">
+          )}
+
+          {saveError && (
+            <div className="w-full flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm mb-4" role="alert">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+              {saveError}
+            </div>
+          )}
+
+          {/* ── Action buttons ────────────────────────────────────────────── */}
+          {editMode ? (
+            <div className="w-full flex gap-3">
               <button
                 onClick={cancelEdit}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[40px] disabled:opacity-50"
+                className="flex-1 py-4 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container transition-colors disabled:opacity-50"
               >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
                 Abbrechen
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || !draft.nickname.trim()}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold hover:opacity-90 active:scale-95 transition-all min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {saving
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  : <Save className="h-3.5 w-3.5" aria-hidden="true" />}
+                {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                 Speichern
               </button>
             </div>
+          ) : (
+            <button
+              onClick={startEdit}
+              className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all"
+            >
+              Bearbeiten
+            </button>
           )}
-        </div>
 
-        {saveError && (
-          <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            {saveError}
-          </div>
-        )}
-
-        {/* Two-column layout on md+ */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-5 items-start">
-
-          {/* ── Left: main content ─────────────────────────────────────────── */}
-          <div className="space-y-5">
-
-            {/* ── Profile header ─────────────────────────────────────────── */}
-            <SectionCard title="Profil" icon={User}>
-              <div className="flex items-start gap-4">
-                {/* Avatar — click to pick, then confirm or cancel */}
-                <div className="flex-shrink-0 flex flex-col items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={photoUploading}
-                    className="h-20 w-20 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden relative group focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim disabled:cursor-not-allowed"
-                    aria-label="Profilbild ändern"
-                  >
-                    {(pendingPhotoPreview ?? photoUrl) ? (
-                      <img src={pendingPhotoPreview ?? photoUrl!} alt="Profilbild" className="h-full w-full object-cover" />
-                    ) : (
-                      <User className="h-9 w-9 text-outline" aria-hidden="true" />
-                    )}
-                    {photoUploading ? (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
-                        <Loader2 className="h-5 w-5 text-white animate-spin" aria-hidden="true" />
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera className="h-5 w-5 text-white" aria-hidden="true" />
-                      </div>
-                    )}
-                  </button>
-                  {photoError && (
-                    <p className="text-xs text-error text-center max-w-[80px]" role="alert">
-                      {photoError}
-                    </p>
-                  )}
-                  {pendingPhotoFile && (
-                    <div className="flex gap-1 mt-0.5">
-                      <button
-                        type="button"
-                        onClick={handlePhotoCancel}
-                        disabled={photoUploading}
-                        className="px-2 py-1 rounded-lg text-xs text-on-surface-variant hover:bg-surface-container transition-colors disabled:opacity-50"
-                      >
-                        Abbrechen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handlePhotoSave}
-                        disabled={photoUploading}
-                        className="px-2 py-1 rounded-lg text-xs bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {photoUploading
-                          ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                          : 'Speichern'}
-                      </button>
-                    </div>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handlePhotoSelect}
-                    aria-hidden="true"
-                  />
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-3">
-                  {editMode ? (
-                    <>
-                      <div className="space-y-1">
-                        <label htmlFor="nickname" className="text-xs font-medium text-on-surface-variant">
-                          Nickname
-                        </label>
-                        <input
-                          id="nickname"
-                          type="text"
-                          value={draft.nickname}
-                          onChange={(e) => setDraft((d) => ({ ...d, nickname: e.target.value }))}
-                          maxLength={50}
-                          className="w-full rounded-xl bg-surface-container-high border border-outline-variant px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary-fixed-dim transition-colors"
-                          placeholder="Nickname"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor="city" className="text-xs font-medium text-on-surface-variant">
-                          Stadt
-                        </label>
-                        <div className="relative">
-                          <MapPin
-                            className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-on-surface-variant pointer-events-none"
-                            aria-hidden="true"
-                          />
-                          <input
-                            id="city"
-                            type="text"
-                            value={draft.city}
-                            onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
-                            maxLength={100}
-                            className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container-high border border-outline-variant text-sm text-on-surface focus:outline-none focus:border-primary-fixed-dim transition-colors"
-                            placeholder="Stadt"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-xl font-bold text-on-surface leading-tight">{profile.nickname}</p>
-                        {profile.birthdate && (
-                          <p className="text-sm text-on-surface-variant mt-0.5">
-                            {calcAge(profile.birthdate)} Jahre
-                          </p>
-                        )}
-                      </div>
-                      {profile.city && (
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
-                          <p className="text-sm text-on-surface-variant">{profile.city}</p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* ── About ──────────────────────────────────────────────────── */}
-            <SectionCard title="Über mich" icon={FileText}>
-              {profile.birthdate && (
-                <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                  <Calendar className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                  <span>
-                    {formatDate(profile.birthdate)}&ensp;·&ensp;{calcAge(profile.birthdate)} Jahre
-                  </span>
-                </div>
-              )}
-
-              {editMode ? (
-                <div className="space-y-1">
-                  <label htmlFor="bio" className="text-xs font-medium text-on-surface-variant">
-                    Bio
-                  </label>
-                  <textarea
-                    id="bio"
-                    value={draft.bio}
-                    onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
-                    rows={4}
-                    maxLength={1000}
-                    className="w-full rounded-xl bg-surface-container-high border border-outline-variant px-3 py-2.5 text-sm text-on-surface focus:outline-none focus:border-primary-fixed-dim transition-colors resize-none"
-                    placeholder="Erzähl etwas über dich…"
-                  />
-                  <p className="text-xs text-on-surface-variant text-right" aria-live="polite">
-                    {draft.bio.length}/1000
-                  </p>
-                </div>
-              ) : (
-                <p className={`text-sm leading-relaxed ${profile.bio ? 'text-on-surface' : 'text-on-surface-variant italic'}`}>
-                  {profile.bio ?? 'Noch keine Bio hinzugefügt.'}
-                </p>
-              )}
-            </SectionCard>
-
-            {/* ── Interests ──────────────────────────────────────────────── */}
-            <SectionCard title="Interessen" icon={Tag}>
-              {editMode ? (
-                allInterests.length === 0 ? (
-                  <p className="text-sm text-on-surface-variant italic">Keine Interessen verfügbar.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.entries(interestsByCategory).map(([category, interests]) => (
-                      <div key={category} className="space-y-2">
-                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-                          {category}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {interests.map((i) => {
-                            const selected = selectedIds.has(i.id)
-                            const pending  = interestLoading === i.id
-                            return (
-                              <button
-                                key={i.id}
-                                type="button"
-                                onClick={() => handleToggleInterest(i.id)}
-                                disabled={interestLoading !== null}
-                                aria-pressed={selected}
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors disabled:cursor-not-allowed ${
-                                  selected
-                                    ? 'bg-primary-fixed-dim text-on-primary-container'
-                                    : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface disabled:opacity-50'
-                                }`}
-                              >
-                                {pending
-                                  ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                                  : i.name_de}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              ) : (
-                userInterests.length === 0 ? (
-                  <p className="text-sm text-on-surface-variant italic">Noch keine Interessen hinzugefügt.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2" aria-label="Deine Interessen">
-                    {userInterests.map((ui) => (
-                      <span
-                        key={ui.interest_id}
-                        className="px-3 py-1 rounded-full bg-surface-container-high text-on-surface text-sm font-medium"
-                      >
-                        {ui.interest.name_de}
-                      </span>
-                    ))}
-                  </div>
-                )
-              )}
-            </SectionCard>
-
-            {/* ── Visibility ─────────────────────────────────────────────── */}
-            <SectionCard title="Sichtbarkeit" icon={Eye}>
-              {/* Onboarding checklist */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
-                  Voraussetzungen
-                </p>
-                {onboardingChecks.map(({ label, done }) => (
-                  <div key={label} className="flex items-center gap-2 text-sm">
-                    {done ? (
-                      <CheckCircle className="h-4 w-4 text-primary-fixed-dim flex-shrink-0" aria-hidden="true" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
-                    )}
-                    <span className={done ? 'text-on-surface' : 'text-on-surface-variant'}>
-                      {label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="h-px bg-outline-variant" />
-
-              {/* Published status or publish button */}
-              {profile.is_published ? (
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-primary-fixed-dim animate-pulse" aria-hidden="true" />
-                  <span className="text-sm font-semibold text-on-surface">
-                    Profil ist öffentlich sichtbar
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-on-surface-variant">
-                    {profile.onboarding_completed
-                      ? 'Dein Profil ist bereit. Veröffentliche es, um von anderen gefunden zu werden.'
-                      : 'Fülle alle Voraussetzungen aus, um dein Profil zu veröffentlichen.'}
-                  </p>
-                  {publishError && (
-                    <p className="text-xs text-error" role="alert">{publishError}</p>
-                  )}
-                  <button
-                    onClick={handlePublish}
-                    disabled={!profile.onboarding_completed || publishLoading}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold hover:opacity-90 active:scale-95 transition-all min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {publishLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Eye className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    Profil veröffentlichen
-                  </button>
-                </div>
-              )}
-            </SectionCard>
-          </div>
-
-          {/* ── Right: sidebar ─────────────────────────────────────────────── */}
-          <aside className="space-y-5">
-
-            {/* Stats */}
-            <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
-              <div className="flex items-center gap-2">
-                <BarChart2 className="h-4 w-4 text-primary-fixed-dim" aria-hidden="true" />
-                <h2 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-                  Statistiken
-                </h2>
-              </div>
-              {([
-                { icon: Eye,           label: 'Profilaufrufe', value: '—' },
-                { icon: Heart,         label: 'Matches',       value: '—' },
-                { icon: MessageCircle, label: 'Antwortrate',   value: '—' },
-              ] as const).map(({ icon: Icon, label, value }) => (
-                <div key={label} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-                    <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                    {label}
-                  </div>
-                  <span className="text-sm font-semibold text-on-surface">{value}</span>
-                </div>
-              ))}
-              <p className="text-xs text-on-surface-variant italic">Bald verfügbar</p>
-            </div>
-
-            {/* Onboarding status */}
-            <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-primary-fixed-dim" aria-hidden="true" />
-                <h2 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-                  Onboarding
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${profile.onboarding_completed ? 'bg-primary-fixed-dim' : 'bg-outline'}`}
-                  aria-hidden="true"
-                />
-                <span className="text-sm text-on-surface">
-                  {profile.onboarding_completed ? 'Abgeschlossen' : 'Unvollständig'}
-                </span>
-              </div>
-              {!profile.onboarding_completed && (
-                <p className="text-xs text-on-surface-variant">
-                  {onboardingChecks.filter((c) => !c.done).map((c) => c.label).join(', ')} fehlt noch.
-                </p>
-              )}
-            </div>
-
-          </aside>
         </div>
       </div>
     </main>

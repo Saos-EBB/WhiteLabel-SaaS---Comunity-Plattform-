@@ -1,23 +1,25 @@
 import { io, Socket } from 'socket.io-client'
+import { useAuthStore } from './store/authStore'
 
 let socket: Socket | null = null
 
-export function connect(token: string): Socket {
+export function connect(): Socket {
+  const token = useAuthStore.getState().accessToken
   if (socket?.connected) return socket
-
-  socket = io('http://localhost:3000', {
-    auth: { token },
-  })
-
-  return socket
-}
-
-export function reconnect(token: string): Socket {
   if (socket) {
     socket.disconnect()
     socket = null
   }
-  return connect(token)
+  socket = io('http://localhost:3000', { auth: { token } })
+  return socket
+}
+
+export function reconnect(): Socket {
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
+  return connect()
 }
 
 export function disconnect(): void {

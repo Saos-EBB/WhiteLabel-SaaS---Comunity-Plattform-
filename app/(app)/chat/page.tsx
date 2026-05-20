@@ -7,7 +7,7 @@ import { MessageCircle, User } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useConversationStore, type Conversation } from '@/lib/store/conversationStore'
-import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
+import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 
 type ConvEnvelope = Conversation[] | { data: Conversation[] }
 
@@ -146,7 +146,8 @@ export default function ChatPage() {
                       <User className="h-6 w-6 text-outline" />
                     </div>
                     <span
-                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-background ${conv.partner_is_online ? 'bg-green-400' : 'bg-outline'}`}
+                      className="absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-background"
+                      style={{ backgroundColor: getStatusColor(conv.partner_is_online ?? false, conv.partner_status_message) }}
                       aria-hidden="true"
                     />
                   </div>

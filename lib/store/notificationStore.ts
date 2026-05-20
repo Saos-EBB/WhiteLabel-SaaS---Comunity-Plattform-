@@ -50,6 +50,7 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
     }),
   addOrUpdateNotification: (notification) =>
     set((state) => {
+      // Group message notifications by conversation
       if (notification.type === 'message' && notification.conversation_id) {
         const idx = state.notifications.findIndex(
           (n) =>
@@ -70,6 +71,31 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
           return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
         }
       }
+
+      // Group all request notifications into a single entry; count may be batched (>1)
+      if (notification.type === 'request') {
+        const idx = state.notifications.findIndex(
+          (n) => n.type === 'request' && !n.is_read
+        )
+        const addCount = notification.count ?? 1
+        if (idx !== -1) {
+          const existing = state.notifications[idx]
+          const newCount = (existing.count ?? 1) + addCount
+          const notifications = [...state.notifications]
+          notifications[idx] = {
+            ...existing,
+            count: newCount,
+            content: newCount === 1 ? '1 neue Kontaktanfrage' : `${newCount} neue Kontaktanfragen`,
+            created_at: notification.created_at,
+          }
+          return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
+        }
+        const count = addCount
+        const content = count === 1 ? '1 neue Kontaktanfrage' : `${count} neue Kontaktanfragen`
+        const notifications = [{ ...notification, count, content }, ...state.notifications]
+        return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
+      }
+
       if (state.notifications.some((n) => n.id === notification.id)) return state
       const notifications = [{ ...notification, count: 1 }, ...state.notifications]
       return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
