@@ -20,6 +20,7 @@ interface Profile {
   font_size: FontSize
   high_contrast: boolean
   lang_simple: boolean
+  profanity_filter: boolean
   is_published: boolean
   onboarding_completed: boolean
 }
@@ -183,7 +184,7 @@ export default function SettingsPage() {
   // ── Accessibility auto-save ────────────────────────────────────────────────
 
   async function saveAccessibility(
-    patch: Partial<Pick<Profile, 'font_size' | 'high_contrast' | 'lang_simple'>>
+    patch: Partial<Pick<Profile, 'font_size' | 'high_contrast' | 'lang_simple' | 'profanity_filter'>>
   ) {
     if (!profile || accessSaving) return
     const prev = profile
@@ -429,6 +430,15 @@ export default function SettingsPage() {
               description="Wechsle zwischen dunklem und hellem Design"
               checked={theme === 'light'}
               onChange={() => toggleTheme()}
+            />
+
+            <ToggleRow
+              id="profanity-filter"
+              label="Schimpfwortfilter"
+              description="Unangemessene Wörter werden unkenntlich gemacht"
+              checked={profile.profanity_filter}
+              onChange={(v) => saveAccessibility({ profanity_filter: v })}
+              saving={accessSaving}
             />
 
             <div className="space-y-2">

@@ -17,6 +17,7 @@ interface Profile {
   bio: string | null
   photo_id: string | null
   photo_url: string | null
+  photo_needs_review: boolean
   gender: string | null
   looking_for: string | null
   onboarding_completed: boolean
@@ -285,13 +286,19 @@ export default function ProfilePage() {
               <img
                 src={displayPhoto}
                 alt="Profilbild"
-                className="w-full h-full object-cover rounded-3xl"
+                className={`w-full h-full object-cover rounded-3xl${profile.photo_needs_review && !pendingPhotoPreview ? ' ring-2 ring-error' : ''}`}
               />
             ) : (
               <div className="w-full h-full rounded-3xl bg-surface-container-high flex items-center justify-center">
                 <span className="text-8xl font-bold text-on-surface-variant select-none">
                   {profile.nickname.charAt(0).toUpperCase()}
                 </span>
+              </div>
+            )}
+
+            {profile.photo_needs_review && !pendingPhotoPreview && photoUrl && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-error/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
+                Wird überprüft
               </div>
             )}
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { MapPin, Play, Loader2, AlertCircle } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store/authStore'
+import { blurText } from '@/lib/profanity'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -17,6 +19,7 @@ interface PublicProfile {
   city: string | null
   photo_id: string | null
   photo_url: string | null
+  photo_needs_review: boolean
   is_online: boolean
   status_message: string | null
 }
@@ -58,6 +61,8 @@ export default function PublicProfilePage() {
 
   const [requestStatus, setRequestStatus] = useState<RequestStatus>('idle')
   const [requestError, setRequestError]   = useState<string | null>(null)
+
+  const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -170,13 +175,19 @@ export default function PublicProfilePage() {
               <img
                 src={photoUrl}
                 alt="Profilbild"
-                className="w-full h-full object-cover rounded-3xl"
+                className={`w-full h-full object-cover rounded-3xl${profile.photo_needs_review ? ' blur-sm ring-2 ring-error' : ''}`}
               />
             ) : (
               <div className="w-full h-full rounded-3xl bg-surface-container-high flex items-center justify-center">
                 <span className="text-8xl font-bold text-on-surface-variant select-none">
                   {profile.nickname.charAt(0).toUpperCase()}
                 </span>
+              </div>
+            )}
+
+            {profile.photo_needs_review && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-error/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
+                Wird überprüft
               </div>
             )}
 
@@ -196,7 +207,7 @@ export default function PublicProfilePage() {
               </div>
               <OnlineIndicator
                 is_online={profile.is_online}
-                status_message={profile.status_message}
+                status_message={profanityFilter && profile.status_message ? blurText(profile.status_message) : profile.status_message}
                 size="sm"
               />
             </div>
@@ -227,7 +238,9 @@ export default function PublicProfilePage() {
           {/* ── Bio ───────────────────────────────────────────────────────── */}
           {profile.bio && (
             <div className="w-full bg-surface-container rounded-2xl p-6 mb-5">
-              <p className="text-on-surface leading-relaxed text-center">{profile.bio}</p>
+              <p className="text-on-surface leading-relaxed text-center">
+                {profanityFilter ? blurText(profile.bio) : profile.bio}
+              </p>
             </div>
           )}
 

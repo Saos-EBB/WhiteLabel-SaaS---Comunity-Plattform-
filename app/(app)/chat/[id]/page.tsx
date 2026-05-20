@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import { blurText } from '@/lib/profanity'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
@@ -60,11 +61,13 @@ function shortId(id: string): string {
 function MessageBubble({
   msg,
   isOwn,
+  profanityFilter,
   onLongPress,
   onContextMenu,
 }: {
   msg: LocalMessage
   isOwn: boolean
+  profanityFilter: boolean
   onLongPress: (id: string) => void
   onContextMenu: (e: React.MouseEvent, id: string) => void
 }) {
@@ -122,7 +125,7 @@ function MessageBubble({
               : 'rounded-bl-sm bg-primary-fixed-dim text-background'
           } ${msg._status === 'pending' ? 'opacity-60' : ''} ${msg._status === 'error' ? 'ring-1 ring-error' : ''}`}
         >
-          {msg.content}
+          {!isOwn && profanityFilter ? blurText(msg.content) : msg.content}
         </div>
 
         <div className={`flex items-center gap-1.5 px-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -147,8 +150,9 @@ export default function ConversationPage() {
   const params = useParams<{ id: string }>()
   const conversationId = params.id
 
-  const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
-  const accessToken   = useAuthStore((s) => s.accessToken)
+  const currentUserId   = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
+  const accessToken     = useAuthStore((s) => s.accessToken)
+  const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
 
   const [messages, setMessages] = useState<LocalMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -428,6 +432,7 @@ export default function ConversationPage() {
               key={msg.id}
               msg={msg}
               isOwn={msg.sender_id === currentUserId}
+              profanityFilter={profanityFilter}
               onLongPress={openDeleteSheet}
               onContextMenu={(_, id) => openDeleteSheet(id)}
             />

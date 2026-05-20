@@ -21,6 +21,7 @@ interface Profile {
   bio: string | null
   photo_id: string | null
   photo_url: string | null
+  photo_needs_review?: boolean
   is_online: boolean
   status_message: string | null
   gender: string | null
@@ -95,9 +96,18 @@ function ProfileCard({ profile }: { profile: Profile }) {
         aria-hidden="true"
       >
         {profile.photo_url ? (
-          <img src={profile.photo_url.replace('http://localhost:3000', '')} alt="" className="h-full w-full object-cover" />
+          <img
+            src={profile.photo_url.replace('http://localhost:3000', '')}
+            alt=""
+            className={`h-full w-full object-cover${profile.photo_needs_review ? ' blur-sm' : ''}`}
+          />
         ) : (
           <Users className="h-10 w-10 text-outline" />
+        )}
+        {profile.photo_needs_review && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-error/80 text-white text-[10px] font-semibold px-2 py-1 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
+            Wird überprüft
+          </div>
         )}
         {profile.is_online && (
           <span

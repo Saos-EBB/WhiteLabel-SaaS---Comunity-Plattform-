@@ -8,6 +8,7 @@ import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { connect, disconnect } from '@/lib/socket'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { useConversationStore } from '@/lib/store/conversationStore'
+import { initProfanityFilter } from '@/lib/profanity'
 
 interface MessagePayload {
   id: string
@@ -44,6 +45,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     fetchApi<User>('/profile/me')
       .then((user) => {
         setUser(user)
+        initProfanityFilter().catch(() => {})
         useAccessibilityStore.getState().applySettings({
           font_size: user.font_size,
           high_contrast: user.high_contrast,
