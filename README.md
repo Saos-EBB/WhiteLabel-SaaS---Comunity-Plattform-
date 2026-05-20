@@ -214,9 +214,48 @@ Each profanity detection inserts a row into `profanity_flags` (user_id, word, co
 
 ### Admin — `/admin`
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| PATCH | `/admin/users/:id/vulnerable-flag` | JWT (role: admin) | Set or unset the `vulnerable_flag` on a user. |
+All admin routes require JWT with `role: admin`.
+
+**Media moderation**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/media/pending` | List all `media_uploads` with `moderation_status = 'pending'`. Returns `id`, `file_url`, `uploaded_at`, `uploaded_by`, `nickname`. |
+| PATCH | `/admin/media/:id/approve` | Approve a photo: sets `moderation_status = approved`, `needs_review = false`, records reviewer + timestamp, deletes open `admin_ticket`, sends owner notification. Returns 204. |
+| PATCH | `/admin/media/:id/reject` | Reject a photo. Body: `{ reason: string }`. Records reviewer, timestamp, and reason; deletes open `admin_ticket`; nulls `profile.photo_id`; sends owner notification. Returns 204. |
+
+**User management**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/users` | Paginated user list. Query: `role`, `is_banned`, `search` (nickname), `page`, `limit`. Returns `{ data, total, page, limit }`. |
+| PATCH | `/admin/users/:id/ban` | Ban a user. Body: `{ reason: string, expires_at?: ISO date }`. |
+| PATCH | `/admin/users/:id/unban` | Lift a ban. |
+| PATCH | `/admin/users/:id/role` | Change role. Body: `{ role: 'user' \| 'admin' \| 'org' }`. |
+| PATCH | `/admin/users/:id/vulnerable-flag` | Set or unset `vulnerable_flag`. Body: `{ vulnerable_flag: boolean }`. |
+| GET | `/admin/users/:id/export` | DSGVO data export for a user. Returns all rows across profiles, interests, sensitive data, consent logs, notifications, reports, strikes, blocks, contact requests, media uploads, and vulnerable flag audit. |
+
+**Reports**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/reports` | Paginated report list. Query: `status` (`open` \| `reviewed` \| `closed`), `page`, `limit`. |
+| PATCH | `/admin/reports/:id` | Update a report. Body: `{ status: string, note?: string }`. Closed reports cannot be updated. |
+
+**Strikes**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/strikes` | Paginated strike list with `user_nickname`. Query: `page`, `limit`. |
+| POST | `/admin/strikes` | Create a strike. Body: `{ user_id, type: 'warning' \| 'temp' \| 'permanent', reason, expires_at? }`. `temp` requires `expires_at`; `permanent` must omit it. Automatically bans the user for `temp`/`permanent` strikes. |
+
+**Profanity word list**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/profanity` | List all runtime-added custom profanity words (`word`, `added_by`, `added_at`). |
+| POST | `/admin/profanity` | Add a word. Body: `{ word: string }`. Persists to `profanity_words` table and loads into leo-profanity runtime. |
+| DELETE | `/admin/profanity/:word` | Remove a word. |
 
 ---
 
@@ -242,7 +281,22 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 
 ## Changelog
 
-### 2026-05-20 (latest)
+### 2026-05-21 (latest)
+- Admin: full admin module rewrite — all admin logic moved from `ModerationController` to a dedicated `AdminController` + `AdminService` under `/admin`
+- Admin: `GET /admin/media/pending`, `PATCH /admin/media/:id/approve`, `PATCH /admin/media/:id/reject` — media moderation (returns 204; frontend fix applied for empty-body parsing)
+- Admin: `GET /admin/users` — paginated, filterable user list (`role`, `is_banned`, `search`); SQL ENUM casts fixed (`::user_role`)
+- Admin: `PATCH /admin/users/:id/ban`, `PATCH /admin/users/:id/unban`, `PATCH /admin/users/:id/role` — user management
+- Admin: `GET /admin/reports`, `PATCH /admin/reports/:id` — report management with `note` field; SQL ENUM cast fixed (`::report_status`)
+- Admin: `GET /admin/strikes`, `POST /admin/strikes` — admin strike creation (auto-bans user for `temp`/`permanent`)
+- Admin: `GET /admin/profanity`, `POST /admin/profanity`, `DELETE /admin/profanity/:word` — runtime profanity word list management; words persisted in new `profanity_words` table (migration `010`)
+- Admin: `GET /admin/users/:id/export` — DSGVO data export across all user-linked tables
+- Profanity: `ProfanityService` now loads custom words from `profanity_words` DB table on `onModuleInit`; `addCustomWord` / `removeCustomWord` persist to DB and update runtime list
+- DB: migration `009_profile_sensitive_data_rls.sql` — RLS on `profile_sensitive_data`; `is_admin_context()` helper function; `own_data`, `admin_access`, `caretaker_access` (placeholder) policies
+- DB: migration `010_admin_profanity_words_report_note.sql` — `profanity_words` table; `reports.note` column
+- Common: `src/common/database/rls.helper.ts` — `withRls(dataSource, userId, fn)` utility; pins a single QueryRunner, issues `SET LOCAL app.current_user_id` inside a transaction so RLS policies see the correct user context
+- Common: `src/common/middleware/rls-context.middleware.ts` — `RlsContextMiddleware` decodes (not verifies) the Bearer token and stores `sub` on `req.rlsUserId` for downstream RLS helpers
+
+### 2026-05-20
 **Backend**
 - Moderation: `GET /moderation/wordlist` — public endpoint returns `{ words: string[] }` from `PROFANITY_WORDLIST`
 - Moderation: three new admin endpoints — `GET /admin/media/queue`, `PATCH /admin/media/:id/approve`, `PATCH /admin/media/:id/reject` (approve/reject sends system notification to owner; reject also nulls `profile.photo_id`)
