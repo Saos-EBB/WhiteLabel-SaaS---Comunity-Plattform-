@@ -125,6 +125,19 @@ All saves show a toast (✓ success or ✗ error).
 #### `/onboarding`
 Profile setup wizard — required before the profile can be published or the app fully accessed.
 
+#### `/admin`
+Admin panel — accessible to `role: admin` users only. Auth guard waits for Zustand `persist` hydration before evaluating the JWT role to prevent false redirects on first render.
+
+Five tabs:
+
+| Tab | Description |
+|---|---|
+| Medien | Photo moderation queue. Approve or reject each pending upload with a reason. Photos proxied via Next.js (`/uploads/…`) to avoid CORS. |
+| Nutzer | Paginated user list with role/banned filters and nickname search. Inline role selector; ban/unban actions via modal. |
+| Meldungen | Paginated report list filtered by status. Inline status + note editing per report. |
+| Strikes | Paginated strike list. "Neuer Strike" modal — type (`warning`, `temp`, `permanent`), target user UUID, reason, optional expiry. |
+| Schimpfwörter | Custom profanity word list. Add / delete words; persisted to `profanity_words` table via backend. |
+
 ---
 
 ## Navigation
@@ -242,7 +255,13 @@ Renders an accessible `aria-label` describing the combined state.
 
 ## Changelog
 
-### 2026-05-20 (latest)
+### 2026-05-21 (latest)
+- Admin panel (`/admin`): full admin UI — media moderation (approve/reject with reason), paginated user management (ban/unban/role), report management (status + note), strike creation, custom profanity word list (add/delete)
+- Admin auth guard: fixed premature redirect on first render — `useAuthStore.persist.hasHydrated()` + `onFinishHydration` subscription ensures Zustand `persist` has loaded before the JWT role is checked
+- Admin media tab: `toProxyUrl()` helper strips absolute origin from `file_url` before setting `<img src>`, routing photos through the Next.js `/uploads/` proxy
+- `lib/api.ts`: `fetchApi` now returns `undefined` for 204 / zero-content-length responses instead of throwing a JSON parse error
+
+### 2026-05-20
 - Profanity filter: new `lib/profanity.ts` — `leo-profanity` wrapper (`initProfanityFilter`, `blurText`, `hasProfanity`)
 - `AuthProvider`: calls `initProfanityFilter()` on login/refresh to load the custom word list from `GET /moderation/wordlist`
 - Chat (`/chat/[id]`): `MessageBubble` applies `blurText()` to incoming messages when `profanity_filter = true` on the current user's profile
