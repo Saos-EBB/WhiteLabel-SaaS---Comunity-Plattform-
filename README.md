@@ -243,6 +243,7 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-20 (latest)
+**Backend**
 - Moderation: `GET /moderation/wordlist` — public endpoint returns `{ words: string[] }` from `PROFANITY_WORDLIST`
 - Moderation: three new admin endpoints — `GET /admin/media/queue`, `PATCH /admin/media/:id/approve`, `PATCH /admin/media/:id/reject` (approve/reject sends system notification to owner; reject also nulls `profile.photo_id`)
 - Moderation: `ProfanityService.createImageTicket()` — creates `admin_tickets` row on every profile photo upload
@@ -250,6 +251,12 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 - Media: `media_uploads` gains `needs_review` (bool, default `true`), `reviewed_at`, `reviewed_by`, `review_rejected_reason` (migration `008_media_review.sql`)
 - Profile: `GET /profile/me`, `GET /profile/:nickname`, `GET /profile/search` all now return `photo_needs_review: boolean`
 - Profanity wordlist: renamed export `CUSTOM_WORDS_DE` → `PROFANITY_WORDLIST`; expanded with EN variants (`fuck`, `nigger`, `bitch`, etc.); removed mild words (`idiot`, `depp`, `trottel`)
+
+**Frontend** _(xxx-frontend)_
+- Profanity filter: `lib/profanity.ts` — `leo-profanity` wrapper; `initProfanityFilter()` fetches word list from `GET /moderation/wordlist` on login
+- Chat, public profile: `blurText()` applied to messages/bio/status when `profanity_filter = true` on current user
+- Settings: "Schimpfwortfilter" toggle added, persists `profanity_filter` via `PUT /profile/me`
+- Discover, profile, public profile: photos with `photo_needs_review = true` show blur overlay + "Wird überprüft" badge
 
 ### 2026-05-20
 - Moderation: new `ProfanityService` — uses `leo-profanity` + German custom word list; `check()`, `blur()`, `flagUser()` (logs to `profanity_flags`), `createNicknameTicket()` (creates `admin_tickets` row)
