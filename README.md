@@ -106,7 +106,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
 | GET | `/profile/me` | JWT | Get own profile. Includes `photo_url` (full URL from `media_uploads`, or `null`). |
-| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings, `status_visible`, `status_message`). Triggers onboarding check. |
+| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings, `status_visible`, `status_message`, `profanity_filter`). Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
 | POST | `/profile/me/interests/:interestId` | JWT | Add an interest. Triggers onboarding check. |
@@ -164,6 +164,18 @@ All moderation routes require JWT.
 | GET | `/moderation/reports` | Get own submitted reports. |
 | GET | `/moderation/reports/:id` | Get a single report. |
 | GET | `/moderation/strikes` | Get own strikes. |
+
+**Profanity filter (`ProfanityService`, internal):**
+
+Uses `leo-profanity` with a German custom word list. Applied automatically in:
+- `PUT /profile/me` — bio and `status_message` changes; nickname changes with profanity create an `admin_tickets` row (type `nickname`) for manual review
+- `POST /chat/conversations/:id/messages` (REST) and `send_message` (WebSocket) — chat messages
+
+Each detection inserts a row into `profanity_flags` (user_id, word, context_type, flagged_at). If a user accumulates ≥ 50 flags within 24 hours a warning is logged server-side.
+
+`profanity_filter` (boolean, default `true`) on the user's profile is a client-side preference; the server always checks and logs regardless of this setting.
+
+**New DB tables (migrations 006–007):** `admin_tickets` (type: `nickname | image | audio | other`, status: `open | reviewed | resolved | dismissed`), `profanity_flags`; `profiles.profanity_filter` column.
 
 ---
 
@@ -225,7 +237,13 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 
 ## Changelog
 
-### 2026-05-19 (latest)
+### 2026-05-20 (latest)
+- Moderation: new `ProfanityService` — uses `leo-profanity` + German custom word list; `check()`, `blur()`, `flagUser()` (logs to `profanity_flags`), `createNicknameTicket()` (creates `admin_tickets` row)
+- Profile: new `profanity_filter` boolean column (default `true`) on `profiles`; `PUT /profile/me` accepts `profanity_filter`
+- Chat + Profile: profanity checks wired into bio, `status_message`, nickname changes, REST message send, and WebSocket `send_message`; bio/status/chat detections → `profanity_flags`; profane nickname changes → `admin_tickets`
+- DB: migration `006_admin_tickets_profanity_flags.sql` — `admin_tickets` + `profanity_flags` tables; migration `007_profanity_filter.sql` — `profiles.profanity_filter` column
+
+### 2026-05-19
 - Profile: new `status_visible` (boolean, default `true`) and `status_message` (enum: `available` · `looking_for_chat` · `looking_for_date` · `busy` · `do_not_disturb`, nullable) columns on `profiles` (migration `003_status_fields.sql`)
 - Profile: `PUT /profile/me` accepts `status_visible` and `status_message`
 - Profile: `GET /profile/search` returns `status_visible`, `status_message`; `is_online` is now `true` only when `status_visible = true` AND `last_active_at > NOW() - 15min` (previously only the time check)

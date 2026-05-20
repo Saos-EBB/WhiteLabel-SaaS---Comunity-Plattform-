@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ModerationController } from './moderation.controller';
 import { ModerationService } from './moderation.service';
+import { ProfanityService } from './profanity.service';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Report } from './entities/report.entity';
@@ -23,6 +24,7 @@ import { User } from '../auth/entities/user.entity';
         }),
     ],
     controllers: [ModerationController],
-    providers: [ModerationService, JwtGuard, RolesGuard],
+    providers: [ModerationService, ProfanityService, JwtGuard, RolesGuard],
+    exports: [ProfanityService],
 })
 export class ModerationModule { }

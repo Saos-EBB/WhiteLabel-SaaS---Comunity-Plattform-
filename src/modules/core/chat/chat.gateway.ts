@@ -13,6 +13,7 @@ import { Repository, IsNull, Not } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageType } from './entities/message.entity';
+import { ProfanityService } from '../moderation/profanity.service';
 
 @WebSocketGateway({
     cors: {
@@ -30,6 +31,7 @@ export class ChatGateway implements OnGatewayConnection {
         private readonly conversationRepo: Repository<Conversation>,
         @InjectRepository(Message)
         private readonly messageRepo: Repository<Message>,
+        private readonly profanityService: ProfanityService,
     ) {}
 
     private extractUserId(client: Socket): string | null {
@@ -107,6 +109,10 @@ for (const conv of conversations) {
                 type: data.type ?? MessageType.TEXT,
             }),
         );
+
+        if (data.content && this.profanityService.check(data.content)) {
+            this.profanityService.flagUser(userId, '', 'chat').catch(() => {});
+        }
 
         this.server.to(data.conversationId).emit('new_message', message);
     }

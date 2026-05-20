@@ -13,10 +13,12 @@ import { Block } from './entities/block.entity';
 import { ProfileService } from './profile.service';
 import { ProfileController } from './profile.controller';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Profile, User, Interest, UserInterest, AgbVersion, ConsentLog, ProfileSensitiveData, Block]),
+        ModerationModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({

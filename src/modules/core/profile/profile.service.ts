@@ -18,6 +18,7 @@ import { ProfileSensitiveData } from './entities/profile-sensitive-data.entity';
 import { Block } from './entities/block.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitSensitiveDataDto } from './dto/submit-sensitive-data.dto';
+import { ProfanityService } from '../moderation/profanity.service';
 
 @Injectable()
 export class ProfileService {
@@ -38,6 +39,7 @@ export class ProfileService {
         private readonly sensitiveDataRepo: Repository<ProfileSensitiveData>,
         @InjectRepository(Block)
         private readonly blockRepo: Repository<Block>,
+        private readonly profanityService: ProfanityService,
     ) { }
 
     private encryptField(value: string): Buffer {
@@ -97,12 +99,20 @@ export class ProfileService {
                 });
                 if (taken) throw new ConflictException('Nickname bereits vergeben');
                 profile.nickname_changed_at = new Date();
+                if (this.profanityService.check(dto.nickname)) {
+                    this.profanityService.createNicknameTicket(userId, dto.nickname).catch(() => {});
+                }
             }
 
             profile.nickname = dto.nickname;
         }
         if (dto.birthdate !== undefined) profile.birthdate = dto.birthdate;
-        if (dto.bio !== undefined) profile.bio = dto.bio;
+        if (dto.bio !== undefined) {
+            profile.bio = dto.bio;
+            if (dto.bio && this.profanityService.check(dto.bio)) {
+                this.profanityService.flagUser(userId, '', 'bio').catch(() => {});
+            }
+        }
         if (dto.city !== undefined) profile.city = dto.city;
         if (dto.lang_simple !== undefined) profile.lang_simple = dto.lang_simple;
         if (dto.font_size !== undefined) profile.font_size = dto.font_size;
@@ -124,8 +134,14 @@ export class ProfileService {
             profile.gender = dto.gender;
         }
         if (dto.looking_for !== undefined) profile.looking_for = dto.looking_for;
+        if (dto.profanity_filter !== undefined) profile.profanity_filter = dto.profanity_filter;
         if (dto.status_visible !== undefined) profile.status_visible = dto.status_visible;
-        if (dto.status_message !== undefined) profile.status_message = dto.status_message;
+        if (dto.status_message !== undefined) {
+            profile.status_message = dto.status_message;
+            if (dto.status_message && this.profanityService.check(dto.status_message)) {
+                this.profanityService.flagUser(userId, '', 'status_message').catch(() => {});
+            }
+        }
 
         const saved = await this.profileRepo.save(profile);
         await this.checkAndCompleteOnboarding(userId);

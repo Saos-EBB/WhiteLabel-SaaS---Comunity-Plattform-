@@ -69,6 +69,10 @@ export class UpdateProfileDto {
 
     @IsOptional()
     @IsBoolean()
+    profanity_filter?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
     status_visible?: boolean;
 
     @IsOptional()

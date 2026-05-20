@@ -95,6 +95,9 @@ export class Profile {
     gender_changed_at!: Date | null;
 
     @Column({ type: 'boolean', default: true })
+    profanity_filter!: boolean;
+
+    @Column({ type: 'boolean', default: true })
     status_visible!: boolean;
 
     @Column({ type: 'enum', enum: StatusMessageOption, nullable: true, default: null })

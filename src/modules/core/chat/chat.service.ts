@@ -14,6 +14,7 @@ import { Message, MessageType } from './entities/message.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { SendContactRequestDto } from './dto/send-contact-request.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { ProfanityService } from '../moderation/profanity.service';
 
 @Injectable()
 export class ChatService {
@@ -28,6 +29,7 @@ export class ChatService {
         private readonly messageRepository: Repository<Message>,
         @InjectRepository(Profile)
         private readonly profileRepository: Repository<Profile>,
+        private readonly profanityService: ProfanityService,
     ) { }
 
     async sendContactRequest(senderId: string, dto: SendContactRequestDto) {
@@ -229,7 +231,13 @@ export class ChatService {
             type: dto.type ?? MessageType.TEXT,
         });
 
-        return this.messageRepository.save(message);
+        const saved = await this.messageRepository.save(message);
+
+        if (dto.content && this.profanityService.check(dto.content)) {
+            this.profanityService.flagUser(userId, '', 'chat').catch(() => {});
+        }
+
+        return saved;
     }
 
     async deleteMessage(userId: string, messageId: string) {
