@@ -70,6 +70,11 @@ export class ProfileController {
             req.user.sub,
             query.city,
             query.interests,
+            query.gender,
+            query.looking_for,
+            query.min_age,
+            query.max_age,
+            query.online_only,
         );
     }
 

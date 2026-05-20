@@ -36,7 +36,7 @@ export class AuthService {
         const stripped = local.replace(/[^a-zA-Z0-9]/g, '');
         const truncated = stripped.slice(0, 20);
         const digits = Math.floor(1000 + Math.random() * 9000).toString();
-        return truncated + digits;
+        return (truncated + digits).toLowerCase();
     }
 
     private hashEmail(email: string): string {
@@ -93,6 +93,12 @@ export class AuthService {
         });
 
         await this.userRepository.save(user);
+
+        if (['development', 'dev', 'local'].includes(process.env.NODE_ENV ?? '')) {
+            user.is_verified = true;
+            user.email_verified_at = new Date();
+            await this.userRepository.save(user);
+        }
 
         const profile = this.profileRepository.create({
             user_id: user.id,

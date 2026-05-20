@@ -88,6 +88,12 @@ export class Profile {
     @Column({ type: 'timestamptz', nullable: true, default: null })
     last_active_at!: Date | null;
 
+    @Column({ type: 'timestamptz', nullable: true, default: null })
+    nickname_changed_at!: Date | null;
+
+    @Column({ type: 'timestamptz', nullable: true, default: null })
+    gender_changed_at!: Date | null;
+
     @Column({ type: 'boolean', default: true })
     status_visible!: boolean;
 

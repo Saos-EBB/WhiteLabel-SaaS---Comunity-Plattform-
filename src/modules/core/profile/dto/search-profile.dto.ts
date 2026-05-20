@@ -1,5 +1,6 @@
-import { IsOptional, IsString, IsArray, IsUUID } from "class-validator";
+import { IsOptional, IsString, IsArray, IsUUID, IsEnum, IsInt, IsBoolean, Min, Max } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { GenderOption, LookingForOption } from '../entities/profile.entity';
 
 export class SearchProfileDto {
     @IsOptional()
@@ -11,5 +12,31 @@ export class SearchProfileDto {
     @IsUUID('4', { each: true })
     @Transform(({ value }) => typeof value === 'string' ? value.split(',') : value)
     interests?: string[];
-}
 
+    @IsOptional()
+    @IsEnum(GenderOption)
+    gender?: GenderOption;
+
+    @IsOptional()
+    @IsEnum(LookingForOption)
+    looking_for?: LookingForOption;
+
+    @IsOptional()
+    @Transform(({ value }) => parseInt(value, 10))
+    @IsInt()
+    @Min(0)
+    @Max(120)
+    min_age?: number;
+
+    @IsOptional()
+    @Transform(({ value }) => parseInt(value, 10))
+    @IsInt()
+    @Min(0)
+    @Max(120)
+    max_age?: number;
+
+    @IsOptional()
+    @Transform(({ value }) => value === 'true' || value === true)
+    @IsBoolean()
+    online_only?: boolean;
+}

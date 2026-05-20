@@ -80,14 +80,27 @@ export class ProfileService {
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {
         const profile = await this.getOwnProfile(userId);
 
-        if (dto.nickname !== undefined && dto.nickname !== profile.nickname) {
-            const taken = await this.profileRepo.findOne({
-                where: { nickname: dto.nickname },
-            });
-            if (taken) throw new ConflictException('Nickname bereits vergeben');
-        }
+        const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
-        if (dto.nickname !== undefined) profile.nickname = dto.nickname;
+        if (dto.nickname !== undefined) {
+            dto.nickname = dto.nickname.toLowerCase().trim();
+
+            if (dto.nickname !== profile.nickname) {
+                if (profile.nickname_changed_at && profile.nickname_changed_at > oneYearAgo) {
+                    throw new BadRequestException('Nickname kann nur einmal pro Jahr geändert werden');
+                }
+                if (!/^[a-z0-9_\-äöüß]{3,30}$/.test(dto.nickname)) {
+                    throw new BadRequestException('Ungültiger Nickname');
+                }
+                const taken = await this.profileRepo.findOne({
+                    where: { nickname: dto.nickname },
+                });
+                if (taken) throw new ConflictException('Nickname bereits vergeben');
+                profile.nickname_changed_at = new Date();
+            }
+
+            profile.nickname = dto.nickname;
+        }
         if (dto.birthdate !== undefined) profile.birthdate = dto.birthdate;
         if (dto.bio !== undefined) profile.bio = dto.bio;
         if (dto.city !== undefined) profile.city = dto.city;
@@ -101,7 +114,15 @@ export class ProfileService {
             }
             profile.is_published = dto.is_published;
         }
-        if (dto.gender !== undefined) profile.gender = dto.gender;
+        if (dto.gender !== undefined) {
+            if (dto.gender !== profile.gender) {
+                if (profile.gender_changed_at && profile.gender_changed_at > oneYearAgo) {
+                    throw new BadRequestException('Geschlecht kann nur einmal pro Jahr geändert werden');
+                }
+                profile.gender_changed_at = new Date();
+            }
+            profile.gender = dto.gender;
+        }
         if (dto.looking_for !== undefined) profile.looking_for = dto.looking_for;
         if (dto.status_visible !== undefined) profile.status_visible = dto.status_visible;
         if (dto.status_message !== undefined) profile.status_message = dto.status_message;
@@ -200,7 +221,7 @@ export class ProfileService {
             photo_url = rows[0]?.file_url ?? null;
         }
 
-        const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000);
+        const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
         const is_online = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
 
         return { ...profile, photo_url, is_online };
@@ -298,11 +319,11 @@ export class ProfileService {
         }
 
         if (onlineOnly) {
-            qb.andWhere("p.last_active_at > NOW() - INTERVAL '15 minutes'");
+            qb.andWhere("p.last_active_at > NOW() - INTERVAL '3 minutes'");
         }
 
         const profiles = await qb.getMany();
-        const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000);
+        const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
 
         const photoIds = profiles
             .map(p => p.photo_id)

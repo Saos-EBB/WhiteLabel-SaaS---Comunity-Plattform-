@@ -144,7 +144,7 @@ export class ChatService {
 
         const latestByConversation = new Map(latestMessages.map(m => [m.conversation_id, m]));
         const profileByUserId = new Map(partnerProfiles.map(p => [p.user_id, p]));
-        const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000);
+        const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
 
         return conversations.map(conv => {
             const latest = latestByConversation.get(conv.id);
