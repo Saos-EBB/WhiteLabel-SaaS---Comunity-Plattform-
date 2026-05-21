@@ -54,6 +54,9 @@ export class Profile {
     @Column({ type: 'uuid', nullable: true })
     photo_id!: string | null;
 
+    @Column({ type: 'uuid', nullable: true, default: null })
+    audio_id!: string | null;
+
     @Column({ type: 'varchar', length: 100, nullable: true })
     city!: string | null;
 
@@ -99,6 +102,24 @@ export class Profile {
 
     @Column({ type: 'boolean', default: true })
     status_visible!: boolean;
+
+    @Column({ type: 'boolean', nullable: false, default: true })
+    show_bio!: boolean;
+
+    @Column({ type: 'boolean', nullable: false, default: true })
+    show_city!: boolean;
+
+    @Column({ type: 'boolean', nullable: false, default: true })
+    show_age!: boolean;
+
+    @Column({ type: 'boolean', nullable: false, default: true })
+    show_gender!: boolean;
+
+    @Column({ type: 'boolean', nullable: false, default: true })
+    show_interests!: boolean;
+
+    @Column({ type: 'boolean', nullable: false, default: true })
+    show_audio!: boolean;
 
     @Column({ type: 'enum', enum: StatusMessageOption, nullable: true, default: null })
     status_message!: StatusMessageOption | null;

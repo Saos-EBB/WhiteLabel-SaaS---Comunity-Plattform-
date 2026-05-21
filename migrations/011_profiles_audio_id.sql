@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS audio_id UUID REFERENCES media_uploads(id) ON DELETE SET NULL;

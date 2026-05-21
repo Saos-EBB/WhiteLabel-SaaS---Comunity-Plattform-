@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, Request, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { ModerationService } from './moderation.service';
+import { ProfanityService } from './profanity.service';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -7,15 +8,17 @@ import { CreateReportDto } from './dto/create-report.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CreateStrikeDto } from './dto/create-strike.dto';
 import { RejectMediaDto } from './dto/reject-media.dto';
-import { PROFANITY_WORDLIST } from './profanity.wordlist';
 
 @Controller('moderation')
 export class ModerationController {
-    constructor(private readonly moderationService: ModerationService) { }
+    constructor(
+        private readonly moderationService: ModerationService,
+        private readonly profanityService: ProfanityService,
+    ) { }
 
     @Get('wordlist')
     getWordlist(): { words: string[] } {
-        return { words: PROFANITY_WORDLIST };
+        return { words: this.profanityService.getFullWordList() };
     }
 
     @Post('reports')

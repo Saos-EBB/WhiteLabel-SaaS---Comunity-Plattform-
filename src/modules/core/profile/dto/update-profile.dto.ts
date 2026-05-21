@@ -76,6 +76,30 @@ export class UpdateProfileDto {
     status_visible?: boolean;
 
     @IsOptional()
+    @IsBoolean()
+    show_bio?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    show_city?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    show_age?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    show_gender?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    show_interests?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    show_audio?: boolean;
+
+    @IsOptional()
     @IsEnum(StatusMessageOption)
     status_message?: StatusMessageOption;
 }

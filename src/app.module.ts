@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { RlsContextMiddleware } from './common/middleware/rls-context.middleware';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -58,4 +59,10 @@ import databaseConfig from './config/database.config';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply globally — the middleware is cheap (decode-only, no DB call).
+    // Only withRls() callers in ProfileService actually use req.rlsUserId.
+    consumer.apply(RlsContextMiddleware).forRoutes('*');
+  }
+}

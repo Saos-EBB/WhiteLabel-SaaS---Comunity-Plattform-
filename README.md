@@ -105,19 +105,19 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
-| GET | `/profile/me` | JWT | Get own profile. Includes `photo_url` and `photo_needs_review` (from `media_uploads`; both `null`/`false` when no photo set). |
-| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, settings, `status_visible`, `status_message`, `profanity_filter`). Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
+| GET | `/profile/me` | JWT | Get own profile. Returns `photo_url`, `photo_needs_review`, `audio_url`, `audio_moderation_status`, all six `show_*` visibility flags (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`), and `subscription: { plan, status, current_period_end } \| null` (active subscription row, or `null`). |
+| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, birthdate, gender, looking_for, `is_published`, `status_visible`, `status_message`, `profanity_filter`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`). Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
 | POST | `/profile/me/interests/:interestId` | JWT | Add an interest. Triggers onboarding check. |
 | DELETE | `/profile/me/interests/:interestId` | JWT | Remove an interest. |
-| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online`, `photo_needs_review`. |
+| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online`, `photo_needs_review`, `birthdate` (null when `show_age = false`). Fields masked by `show_*` flags: `bio`, `city`, `gender`, `looking_for` return `null` when hidden; interests return `[]` when `show_interests = false`. |
 | POST | `/profile/me/consent/sensitive-data` | JWT | Record AGB consent for sensitive data collection. Returns consent log ID. IP is SHA-256 hashed. |
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
 | POST | `/profile/me/block/:userId` | JWT | Block a user. |
 | DELETE | `/profile/me/block/:userId` | JWT | Unblock a user. |
 | GET | `/profile/user/:userId` | JWT | Get nickname and photo_id for any account UUID. Used by frontend to resolve partner names in chat. |
-| GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). Returns `is_online`, `status_visible`, `status_message`, `last_active_at`, `photo_needs_review`. |
+| GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). Returns `is_online`, `status_visible`, `status_message`, `last_active_at`, `photo_needs_review`, `gender`, `looking_for`, `birthdate`. Fields masked by `show_*` flags: `bio`, `city`, `gender`, `looking_for`, `birthdate` return `null` when hidden; `audio_url` returns `null` when `show_audio = false`. Interests endpoint (`/:nickname/interests`) returns `[]` when `show_interests = false`. |
 
 ---
 
@@ -282,6 +282,15 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- Profile visibility: 6 new boolean columns on `profiles` (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`, all `NOT NULL DEFAULT true`) — migration `012_profile_visibility_fields.sql`
+- Profile: `PUT /profile/me` now accepts all six `show_*` fields as optional booleans
+- Profile: `GET /profile/me` now returns all `show_*` flags and `subscription: { plan, status, current_period_end } | null` (queries `subscriptions` table for the active row)
+- Profile: `GET /profile/:nickname` applies visibility masking — `bio`, `city`, `birthdate`, `gender`, `looking_for` return `null` when the corresponding flag is false; `audio_url` is only fetched and returned when `show_audio = true`; now also selects and returns `gender`, `looking_for`, `birthdate`
+- Profile: `GET /profile/:nickname/interests` returns `[]` when `show_interests = false` (no interests fetched)
+- Profile: `GET /profile/search` selects `birthdate` and all `show_*` flags; returns masked `bio`, `city`, `birthdate`, `gender`, `looking_for` (null when hidden) and masked interests (`[]` when `show_interests = false`)
+- Admin: fixed missing `FileType` import in `admin.service.ts` (added to existing `media-upload.entity` import)
+
+### 2026-05-21
 - Admin: full admin module rewrite — all admin logic moved from `ModerationController` to a dedicated `AdminController` + `AdminService` under `/admin`
 - Admin: `GET /admin/media/pending`, `PATCH /admin/media/:id/approve`, `PATCH /admin/media/:id/reject` — media moderation (returns 204; frontend fix applied for empty-body parsing)
 - Admin: `GET /admin/users` — paginated, filterable user list (`role`, `is_banned`, `search`); SQL ENUM casts fixed (`::user_role`)

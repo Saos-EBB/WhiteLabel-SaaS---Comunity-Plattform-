@@ -52,6 +52,9 @@ export class Report {
     @Column({ type: 'timestamptz', nullable: true })
     reviewed_at!: Date | null;
 
+    @Column({ type: 'text', nullable: true })
+    note!: string | null;
+
     @Column({ type: 'timestamptz', nullable: true })
     deleted_at!: Date | null;
 }

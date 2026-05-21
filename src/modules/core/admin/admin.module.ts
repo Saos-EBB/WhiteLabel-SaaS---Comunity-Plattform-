@@ -3,15 +3,21 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { User } from '../auth/entities/user.entity';
+import { MediaUpload } from '../media/entities/media-upload.entity';
+import { Report } from '../moderation/entities/report.entity';
+import { Strike } from '../moderation/entities/strike.entity';
+import { Profile } from '../profile/entities/profile.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { PseudonymizationTask } from './tasks/pseudonymization.task';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([User]),
+        TypeOrmModule.forFeature([User, MediaUpload, Report, Strike, Profile]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({
@@ -20,6 +26,8 @@ import { PseudonymizationTask } from './tasks/pseudonymization.task';
             }),
             inject: [ConfigService],
         }),
+        NotificationsModule,
+        ModerationModule,
     ],
     controllers: [AdminController],
     providers: [AdminService, JwtGuard, RolesGuard, PseudonymizationTask],

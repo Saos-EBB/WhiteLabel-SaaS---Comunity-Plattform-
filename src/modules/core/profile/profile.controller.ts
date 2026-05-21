@@ -1,21 +1,29 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
     Get,
+    HttpCode,
     Param,
     Patch,
     Post,
     Put,
     Request,
+    UploadedFile,
     UseGuards,
-    Query
+    UseInterceptors,
+    Query,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SearchProfileDto } from './dto/search-profile.dto';
 import { SubmitSensitiveDataDto } from './dto/submit-sensitive-data.dto';
+
+const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'];
 
 @Controller('profile')
 export class ProfileController {
@@ -90,6 +98,37 @@ export class ProfileController {
     @UseGuards(JwtGuard)
     submitSensitiveData(@Request() req: any, @Body() dto: SubmitSensitiveDataDto) {
         return this.profileService.submitSensitiveData(req.user.sub, dto);
+    }
+
+    @Post('audio')
+    @UseGuards(JwtGuard)
+    @UseInterceptors(
+        FileInterceptor('audio', {
+            storage: memoryStorage(),
+            limits: { fileSize: 5 * 1024 * 1024 },
+            fileFilter: (_req, file, cb) => {
+                const base = file.mimetype.split(';')[0].trim();
+                if (ALLOWED_AUDIO_TYPES.includes(base)) {
+                    cb(null, true);
+                } else {
+                    cb(new BadRequestException('Nur MP3, OGG, MP4, WAV und WebM erlaubt'), false);
+                }
+            },
+        }),
+    )
+    uploadProfileAudio(
+        @Request() req: any,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        if (!file) throw new BadRequestException('Keine Datei hochgeladen');
+        return this.profileService.uploadProfileAudio(req.user.sub, file);
+    }
+
+    @Delete('audio')
+    @UseGuards(JwtGuard)
+    @HttpCode(204)
+    deleteProfileAudio(@Request() req: any): Promise<void> {
+        return this.profileService.deleteProfileAudio(req.user.sub);
     }
 
     @Post('me/block/:userId')

@@ -6,7 +6,12 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
+import { MediaUpload, FileType, FileContext, ModerationStatus } from '../media/entities/media-upload.entity';
+import { withRls } from '../../../common/database/rls.helper';
 import * as crypto from 'crypto';
 import { Profile } from './entities/profile.entity';
 import { User } from '../auth/entities/user.entity';
@@ -39,7 +44,11 @@ export class ProfileService {
         private readonly sensitiveDataRepo: Repository<ProfileSensitiveData>,
         @InjectRepository(Block)
         private readonly blockRepo: Repository<Block>,
+        @InjectRepository(MediaUpload)
+        private readonly mediaUploadRepo: Repository<MediaUpload>,
         private readonly profanityService: ProfanityService,
+        @InjectDataSource()
+        private readonly dataSource: DataSource,
     ) { }
 
     private encryptField(value: string): Buffer {
@@ -64,7 +73,7 @@ export class ProfileService {
         return profile;
     }
 
-    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean }> {
+    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean; audio_url: string | null; audio_moderation_status: string | null; subscription: { plan: string; status: string; current_period_end: string | null } | null }> {
         const profile = await this.getOwnProfile(userId);
 
         let photo_url: string | null = null;
@@ -78,7 +87,28 @@ export class ProfileService {
             photo_needs_review = rows[0]?.needs_review ?? false;
         }
 
-        return { ...profile, photo_url, photo_needs_review };
+        let audio_url: string | null = null;
+        let audio_moderation_status: string | null = null;
+        if (profile.audio_id) {
+            const rows = await this.profileRepo.manager.query<{ file_url: string; moderation_status: string }[]>(
+                'SELECT file_url, moderation_status FROM media_uploads WHERE id = $1',
+                [profile.audio_id],
+            );
+            audio_url = rows[0]?.file_url ?? null;
+            audio_moderation_status = rows[0]?.moderation_status ?? null;
+        }
+
+        const subRows = await this.profileRepo.manager.query<{ plan: string; status: string; expires_at: Date | null }[]>(
+            `SELECT plan, status, expires_at FROM subscriptions
+             WHERE user_id = $1 AND status IN ('active')
+             ORDER BY started_at DESC LIMIT 1`,
+            [userId],
+        );
+        const subscription = subRows[0]
+            ? { plan: subRows[0].plan, status: subRows[0].status, current_period_end: subRows[0].expires_at ? new Date(subRows[0].expires_at).toISOString() : null }
+            : null;
+
+        return { ...profile, photo_url, photo_needs_review, audio_url, audio_moderation_status, subscription };
     }
 
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {
@@ -138,6 +168,12 @@ export class ProfileService {
         if (dto.looking_for !== undefined) profile.looking_for = dto.looking_for;
         if (dto.profanity_filter !== undefined) profile.profanity_filter = dto.profanity_filter;
         if (dto.status_visible !== undefined) profile.status_visible = dto.status_visible;
+        if (dto.show_bio !== undefined) profile.show_bio = dto.show_bio;
+        if (dto.show_city !== undefined) profile.show_city = dto.show_city;
+        if (dto.show_age !== undefined) profile.show_age = dto.show_age;
+        if (dto.show_gender !== undefined) profile.show_gender = dto.show_gender;
+        if (dto.show_interests !== undefined) profile.show_interests = dto.show_interests;
+        if (dto.show_audio !== undefined) profile.show_audio = dto.show_audio;
         if (dto.status_message !== undefined) {
             profile.status_message = dto.status_message;
             if (dto.status_message && this.profanityService.check(dto.status_message)) {
@@ -218,11 +254,17 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean }> {
+    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean; audio_url: string | null }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
+            .select([
+                'p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.birthdate',
+                'p.photo_id', 'p.audio_id', 'p.gender', 'p.looking_for',
+                'p.last_active_at', 'p.status_visible', 'p.status_message',
+                'p.show_bio', 'p.show_city', 'p.show_age', 'p.show_gender',
+                'p.show_interests', 'p.show_audio',
+            ])
             .where('p.nickname = :nickname', { nickname })
             .andWhere('p.is_published = true')
             .andWhere('u.deleted_at IS NULL')
@@ -241,23 +283,46 @@ export class ProfileService {
             photo_needs_review = rows[0]?.needs_review ?? false;
         }
 
+        let audio_url: string | null = null;
+        if (profile.show_audio && profile.audio_id) {
+            const rows = await this.profileRepo.manager.query<{ file_url: string; moderation_status: string }[]>(
+                'SELECT file_url, moderation_status FROM media_uploads WHERE id = $1',
+                [profile.audio_id],
+            );
+            if (rows[0]?.moderation_status === ModerationStatus.APPROVED) {
+                audio_url = rows[0].file_url;
+            }
+        }
+
         const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
         const is_online = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
 
-        return { ...profile, photo_url, is_online, photo_needs_review };
+        return {
+            ...profile,
+            bio:        profile.show_bio      ? profile.bio        : null,
+            city:       profile.show_city     ? profile.city       : null,
+            birthdate:  profile.show_age      ? profile.birthdate  : (null as any),
+            gender:     profile.show_gender   ? profile.gender     : null,
+            looking_for: profile.show_gender  ? profile.looking_for : null,
+            photo_url,
+            is_online,
+            photo_needs_review,
+            audio_url,
+        };
     }
 
     async getPublicProfileInterests(nickname: string): Promise<UserInterest[]> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.user_id'])
+            .select(['p.user_id', 'p.show_interests'])
             .where('p.nickname = :nickname', { nickname })
             .andWhere('p.is_published = true')
             .andWhere('u.deleted_at IS NULL')
             .getOne();
 
         if (!profile) throw new NotFoundException('Profil nicht gefunden');
+        if (!profile.show_interests) return [];
 
         return this.userInterestRepo.find({
             where: { user_id: profile.user_id },
@@ -293,7 +358,13 @@ export class ProfileService {
         const qb = this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
-            .select(['p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.photo_id', 'p.gender', 'p.looking_for', 'p.last_active_at', 'p.status_visible', 'p.status_message'])
+            .select([
+                'p.id', 'p.user_id', 'p.nickname', 'p.bio', 'p.city', 'p.birthdate',
+                'p.photo_id', 'p.gender', 'p.looking_for', 'p.last_active_at',
+                'p.status_visible', 'p.status_message',
+                'p.show_bio', 'p.show_city', 'p.show_age', 'p.show_gender',
+                'p.show_interests', 'p.show_audio',
+            ])
             .where('p.is_published = true')
             .andWhere('u.is_banned = false')
             .andWhere('u.deleted_at IS NULL')
@@ -345,7 +416,16 @@ export class ProfileService {
         const profiles = await qb.getMany();
         const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
 
-        const photoIds = profiles
+        const maskedProfiles = profiles.map(p => ({
+            ...p,
+            bio:         p.show_bio     ? p.bio         : null,
+            city:        p.show_city    ? p.city         : null,
+            birthdate:   p.show_age     ? p.birthdate    : (null as any),
+            gender:      p.show_gender  ? p.gender       : null,
+            looking_for: p.show_gender  ? p.looking_for  : null,
+        }));
+
+        const photoIds = maskedProfiles
             .map(p => p.photo_id)
             .filter((id): id is string => id !== null);
 
@@ -362,7 +442,7 @@ export class ProfileService {
             }
         }
 
-        const userIds = profiles.map(p => p.user_id);
+        const userIds = maskedProfiles.map(p => p.user_id);
 
         type InterestRow = { user_id: string; id: string; name_de: string; category: string | null };
         const interestRows = userIds.length > 0
@@ -380,12 +460,12 @@ export class ProfileService {
             (interestsMap[row.user_id] ??= []).push({ id: row.id, name_de: row.name_de, category: row.category });
         }
 
-        return profiles.map(p => ({
+        return maskedProfiles.map(p => ({
             ...p,
             photo_url: p.photo_id ? (urlMap[p.photo_id] ?? null) : null,
             photo_needs_review: p.photo_id ? (reviewMap[p.photo_id] ?? false) : false,
             is_online: p.status_visible && p.last_active_at !== null && p.last_active_at > onlineThreshold,
-            interests: interestsMap[p.user_id] ?? [],
+            interests: p.show_interests ? (interestsMap[p.user_id] ?? []) : [],
         }));
     }
 
@@ -415,6 +495,7 @@ export class ProfileService {
         userId: string,
         dto: SubmitSensitiveDataDto,
     ): Promise<{ disability_visible: boolean; collected_at: Date }> {
+        // consent_logs has no RLS — safe to query with the regular pool
         const consent = await this.consentLogRepo.findOne({
             where: { id: dto.consent_id },
         });
@@ -425,27 +506,35 @@ export class ProfileService {
         const encryptedType = this.encryptField(dto.disability_type);
         const now = new Date();
 
-        const existing = await this.sensitiveDataRepo.findOne({ where: { user_id: userId } });
+        // profile_sensitive_data has FORCE ROW LEVEL SECURITY.
+        // withRls pins a single connection, issues SET LOCAL app.current_user_id,
+        // and runs all queries on that connection so the RLS policies see the
+        // correct user context.
+        return withRls(this.dataSource, userId, async (manager) => {
+            const existing = await manager.findOne(ProfileSensitiveData, {
+                where: { user_id: userId },
+            });
 
-        if (existing) {
-            existing.consent_id = dto.consent_id;
-            existing.disability_type = encryptedType;
-            existing.disability_visible = dto.disability_visible;
-            existing.updated_at = now;
-            await this.sensitiveDataRepo.save(existing);
-            return { disability_visible: existing.disability_visible, collected_at: existing.collected_at };
-        }
+            if (existing) {
+                existing.consent_id       = dto.consent_id;
+                existing.disability_type  = encryptedType;
+                existing.disability_visible = dto.disability_visible;
+                existing.updated_at       = now;
+                await manager.save(ProfileSensitiveData, existing);
+                return { disability_visible: existing.disability_visible, collected_at: existing.collected_at };
+            }
 
-        const entry = this.sensitiveDataRepo.create({
-            user_id: userId,
-            consent_id: dto.consent_id,
-            disability_type: encryptedType,
-            disability_visible: dto.disability_visible,
-            collected_at: now,
-            updated_at: now,
+            const entry = manager.create(ProfileSensitiveData, {
+                user_id:            userId,
+                consent_id:         dto.consent_id,
+                disability_type:    encryptedType,
+                disability_visible: dto.disability_visible,
+                collected_at:       now,
+                updated_at:         now,
+            });
+            const saved = await manager.save(ProfileSensitiveData, entry);
+            return { disability_visible: saved.disability_visible, collected_at: saved.collected_at };
         });
-        const saved = await this.sensitiveDataRepo.save(entry);
-        return { disability_visible: saved.disability_visible, collected_at: saved.collected_at };
     }
 
 
@@ -463,6 +552,67 @@ export class ProfileService {
         if (!existing) throw new NotFoundException('Blockierung nicht gefunden');
 
         await this.blockRepo.delete({ id: existing.id });
+    }
+
+    async uploadProfileAudio(
+        userId: string,
+        file: Express.Multer.File,
+    ): Promise<{ id: string; file_url: string; moderation_status: string }> {
+        if (file.size > 5 * 1024 * 1024) {
+            throw new BadRequestException('Datei zu groß. Maximal 5 MB erlaubt.');
+        }
+
+        const baseType = file.mimetype.split(';')[0].trim();
+        const extMap: Record<string, string> = {
+            'audio/mpeg': '.mp3',
+            'audio/ogg': '.ogg',
+            'audio/mp4': '.m4a',
+            'audio/wav': '.wav',
+            'audio/webm': '.webm',
+        };
+        const ext = extMap[baseType] ?? '.audio';
+        const filename = `${userId}-${Date.now()}${ext}`;
+        const uploadDir = path.join(process.cwd(), 'uploads', 'audio');
+        fs.mkdirSync(uploadDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadDir, filename), file.buffer);
+
+        const fileUrl = `http://localhost:3000/uploads/audio/${filename}`;
+
+        const profile = await this.getOwnProfile(userId);
+        if (profile.audio_id) {
+            await this.mediaUploadRepo.update(profile.audio_id, {
+                moderation_status: ModerationStatus.REJECTED,
+            });
+        }
+
+        const media = this.mediaUploadRepo.create({
+            uploaded_by: userId,
+            file_url: fileUrl,
+            file_type: FileType.AUDIO,
+            context: FileContext.PROFILE,
+            moderation_status: ModerationStatus.PENDING,
+            needs_review: true,
+            is_encrypted: false,
+            file_size_kb: Math.ceil(file.size / 1024),
+            conversation_id: null,
+            org_id: null,
+            file_use_for: 'profile_audio',
+        });
+        const saved = await this.mediaUploadRepo.save(media);
+
+        await this.profileRepo.update({ user_id: userId }, { audio_id: saved.id });
+
+        return { id: saved.id, file_url: fileUrl, moderation_status: ModerationStatus.PENDING };
+    }
+
+    async deleteProfileAudio(userId: string): Promise<void> {
+        const profile = await this.getOwnProfile(userId);
+        if (!profile.audio_id) return;
+
+        await this.mediaUploadRepo.update(profile.audio_id, {
+            moderation_status: ModerationStatus.REJECTED,
+        });
+        await this.profileRepo.update({ user_id: userId }, { audio_id: null });
     }
 
 }
