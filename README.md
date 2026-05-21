@@ -292,6 +292,14 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- Auth: account reactivation — `POST /auth/login` now finds soft-deleted accounts and, if `deleted_at` is within 30 days, clears it on successful login (account restored). Accounts deleted >30 days ago are treated as non-existent (same `401` as a wrong password — no enumeration).
+- Auth: `DELETE /auth/account` now bulk-revokes all active refresh tokens for the user at the time of soft-delete, preventing reuse of previously-issued cookies.
+- Real-time: `@nestjs/event-emitter` added (`^3.1.0`); `EventEmitterModule.forRoot()` registered in `AppModule`.
+- Real-time: `ChatGateway` — each authenticated user joins a personal room `user:{userId}` on socket connect; `emitToUser(userId, event, data)` helper pushes to that room.
+- Real-time: `NotificationsService.createNotification()` emits `notification.created` after saving — `ChatGateway` listens and pushes a `notification` socket event to the recipient in real-time (no polling required).
+- Real-time: `ChatService.sendContactRequest()` emits `contact_request.created` after saving — `ChatGateway` listens and pushes a `contact_request` socket event to the recipient in real-time.
+
+### 2026-05-21
 - GDPR: new `GdprModule` — `GET /gdpr/export` streams a PDF (Art. 15 DSGVO) with 14 data sections; rate-limited to once per 30 days via new `users.last_gdpr_export_at` column (migration `013_users_last_gdpr_export_at.sql`); decrypts email and disability type in-place; never exposes third-party UUIDs or hashed fields; pdfkit recursion fixed via `bufferPages: true` + post-render footer loop (removes `pageAdded` handler); long text truncated (bio 500 chars, all other free-text 300 chars); empty sections skip `addPage()`; message limit reduced to 100; profile SELECT corrected to actual entity columns
 - Profile visibility: 6 new boolean columns on `profiles` (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`, all `NOT NULL DEFAULT true`) — migration `012_profile_visibility_fields.sql`
 - Profile: `PUT /profile/me` now accepts all six `show_*` fields as optional booleans

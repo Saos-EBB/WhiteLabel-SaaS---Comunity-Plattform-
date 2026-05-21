@@ -1,6 +1,7 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Notification, NotificationType } from './entities/notification.entity';
 import { NotificationSettings } from './entities/notification-settings.entity';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
@@ -12,11 +13,13 @@ export class NotificationsService {
         private readonly notificationRepository: Repository<Notification>,
         @InjectRepository(NotificationSettings)
         private readonly settingsRepository: Repository<NotificationSettings>,
+        private readonly eventEmitter: EventEmitter2,
     ) { }
 
     async createNotification(userId: string, type: NotificationType, content: string): Promise<void> {
         const notification = this.notificationRepository.create({ user_id: userId, type, content });
-        await this.notificationRepository.save(notification);
+        const saved = await this.notificationRepository.save(notification);
+        this.eventEmitter.emit('notification.created', { userId, notification: saved });
     }
 
     async getNotifications(userId: string) {

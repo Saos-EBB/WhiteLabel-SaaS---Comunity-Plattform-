@@ -118,13 +118,24 @@ export class AuthService {
         const emailHash = this.hashEmail(dto.email);
 
         const user = await this.userRepository.findOne({
-            where: { email_search_hash: emailHash, deleted_at: IsNull() },
+            where: { email_search_hash: emailHash },
         });
 
         if (!user) throw new UnauthorizedException('Ungültige Zugangsdaten');
 
+        if (user.deleted_at) {
+            const daysSinceDeletion = (Date.now() - user.deleted_at.getTime()) / (1000 * 60 * 60 * 24);
+            if (daysSinceDeletion > 30) {
+                throw new UnauthorizedException('Ungültige Zugangsdaten');
+            }
+        }
+
         const passwordValid = await bcrypt.compare(dto.password, user.password_hash ?? '');
         if (!passwordValid) throw new UnauthorizedException('Ungültige Zugangsdaten');
+
+        if (user.deleted_at) {
+            user.deleted_at = null;
+        }
 
         if (user.is_banned) {
             if (user.ban_expires_at && user.ban_expires_at < new Date()) {
@@ -306,6 +317,10 @@ export class AuthService {
         if (!user) throw new NotFoundException('User nicht gefunden');
         if (user.deleted_at) throw new BadRequestException('Account bereits gelöscht');
         user.deleted_at = new Date();
+        await this.refreshTokenRepository.update(
+            { user_id: userId },
+            { is_revoked: true },
+        );
         await this.userRepository.save(user);
         return { message: 'Account erfolgreich gelöscht' };
     }

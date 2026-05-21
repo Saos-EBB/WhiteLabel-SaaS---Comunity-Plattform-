@@ -15,6 +15,7 @@ import { Profile } from '../profile/entities/profile.entity';
 import { SendContactRequestDto } from './dto/send-contact-request.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ProfanityService } from '../moderation/profanity.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ChatService {
@@ -30,6 +31,7 @@ export class ChatService {
         @InjectRepository(Profile)
         private readonly profileRepository: Repository<Profile>,
         private readonly profanityService: ProfanityService,
+        private readonly eventEmitter: EventEmitter2,
     ) { }
 
     async sendContactRequest(senderId: string, dto: SendContactRequestDto) {
@@ -53,7 +55,9 @@ export class ChatService {
             message_preview: dto.message_preview ?? null,
         });
 
-        return this.contactRequestRepository.save(request);
+        const saved = await this.contactRequestRepository.save(request);
+        this.eventEmitter.emit('contact_request.created', { recipientId: dto.receiver_id, request: saved });
+        return saved;
     }
 
     async getIncomingRequests(userId: string) {

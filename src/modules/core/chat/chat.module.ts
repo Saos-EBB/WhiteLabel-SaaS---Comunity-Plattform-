@@ -28,5 +28,6 @@ import { Profile } from '../profile/entities/profile.entity';
     ],
     controllers: [ChatController],
     providers: [ChatService, JwtGuard, ChatGateway],
+    exports: [ChatGateway],
 })
 export class ChatModule { }

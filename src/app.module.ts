@@ -3,6 +3,7 @@ import { RlsContextMiddleware } from './common/middleware/rls-context.middleware
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/core/auth/auth.module';
@@ -24,6 +25,7 @@ import databaseConfig from './config/database.config';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig],

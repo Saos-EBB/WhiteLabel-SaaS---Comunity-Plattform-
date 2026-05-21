@@ -8,6 +8,7 @@ import {
     ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -62,6 +63,22 @@ if (!userId) {
 for (const conv of conversations) {
             client.join(conv.id);
         }
+
+        client.join(`user:${userId}`);
+    }
+
+    emitToUser(userId: string, event: string, data: unknown): void {
+        this.server.to(`user:${userId}`).emit(event, data);
+    }
+
+    @OnEvent('notification.created')
+    handleNotificationCreated(payload: { userId: string; notification: any }) {
+        this.emitToUser(payload.userId, 'notification', payload.notification);
+    }
+
+    @OnEvent('contact_request.created')
+    handleContactRequestCreated(payload: { recipientId: string; request: any }) {
+        this.emitToUser(payload.recipientId, 'contact_request', payload.request);
     }
 
     @SubscribeMessage('join_conversation')
