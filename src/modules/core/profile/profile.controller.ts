@@ -83,6 +83,7 @@ export class ProfileController {
             query.min_age,
             query.max_age,
             query.online_only,
+            query.connection_status,
         );
     }
 

@@ -354,7 +354,8 @@ export class ProfileService {
         minAge?: number,
         maxAge?: number,
         onlineOnly?: boolean,
-    ): Promise<(Partial<Profile> & { photo_url: string | null; photo_needs_review: boolean; is_online: boolean; interests: { id: string; name_de: string; category: string | null }[] })[]> {
+        connectionStatus?: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED',
+    ): Promise<(Partial<Profile> & { photo_url: string | null; photo_needs_review: boolean; is_online: boolean; interests: { id: string; name_de: string; category: string | null }[]; connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED'; conversation_id: string | null; request_id: string | null })[]> {
         const qb = this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -413,6 +414,50 @@ export class ProfileService {
             qb.andWhere("p.last_active_at > NOW() - INTERVAL '3 minutes'");
         }
 
+        if (connectionStatus === 'CONNECTED') {
+            qb.andWhere(`
+                EXISTS (
+                    SELECT 1 FROM conversations c
+                    WHERE ((c.user_a_id = :requestingUserId AND c.user_b_id = p.user_id)
+                        OR (c.user_a_id = p.user_id AND c.user_b_id = :requestingUserId))
+                      AND c.purged_at IS NULL
+                )
+            `);
+        } else if (connectionStatus === 'SENT') {
+            qb.andWhere(`
+                EXISTS (
+                    SELECT 1 FROM contact_requests cr
+                    WHERE cr.sender_id = :requestingUserId AND cr.receiver_id = p.user_id
+                      AND cr.status = 'pending'
+                )
+            `);
+        } else if (connectionStatus === 'RECEIVED') {
+            qb.andWhere(`
+                EXISTS (
+                    SELECT 1 FROM contact_requests cr
+                    WHERE cr.sender_id = p.user_id AND cr.receiver_id = :requestingUserId
+                      AND cr.status = 'pending'
+                )
+            `);
+        } else if (connectionStatus === 'NONE') {
+            qb.andWhere(`
+                NOT EXISTS (
+                    SELECT 1 FROM conversations c
+                    WHERE ((c.user_a_id = :requestingUserId AND c.user_b_id = p.user_id)
+                        OR (c.user_a_id = p.user_id AND c.user_b_id = :requestingUserId))
+                      AND c.purged_at IS NULL
+                )
+            `);
+            qb.andWhere(`
+                NOT EXISTS (
+                    SELECT 1 FROM contact_requests cr
+                    WHERE ((cr.sender_id = :requestingUserId AND cr.receiver_id = p.user_id)
+                        OR (cr.sender_id = p.user_id AND cr.receiver_id = :requestingUserId))
+                      AND cr.status = 'pending'
+                )
+            `);
+        }
+
         const profiles = await qb.getMany();
         const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
 
@@ -460,12 +505,65 @@ export class ProfileService {
             (interestsMap[row.user_id] ??= []).push({ id: row.id, name_de: row.name_de, category: row.category });
         }
 
+        type ConnectionRow = {
+            user_id: string;
+            connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED';
+            conversation_id: string | null;
+            request_id: string | null;
+        };
+        const connectionRows = userIds.length > 0
+            ? await this.profileRepo.manager.query<ConnectionRow[]>(
+                  `WITH u AS (SELECT unnest($1::uuid[]) AS uid)
+                   SELECT
+                     u.uid AS user_id,
+                     CASE
+                       WHEN EXISTS (
+                         SELECT 1 FROM conversations c
+                         WHERE ((c.user_a_id = $2 AND c.user_b_id = u.uid)
+                             OR (c.user_a_id = u.uid AND c.user_b_id = $2))
+                           AND c.purged_at IS NULL
+                       ) THEN 'CONNECTED'
+                       WHEN EXISTS (
+                         SELECT 1 FROM contact_requests cr
+                         WHERE cr.sender_id = $2 AND cr.receiver_id = u.uid AND cr.status = 'pending'
+                       ) THEN 'SENT'
+                       WHEN EXISTS (
+                         SELECT 1 FROM contact_requests cr
+                         WHERE cr.sender_id = u.uid AND cr.receiver_id = $2 AND cr.status = 'pending'
+                       ) THEN 'RECEIVED'
+                       ELSE 'NONE'
+                     END AS connection_status,
+                     (
+                       SELECT c.id FROM conversations c
+                       WHERE ((c.user_a_id = $2 AND c.user_b_id = u.uid)
+                           OR (c.user_a_id = u.uid AND c.user_b_id = $2))
+                         AND c.purged_at IS NULL
+                       LIMIT 1
+                     ) AS conversation_id,
+                     (
+                       SELECT cr.id FROM contact_requests cr
+                       WHERE cr.sender_id = u.uid AND cr.receiver_id = $2 AND cr.status = 'pending'
+                       LIMIT 1
+                     ) AS request_id
+                   FROM u`,
+                  [userIds, requestingUserId],
+              )
+            : [];
+
+        const connectionMap: Record<string, ConnectionRow> = {};
+        for (const row of connectionRows) {
+            connectionMap[row.user_id] = row;
+        }
+
         return maskedProfiles.map(p => ({
             ...p,
             photo_url: p.photo_id ? (urlMap[p.photo_id] ?? null) : null,
             photo_needs_review: p.photo_id ? (reviewMap[p.photo_id] ?? false) : false,
             is_online: p.status_visible && p.last_active_at !== null && p.last_active_at > onlineThreshold,
             interests: p.show_interests ? (interestsMap[p.user_id] ?? []) : [],
+            connection_status: (connectionMap[p.user_id]?.connection_status ?? 'NONE') as 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED',
+            conversation_id: connectionMap[p.user_id]?.conversation_id ?? null,
+            request_id: connectionMap[p.user_id]?.request_id ?? null,
         }));
     }
 

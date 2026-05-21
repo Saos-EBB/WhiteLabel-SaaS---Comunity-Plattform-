@@ -94,7 +94,20 @@ export class ChatService {
             contact_request_id: request.id,
         });
 
-        return this.conversationRepository.save(conversation);
+        const savedConversation = await this.conversationRepository.save(conversation);
+
+        const acceptorProfile = await this.profileRepository.findOne({
+            where: { user_id: userId },
+            select: { id: true, nickname: true },
+        });
+
+        this.eventEmitter.emit('contact_request.accepted', {
+            senderId: request.sender_id,
+            conversationId: savedConversation.id,
+            acceptedByNickname: acceptorProfile?.nickname ?? 'Jemand',
+        });
+
+        return savedConversation;
     }
 
     async declineRequest(userId: string, requestId: string) {

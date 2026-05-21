@@ -81,6 +81,14 @@ for (const conv of conversations) {
         this.emitToUser(payload.recipientId, 'contact_request', payload.request);
     }
 
+    @OnEvent('contact_request.accepted')
+    handleContactRequestAccepted(payload: { senderId: string; conversationId: string; acceptedByNickname: string }) {
+        this.emitToUser(payload.senderId, 'contact_request_accepted', {
+            conversationId: payload.conversationId,
+            acceptedByNickname: payload.acceptedByNickname,
+        });
+    }
+
     @SubscribeMessage('join_conversation')
     async handleJoinConversation(
         @ConnectedSocket() client: Socket,

@@ -35,14 +35,13 @@ export class PaymentService {
     async createSubscription(userId: string, dto: CreateSubscriptionDto) {
         const session = await this.stripeService.stripe.checkout.sessions.create({
             mode: dto.plan === 'lifetime' ? 'payment' : 'subscription',
-            payment_method_types: [dto.payment_method],
+            ui_mode: 'embedded_page' as any,
             line_items: [{ price: PRICE_IDS[dto.plan], quantity: 1 }],
             metadata: { userId, plan: dto.plan },
-            success_url: process.env.STRIPE_SUCCESS_URL ?? 'http://localhost:3000/payment/success',
-            cancel_url: process.env.STRIPE_CANCEL_URL ?? 'http://localhost:3000/payment/cancel',
+            return_url: process.env.STRIPE_RETURN_URL ?? 'http://localhost:3001/settings',
         });
 
-        return { url: session.url };
+        return { clientSecret: session.client_secret };
     }
 
     async cancelSubscription(userId: string, subscriptionId: string) {

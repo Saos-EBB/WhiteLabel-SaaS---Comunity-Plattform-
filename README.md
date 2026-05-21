@@ -44,8 +44,7 @@ Copy `.env.example` to `.env` and fill in all values.
 | `STRIPE_SECRET_KEY` | Stripe secret API key |
 | `STRIPE_PUBLISHABLE_KEY` | Stripe publishable API key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `STRIPE_SUCCESS_URL` | Redirect URL after successful checkout |
-| `STRIPE_CANCEL_URL` | Redirect URL after cancelled checkout |
+| `STRIPE_RETURN_URL` | URL Stripe redirects to after Embedded Checkout completes (e.g. `http://localhost:3001/settings`) |
 | `PORT` | HTTP server port (default `3000`) |
 
 ---
@@ -189,7 +188,7 @@ Each profanity detection inserts a row into `profanity_flags` (user_id, word, co
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/payment/subscriptions` | JWT | Get active subscription. |
-| POST | `/payment/subscriptions` | JWT | Create a Stripe Checkout session. Returns `{ url }`. |
+| POST | `/payment/subscriptions` | JWT | Create a Stripe Embedded Checkout session. Returns `{ clientSecret }`. |
 | DELETE | `/payment/subscriptions/:id` | JWT | Cancel a subscription. |
 | GET | `/payment/logs` | JWT + Premium | Get payment history. Requires an active premium subscription. |
 | POST | `/payment/webhook` | — (Stripe signature) | Stripe webhook receiver. Handles `checkout.session.completed`, `invoice.payment_failed`, `customer.subscription.deleted`. |
@@ -292,6 +291,9 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- Payment: `POST /payment/subscriptions` switched to Stripe Embedded Checkout — session now created with `ui_mode: 'embedded'` and `return_url`; endpoint returns `{ clientSecret }` instead of `{ url }`. `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` env vars replaced by `STRIPE_RETURN_URL`.
+
+### 2026-05-21
 - Auth: account reactivation — `POST /auth/login` now finds soft-deleted accounts and, if `deleted_at` is within 30 days, clears it on successful login (account restored). Accounts deleted >30 days ago are treated as non-existent (same `401` as a wrong password — no enumeration).
 - Auth: `DELETE /auth/account` now bulk-revokes all active refresh tokens for the user at the time of soft-delete, preventing reuse of previously-issued cookies.
 - Real-time: `@nestjs/event-emitter` added (`^3.1.0`); `EventEmitterModule.forRoot()` registered in `AppModule`.

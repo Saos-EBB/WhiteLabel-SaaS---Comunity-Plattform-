@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsArray, IsUUID, IsEnum, IsInt, IsBoolean, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, IsEnum, IsInt, IsBoolean, IsIn, Min, Max } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { GenderOption, LookingForOption } from '../entities/profile.entity';
 
@@ -39,4 +39,8 @@ export class SearchProfileDto {
     @Transform(({ value }) => value === 'true' || value === true)
     @IsBoolean()
     online_only?: boolean;
+
+    @IsOptional()
+    @IsIn(['NONE', 'SENT', 'RECEIVED', 'CONNECTED'])
+    connection_status?: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED';
 }
