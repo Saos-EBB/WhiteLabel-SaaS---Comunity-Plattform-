@@ -12,10 +12,11 @@ import { Conversation } from './entities/conversation.entity';
 import { Message } from './entities/message.entity';
 import { User } from '../auth/entities/user.entity';
 import { Profile } from '../profile/entities/profile.entity';
+import { Block } from '../profile/entities/block.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([ContactRequest, Conversation, Message, User, Profile]),
+        TypeOrmModule.forFeature([ContactRequest, Conversation, Message, User, Profile, Block]),
         ModerationModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],

@@ -132,6 +132,12 @@ export class ProfileController {
         return this.profileService.deleteProfileAudio(req.user.sub);
     }
 
+    @Get('me/blocks')
+    @UseGuards(JwtGuard)
+    getBlocks(@Request() req: any) {
+        return this.profileService.getBlocks(req.user.sub);
+    }
+
     @Post('me/block/:userId')
     @UseGuards(JwtGuard)
     blockUser(@Request() req: any, @Param('userId') userId: string) {

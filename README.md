@@ -113,6 +113,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online`, `photo_needs_review`, `birthdate` (null when `show_age = false`). Fields masked by `show_*` flags: `bio`, `city`, `gender`, `looking_for` return `null` when hidden; interests return `[]` when `show_interests = false`. |
 | POST | `/profile/me/consent/sensitive-data` | JWT | Record AGB consent for sensitive data collection. Returns consent log ID. IP is SHA-256 hashed. |
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
+| GET | `/profile/me/blocks` | JWT | List all users blocked by the authenticated user. Returns `[{ block_id, user_id, nickname, photo_url }]`, ordered by block date descending. |
 | POST | `/profile/me/block/:userId` | JWT | Block a user. |
 | DELETE | `/profile/me/block/:userId` | JWT | Unblock a user. |
 | GET | `/profile/user/:userId` | JWT | Get nickname and photo_id for any account UUID. Used by frontend to resolve partner names in chat. |
@@ -132,10 +133,11 @@ All chat routes require JWT.
 | PATCH | `/chat/requests/:id/accept` | Accept a contact request. Creates conversation. |
 | PATCH | `/chat/requests/:id/decline` | Decline a contact request. |
 | GET | `/chat/conversations` | List own conversations. Each entry includes `partner_is_online`, `partner_status_visible`, `partner_status_message`, `partner_last_active_at`. |
-| GET | `/chat/conversations/:id` | Get a single conversation. |
+| GET | `/chat/conversations/:id` | Get a single conversation. Now returns `is_blocked: boolean` and `blocked_by: 'me' \| 'them' \| null`. |
 | GET | `/chat/conversations/:id/messages` | Get messages for a conversation. |
 | POST | `/chat/conversations/:id/messages` | Send a message in a conversation. |
 | DELETE | `/chat/messages/:id` | Delete own message. |
+| DELETE | `/chat/connections/:userId` | Disconnect from a connected user. Sets `deleted_at_a`, `deleted_at_b`, and `purged_at` on the conversation; reverts the accepted contact request to `declined`. Deletes chat history for both sides. |
 
 ---
 
@@ -158,7 +160,7 @@ All notification routes require JWT.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/moderation/wordlist` | — | Returns the active profanity word list: `{ words: string[] }`. |
-| POST | `/moderation/reports` | JWT | Submit a report against a user or content. |
+| POST | `/moderation/reports` | JWT | Submit a report against a user or content. After saving, counts distinct reporters against the target; if ≥ 10 unique reporters have open/reviewed reports the user is auto-banned (`ban_reason = 'Auto-Ban: 10 unabhängige Meldungen'`) and receives a system notification. |
 | GET | `/moderation/reports` | JWT (admin) | List all reports. |
 | GET | `/moderation/reports/:id` | JWT (admin) | Get a single report. |
 | POST | `/moderation/strikes` | JWT (admin) | Issue a strike. |
@@ -289,6 +291,13 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ---
 
 ## Changelog
+
+### 2026-05-22 (latest)
+- Chat: new `DELETE /chat/connections/:userId` — disconnect from a connected user; sets `deleted_at_a`, `deleted_at_b`, and `purged_at` on the conversation, reverts the accepted contact request to `declined`. Both sides lose access to the chat history.
+- Chat: `GET /chat/conversations/:id` now returns `is_blocked: boolean` and `blocked_by: 'me' | 'them' | null` (checked against the `blocks` table for both directions).
+- Chat: `ContactRequestStatus` enum gains `CANCELLED` value.
+- Profile: new `GET /profile/me/blocks` — returns all users blocked by the caller (`block_id`, `user_id`, `nickname`, `photo_url`), ordered by block date descending.
+- Moderation: `POST /moderation/reports` now counts distinct reporters per target after each submission; automatically bans the target and sends a system notification when ≥ 10 unique open/reviewed reports are found.
 
 ### 2026-05-21 (latest)
 - Payment: `POST /payment/subscriptions` switched to Stripe Embedded Checkout — session now created with `ui_mode: 'embedded'` and `return_url`; endpoint returns `{ clientSecret }` instead of `{ url }`. `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` env vars replaced by `STRIPE_RETURN_URL`.

@@ -5,6 +5,7 @@ export enum ContactRequestStatus {
     PENDING = 'pending',
     ACCEPTED = 'accepted',
     DECLINED = 'declined',
+    CANCELLED = 'cancelled',
 }
 
 @Entity('contact_requests')

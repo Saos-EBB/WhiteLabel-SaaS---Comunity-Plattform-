@@ -636,6 +636,45 @@ export class ProfileService {
     }
 
 
+    async getBlocks(userId: string): Promise<{ block_id: string; user_id: string; nickname: string; photo_url: string | null }[]> {
+        const blocks = await this.blockRepo.find({
+            where: { blocker_id: userId },
+            order: { created_at: 'DESC' },
+        });
+
+        if (blocks.length === 0) return [];
+
+        const blockedUserIds = blocks.map(b => b.blocked_id);
+
+        const profiles = await this.profileRepo
+            .createQueryBuilder('p')
+            .select(['p.user_id', 'p.nickname', 'p.photo_id'])
+            .where('p.user_id IN (:...blockedUserIds)', { blockedUserIds })
+            .getMany();
+
+        const profileMap = new Map(profiles.map(p => [p.user_id, p]));
+
+        const photoIds = profiles.filter(p => p.photo_id).map(p => p.photo_id as string);
+        const urlMap: Record<string, string> = {};
+        if (photoIds.length > 0) {
+            const rows = await this.profileRepo.manager.query<{ id: string; file_url: string }[]>(
+                'SELECT id, file_url FROM media_uploads WHERE id = ANY($1)',
+                [photoIds],
+            );
+            for (const row of rows) urlMap[row.id] = row.file_url;
+        }
+
+        return blocks.map(b => {
+            const prof = profileMap.get(b.blocked_id);
+            return {
+                block_id: b.id,
+                user_id: b.blocked_id,
+                nickname: prof?.nickname ?? 'Unbekannt',
+                photo_url: prof?.photo_id ? (urlMap[prof.photo_id] ?? null) : null,
+            };
+        });
+    }
+
     async blockUser(blockerId: string, blockedId: string): Promise<void> {
         if (blockerId === blockedId) throw new BadRequestException('Du kannst dich nicht selbst blockieren');
 

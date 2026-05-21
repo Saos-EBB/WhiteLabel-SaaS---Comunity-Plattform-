@@ -74,6 +74,11 @@ was
         return this.chatService.deleteConversation(req.user.sub, id);
     }
 
+    @Delete('connections/:userId')
+    disconnectUser(@Request() req: any, @Param('userId', ParseUUIDPipe) userId: string) {
+        return this.chatService.disconnectUser(req.user.sub, userId);
+    }
+
     @Delete('messages/:id')
     deleteMessage(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
         return this.chatService.deleteMessage(req.user.sub, id);

@@ -46,7 +46,31 @@ export class ModerationService {
             reviewed_at: null,
         });
 
-        return this.reportRepository.save(report);
+        const saved = await this.reportRepository.save(report);
+
+        const result = await this.reportRepository
+            .createQueryBuilder('r')
+            .select('COUNT(DISTINCT r.reporter_id)', 'count')
+            .where('r.reported_user_id = :userId', { userId: dto.reported_user_id })
+            .andWhere('r.status IN (:...statuses)', { statuses: ['open', 'reviewed'] })
+            .getRawOne();
+
+        if (parseInt(result?.count ?? '0', 10) >= 10) {
+            const user = await this.userRepository.findOne({ where: { id: dto.reported_user_id } });
+            if (user && !user.is_banned) {
+                user.is_banned = true;
+                user.ban_reason = 'Auto-Ban: 10 unabhängige Meldungen';
+                user.ban_expires_at = null;
+                await this.userRepository.save(user);
+                await this.notificationsService.createNotification(
+                    dto.reported_user_id,
+                    'system',
+                    'Dein Konto wurde gesperrt',
+                );
+            }
+        }
+
+        return saved;
     }
 
     async getReports(reporterId: string) {
