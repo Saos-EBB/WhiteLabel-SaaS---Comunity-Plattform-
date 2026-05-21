@@ -93,6 +93,8 @@ function ProfileCard({
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
 
   async function handleConnect() {
     setBusy(true)
@@ -126,20 +128,42 @@ function ProfileCard({
     }
   }
 
+  async function handleDisconnect() {
+    setDisconnecting(true)
+    try {
+      await fetchApi<unknown>(`/chat/connections/${profile.user_id}`, { method: 'DELETE' })
+      onUpdate(profile.user_id, { connection_status: 'NONE', conversation_id: null })
+      setDisconnectConfirmOpen(false)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Trennen')
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
   const age = calcAge(profile.birthdate)
   const cs = profile.connection_status ?? 'NONE'
 
   function renderAction() {
     if (cs === 'CONNECTED') {
       return (
-        <button
-          onClick={() => profile.conversation_id && router.push(`/chat/${profile.conversation_id}`)}
-          disabled={!profile.conversation_id}
-          className="w-full py-2.5 rounded-full bg-emerald-600 text-white text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          aria-label={`Mit ${profile.nickname} chatten`}
-        >
-          Chatten →
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={() => profile.conversation_id && router.push(`/chat/${profile.conversation_id}`)}
+            disabled={!profile.conversation_id}
+            className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            aria-label={`Mit ${profile.nickname} chatten`}
+          >
+            Chatten →
+          </button>
+          <button
+            onClick={() => setDisconnectConfirmOpen(true)}
+            className="w-full py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-xs sm:text-sm font-medium min-h-[44px] hover:bg-surface-container-high active:scale-95 transition-all"
+            aria-label={`Verbindung mit ${profile.nickname} trennen`}
+          >
+            Verbindung trennen
+          </button>
+        </div>
       )
     }
     if (cs === 'SENT') {
@@ -258,6 +282,49 @@ function ProfileCard({
           )}
         </div>
       </div>
+
+      {/* Disconnect confirmation bottom sheet */}
+      {disconnectConfirmOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-20 bg-black/50"
+            onClick={() => !disconnecting && setDisconnectConfirmOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Verbindung trennen"
+          >
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p className="font-semibold text-on-surface">Verbindung trennen?</p>
+              <p className="text-sm text-on-surface-variant">
+                Der gemeinsame Chat wird für beide Seiten gelöscht und kann nicht wiederhergestellt werden.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              >
+                {disconnecting && (
+                  <span className="h-3.5 w-3.5 rounded-full border-2 border-error/30 border-t-error animate-spin" aria-hidden="true" />
+                )}
+                Trennen
+              </button>
+              <button
+                onClick={() => setDisconnectConfirmOpen(false)}
+                disabled={disconnecting}
+                className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </article>
   )
 }

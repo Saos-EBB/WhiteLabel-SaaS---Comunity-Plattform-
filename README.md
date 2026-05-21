@@ -54,7 +54,7 @@ Browse published profiles in a 2-col (mobile) / 3-col (desktop) grid. Skeleton l
 
 Filters: city (text, Enter to apply), gender, looking_for, age range (min/max), online-only toggle. Apply and reset buttons.
 
-Each profile card shows photo, name + age, city, up to 3 interest chips, and an `OnlineIndicator` for status. "Verbinden" button posts to `POST /chat/requests`; the card switches to "Anfrage gesendet ✓" optimistically. Nickname links to `/profile/[nickname]`.
+Each profile card shows photo, name + age, city, up to 3 interest chips, and an `OnlineIndicator` for status. "Verbinden" button posts to `POST /chat/requests`; the card switches to "Anfrage gesendet ✓" optimistically. Nickname links to `/profile/[nickname]`. Connected profiles show "Chatten →" and a "Verbindung trennen" button; the latter opens a bottom sheet confirmation and calls `DELETE /chat/connections/:userId` (deletes chat for both sides).
 
 #### `/requests`
 Incoming and outgoing contact requests. Accept / decline.
@@ -73,6 +73,8 @@ Real-time conversation page.
 - Delete own message: long-press (mobile) or right-click → bottom sheet confirmation → `DELETE /chat/messages/:id`. Deleted messages render as "Nachricht gelöscht".
 - Scroll-to-bottom button appears when the sentinel div leaves the viewport (IntersectionObserver).
 - Suppresses the bell unread badge for `message`-type notifications while this conversation is open.
+- **Three-dot menu** (header): "Chat löschen" (DELETE own copy, navigates to `/chat`), "User melden" (opens `ReportModal`), "Nutzer blockieren" (bottom sheet → `POST /profile/me/block/:userId`).
+- **Block banner:** when `is_blocked = true` (either direction) the input is disabled and a banner shows "Dieser Nutzer hat dich blockiert." or "Du kannst diesem Nutzer keine Nachrichten senden." Partner name replaced with "XXXX" when blocked.
 
 **Not yet implemented:** `read_at` data exists in the message type but read receipts are not rendered in the UI.
 
@@ -127,10 +129,17 @@ Accordion layout — single section open at a time, CSS `grid-rows` height trans
 - **Konto löschen** — focus-trapped confirmation dialog; calls `DELETE /auth/account`, clears auth store and redirects to `/login` on success; shows inline error on failure with spinner during the request.
 - Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
 
-**E) Abonnement & Zahlung:**
+**E) Sicherheit & Blockierungen:**
+- Blocked user list lazy-loaded from `GET /profile/me/blocks` when the section is first opened. Shows avatar, nickname, and an "Entsperren" button.
+- Unblock flow: tap "Entsperren" → inline confirmation ("Bestätigen" / "Abbrechen") → `DELETE /profile/me/block/:userId`; user removed from list on success with success toast.
+
+**F) Abonnement & Zahlung:**
 - Subscription detail fetched lazily from `GET /payment/subscriptions` when the accordion is first opened — not on page mount.
 - **Active subscription:** plan label (Monatlich / Jährlich / Lebenslang), "Aktiv" badge, expiry date in de-DE format (hidden for lifetime plan). Cancel button ("Abonnement kündigen") reveals an inline confirmation step ("Bist du sicher? Diese Aktion kann nicht rückgängig gemacht werden." + Bestätigen / Abbrechen) before calling `DELETE /payment/subscriptions/:id`; on success profile is re-fetched.
 - **No active subscription:** "Kein aktives Abonnement" message and three plan buttons (Monatlich / Jährlich / Lebenslang). Clicking any plan opens `StripeCheckoutModal` with the selected plan.
+
+**G) Support:**
+- "Problem melden" button opens `ReportModal` without a pre-filled user (nickname lookup mode).
 
 All saves show a toast (✓ success or ✗ error).
 
@@ -274,6 +283,24 @@ On mount POSTs to `POST /payment/subscriptions` to obtain a `clientSecret`, then
 
 ---
 
+### `ReportModal` — `components/ui/ReportModal.tsx`
+
+Modal for reporting a user or piece of content.
+
+```tsx
+<ReportModal reportedUserId="uuid" onClose={() => setOpen(false)} />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `reportedUserId` | `string \| undefined` | Pre-fills the target user. If omitted, a nickname text input is shown and the user ID is resolved via `GET /profile/:nickname`. |
+| `messageId` | `string \| undefined` | Optional — attached to the report body when reporting a specific message. |
+| `onClose` | `() => void` | Called when the backdrop or × button is clicked, or automatically after 2 s on success. |
+
+Five preset reason options (Belästigung, Spam, Fake-Profil, Unangemessene Inhalte, Missbrauch) + optional free-text description (500 char limit). Submits to `POST /moderation/reports`. Used from the chat header, the public profile page, and the Support settings accordion.
+
+---
+
 ### `AudioPlayer` — `components/ui/AudioPlayer.tsx`
 
 Custom audio player replacing native `<audio controls>` on profile pages.
@@ -303,6 +330,15 @@ Custom audio player replacing native `<audio controls>` on profile pages.
 ---
 
 ## Changelog
+
+### 2026-05-22 (latest)
+- Chat (`/chat/[id]`): three-dot menu in the header — "Chat löschen" (soft-delete own copy, navigates to `/chat`), "User melden" (opens `ReportModal`), "Nutzer blockieren" (bottom sheet confirmation → `POST /profile/me/block/:userId`).
+- Chat (`/chat/[id]`): block state loaded from `is_blocked` / `blocked_by` on conversation fetch; input and send button disabled when blocked; block banner shown in the input bar; partner name replaced with "XXXX" when blocked.
+- Discover (`/discover`): connected profiles now show a "Verbindung trennen" button below "Chatten →"; confirmation bottom sheet calls `DELETE /chat/connections/:userId` and resets connection status to NONE.
+- Public profile (`/profile/[nickname]`): "Verbindung trennen" button for connected profiles (bottom sheet confirmation); "User melden" button opens `ReportModal`; "Nutzer blockieren" button (bottom sheet confirmation → `POST /profile/me/block/:userId` → navigates back). `connection_status` field added to `PublicProfile` type.
+- Settings (`/settings`): new **E) Sicherheit & Blockierungen** accordion section — blocked user list lazy-loaded from `GET /profile/me/blocks`; inline unblock flow with confirmation.
+- Settings (`/settings`): new **G) Support** accordion section — "Problem melden" button opens `ReportModal` in nickname-lookup mode.
+- New component: `ReportModal` (`components/ui/ReportModal.tsx`) — report modal with reason dropdown (5 options), optional description (500 chars), optional nickname lookup when `reportedUserId` is omitted. Used from chat page, public profile, and settings.
 
 ### 2026-05-21 (latest)
 - Payment: `POST /payment/subscriptions` now returns `{ clientSecret }` (Stripe Embedded Checkout). `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` added to `.env.local`.

@@ -1,15 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { MapPin, Loader2, AlertCircle } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { MapPin, Loader2, AlertCircle, Flag, Ban } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
+import ReportModal from '@/components/ui/ReportModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type ConnectionStatus = 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED'
 
 interface PublicProfile {
   id: string
@@ -26,6 +29,7 @@ interface PublicProfile {
   audio_url: string | null
   is_online: boolean
   status_message: string | null
+  connection_status?: ConnectionStatus
 }
 
 const GENDER_LABELS: Record<string, string> = {
@@ -79,9 +83,17 @@ export default function PublicProfilePage() {
 
   const [audioUrl, setAudioUrl]           = useState<string | null>(null)
 
-  const [requestStatus, setRequestStatus] = useState<RequestStatus>('idle')
-  const [requestError, setRequestError]   = useState<string | null>(null)
+  const [requestStatus, setRequestStatus]           = useState<RequestStatus>('idle')
+  const [requestError, setRequestError]             = useState<string | null>(null)
+  const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
+  const [disconnecting, setDisconnecting]           = useState(false)
+  const [disconnectError, setDisconnectError]       = useState<string | null>(null)
+  const [reportOpen, setReportOpen]                 = useState(false)
+  const [blockConfirmOpen, setBlockConfirmOpen]     = useState(false)
+  const [blocking, setBlocking]                     = useState(false)
+  const [blockError, setBlockError]                 = useState<string | null>(null)
 
+  const router = useRouter()
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
 
   // ── Load ───────────────────────────────────────────────────────────────────
@@ -144,6 +156,40 @@ export default function PublicProfilePage() {
     } catch (err) {
       setRequestError(err instanceof Error ? err.message : 'Anfrage fehlgeschlagen')
       setRequestStatus('idle')
+    }
+  }
+
+  // ── Disconnect ─────────────────────────────────────────────────────────────
+
+  async function handleDisconnect() {
+    if (!profile || disconnecting) return
+    setDisconnecting(true)
+    setDisconnectError(null)
+    try {
+      await fetchApi<unknown>(`/chat/connections/${profile.user_id}`, { method: 'DELETE' })
+      setProfile((p) => p ? { ...p, connection_status: 'NONE' } : p)
+      setDisconnectConfirmOpen(false)
+    } catch (err) {
+      setDisconnectError(err instanceof Error ? err.message : 'Fehler beim Trennen')
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
+  // ── Block ──────────────────────────────────────────────────────────────────
+
+  async function handleBlock() {
+    if (!profile || blocking) return
+    setBlocking(true)
+    setBlockError(null)
+    try {
+      await fetchApi<unknown>(`/profile/me/block/${profile.user_id}`, { method: 'POST' })
+      setBlockConfirmOpen(false)
+      router.back()
+    } catch (err) {
+      setBlockError(err instanceof Error ? err.message : 'Fehler beim Blockieren')
+    } finally {
+      setBlocking(false)
     }
   }
 
@@ -292,26 +338,161 @@ export default function PublicProfilePage() {
             </div>
           )}
 
-          {/* ── Contact request button (other profiles only) ───────────────── */}
+          {/* ── Actions (other profiles only) ─────────────────────────────── */}
           {!isOwnProfile && (
-            <div className="w-full">
-              {requestError && (
-                <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm mb-4" role="alert">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                  {requestError}
-                </div>
+            <div className="w-full space-y-3">
+
+              {/* Disconnect / Contact request */}
+              {profile.connection_status === 'CONNECTED' ? (
+                <>
+                  {disconnectError && (
+                    <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                      {disconnectError}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setDisconnectConfirmOpen(true)}
+                    className="w-full py-4 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    Verbindung trennen
+                  </button>
+                </>
+              ) : (
+                <>
+                  {requestError && (
+                    <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                      {requestError}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleContactRequest}
+                    disabled={requestStatus === 'loading' || requestStatus === 'sent'}
+                    className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {requestStatus === 'loading' && (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    )}
+                    {requestStatus === 'sent' ? 'Anfrage gesendet ✓' : 'Kontakt anfragen'}
+                  </button>
+                </>
               )}
+
+              {/* Report button */}
               <button
-                onClick={handleContactRequest}
-                disabled={requestStatus === 'loading' || requestStatus === 'sent'}
-                className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={() => setReportOpen(true)}
+                className="w-full py-3 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium hover:bg-surface-container active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                {requestStatus === 'loading' && (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                )}
-                {requestStatus === 'sent' ? 'Anfrage gesendet ✓' : 'Kontakt anfragen'}
+                <Flag className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                User melden
+              </button>
+
+              {/* Block button */}
+              <button
+                onClick={() => setBlockConfirmOpen(true)}
+                className="w-full py-3 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium hover:bg-surface-container active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Ban className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                Nutzer blockieren
               </button>
             </div>
+          )}
+
+          {/* Disconnect confirmation bottom sheet */}
+          {disconnectConfirmOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-20 bg-black/50"
+                onClick={() => !disconnecting && setDisconnectConfirmOpen(false)}
+                aria-hidden="true"
+              />
+              <div
+                className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Verbindung trennen"
+              >
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <p className="font-semibold text-on-surface">Verbindung trennen?</p>
+                  <p className="text-sm text-on-surface-variant">
+                    Der gemeinsame Chat wird für beide Seiten gelöscht und kann nicht wiederhergestellt werden.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row-reverse">
+                  <button
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    {disconnecting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    Trennen
+                  </button>
+                  <button
+                    onClick={() => setDisconnectConfirmOpen(false)}
+                    disabled={disconnecting}
+                    className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Block user confirmation bottom sheet */}
+          {blockConfirmOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-20 bg-black/50"
+                onClick={() => !blocking && setBlockConfirmOpen(false)}
+                aria-hidden="true"
+              />
+              <div
+                className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Nutzer blockieren"
+              >
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <p className="font-semibold text-on-surface">Nutzer blockieren?</p>
+                  <p className="text-sm text-on-surface-variant">
+                    Der Nutzer wird aus deiner Suche entfernt. Du kannst ihm keine Nachrichten mehr senden. Diese Aktion kann rückgängig gemacht werden.
+                  </p>
+                </div>
+                {blockError && (
+                  <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    {blockError}
+                  </div>
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row-reverse">
+                  <button
+                    onClick={handleBlock}
+                    disabled={blocking}
+                    className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    {blocking && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    Blockieren
+                  </button>
+                  <button
+                    onClick={() => setBlockConfirmOpen(false)}
+                    disabled={blocking}
+                    className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Report modal */}
+          {reportOpen && (
+            <ReportModal
+              reportedUserId={profile.user_id}
+              onClose={() => setReportOpen(false)}
+            />
           )}
 
         </div>

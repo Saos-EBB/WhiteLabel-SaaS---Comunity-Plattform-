@@ -3,20 +3,28 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download, CreditCard,
+  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download, CreditCard, Flag, Shield, User,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useThemeStore } from '@/lib/store/themeStore'
 import StripeCheckoutModal from '@/components/ui/StripeCheckoutModal'
+import ReportModal from '@/components/ui/ReportModal'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FontSize = 'normal' | 'large' | 'xl'
-type AccordionSection = 'design' | 'notifications' | 'visibility' | 'account' | 'payment'
+type AccordionSection = 'design' | 'notifications' | 'visibility' | 'account' | 'security' | 'payment' | 'support'
+
+interface BlockedUser {
+  block_id: string
+  user_id: string
+  nickname: string
+  photo_url: string | null
+}
 
 interface Subscription {
   plan: string
@@ -229,6 +237,13 @@ export default function SettingsPage() {
   const [cancelConfirm, setCancelConfirm] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [checkoutPlan, setCheckoutPlan]   = useState<'monthly' | 'yearly' | 'lifetime' | null>(null)
+  const [reportOpen, setReportOpen]       = useState(false)
+
+  const [blockedUsers, setBlockedUsers]   = useState<BlockedUser[]>([])
+  const [blocksLoading, setBlocksLoading] = useState(false)
+  const [blocksFetched, setBlocksFetched] = useState(false)
+  const [confirmingUnblockId, setConfirmingUnblockId] = useState<string | null>(null)
+  const [unblocking, setUnblocking]       = useState(false)
 
   useEffect(() => {
     return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
@@ -266,6 +281,16 @@ export default function SettingsPage() {
       .catch(() => {})
       .finally(() => setSubLoading(false))
   }, [openSection, subFetched])
+
+  useEffect(() => {
+    if (openSection !== 'security' || blocksFetched) return
+    setBlocksFetched(true)
+    setBlocksLoading(true)
+    fetchApi<BlockedUser[]>('/profile/me/blocks')
+      .then(setBlockedUsers)
+      .catch(() => {})
+      .finally(() => setBlocksLoading(false))
+  }, [openSection, blocksFetched])
 
   // ── Toast ──────────────────────────────────────────────────────────────────
 
@@ -478,6 +503,23 @@ export default function SettingsPage() {
       setGdprError('Export fehlgeschlagen. Bitte versuche es später erneut.')
     } finally {
       setGdprLoading(false)
+    }
+  }
+
+  // ── Unblock user ──────────────────────────────────────────────────────────
+
+  async function handleUnblock(userId: string) {
+    if (unblocking) return
+    setUnblocking(true)
+    try {
+      await fetchApi(`/profile/me/block/${userId}`, { method: 'DELETE' })
+      setBlockedUsers((prev) => prev.filter((b) => b.user_id !== userId))
+      setConfirmingUnblockId(null)
+      showToast('Blockierung aufgehoben')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler beim Entsperren', false)
+    } finally {
+      setUnblocking(false)
     }
   }
 
@@ -854,7 +896,75 @@ export default function SettingsPage() {
 
         </AccordionItem>
 
-        {/* ── E) Abonnement & Zahlung ───────────────────────────────────────── */}
+        {/* ── E) Sicherheit & Blockierungen ────────────────────────────────── */}
+        <AccordionItem
+          title="Sicherheit & Blockierungen"
+          icon={<Shield className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
+          isOpen={openSection === 'security'}
+          onToggle={() => toggleSection('security')}
+        >
+          {blocksLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin" aria-label="Lädt blockierte Nutzer" />
+            </div>
+          ) : blockedUsers.length === 0 ? (
+            <p className="text-sm text-on-surface-variant text-center py-2">Keine blockierten Nutzer</p>
+          ) : (
+            <div className="space-y-2">
+              {blockedUsers.map((b) => (
+                <div key={b.user_id} className="rounded-xl bg-surface-container-high overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 min-h-[56px]">
+                    {/* Avatar */}
+                    <div className="flex-shrink-0 h-9 w-9 rounded-full bg-surface-container overflow-hidden flex items-center justify-center">
+                      {b.photo_url ? (
+                        <img src={b.photo_url} alt="" className="h-full w-full object-cover" aria-hidden="true" />
+                      ) : (
+                        <User className="h-4 w-4 text-outline" aria-hidden="true" />
+                      )}
+                    </div>
+
+                    <span className="flex-1 text-sm font-medium text-on-surface truncate">{b.nickname}</span>
+
+                    {confirmingUnblockId === b.user_id ? (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => setConfirmingUnblockId(null)}
+                          disabled={unblocking}
+                          className="px-3 py-1.5 rounded-full border border-outline-variant text-on-surface text-xs font-medium hover:bg-surface-container transition-colors disabled:opacity-50 min-h-[36px]"
+                        >
+                          Abbrechen
+                        </button>
+                        <button
+                          onClick={() => handleUnblock(b.user_id)}
+                          disabled={unblocking}
+                          className="px-3 py-1.5 rounded-full bg-error-container text-error text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 min-h-[36px] flex items-center gap-1.5"
+                        >
+                          {unblocking && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                          Bestätigen
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmingUnblockId(b.user_id)}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-full border border-outline-variant text-on-surface text-xs font-medium hover:bg-surface-container transition-colors min-h-[36px]"
+                      >
+                        Entsperren
+                      </button>
+                    )}
+                  </div>
+
+                  {confirmingUnblockId === b.user_id && (
+                    <div className="px-4 pb-3 text-xs text-on-surface-variant">
+                      Möchtest du die Blockierung aufheben?
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </AccordionItem>
+
+        {/* ── F) Abonnement & Zahlung ───────────────────────────────────────── */}
         <AccordionItem
           title="Abonnement & Zahlung"
           icon={<CreditCard className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
@@ -937,6 +1047,25 @@ export default function SettingsPage() {
           )}
         </AccordionItem>
 
+        {/* ── G) Support ───────────────────────────────────────────────────── */}
+        <AccordionItem
+          title="Support"
+          icon={<Flag className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
+          isOpen={openSection === 'support'}
+          onToggle={() => toggleSection('support')}
+        >
+          <p className="text-sm text-on-surface-variant">
+            Hast du ein Problem mit einem Nutzer oder unangemessene Inhalte gesehen?
+          </p>
+          <button
+            onClick={() => setReportOpen(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px] hover:bg-surface-container transition-colors text-left"
+          >
+            <Flag className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+            <span className="text-sm font-medium text-on-surface">Problem melden</span>
+          </button>
+        </AccordionItem>
+
       </div>
 
       {/* ── Stripe Embedded Checkout modal ─────────────────────────────────── */}
@@ -945,6 +1074,11 @@ export default function SettingsPage() {
           plan={checkoutPlan}
           onClose={() => setCheckoutPlan(null)}
         />
+      )}
+
+      {/* ── Report modal ───────────────────────────────────────────────────── */}
+      {reportOpen && (
+        <ReportModal onClose={() => setReportOpen(false)} />
       )}
 
       {/* ── Delete account dialog ───────────────────────────────────────────── */}

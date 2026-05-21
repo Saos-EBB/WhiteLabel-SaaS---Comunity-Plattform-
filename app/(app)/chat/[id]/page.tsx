@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2 } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2, MoreVertical, Flag, Ban } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
+import ReportModal from '@/components/ui/ReportModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ function MessageBubble({
 export default function ConversationPage() {
   const params = useParams<{ id: string }>()
   const conversationId = params.id
+  const router = useRouter()
 
   const currentUserId   = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
   const accessToken     = useAuthStore((s) => s.accessToken)
@@ -163,6 +165,19 @@ export default function ConversationPage() {
   // id of message currently showing the delete confirmation sheet
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // three-dot menu + chat-level actions
+  const [menuOpen, setMenuOpen]             = useState(false)
+  const [deleteChatOpen, setDeleteChatOpen] = useState(false)
+  const [deletingChat, setDeletingChat]     = useState(false)
+  const [reportOpen, setReportOpen]         = useState(false)
+  const [partnerUserId, setPartnerUserId]   = useState<string | null>(null)
+
+  // block state
+  const [isBlocked, setIsBlocked]   = useState(false)
+  const [blockedBy, setBlockedBy]   = useState<'me' | 'them' | null>(null)
+  const [blockOpen, setBlockOpen]   = useState(false)
+  const [blocking, setBlocking]     = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const isFirstScroll = useRef(true)
@@ -192,11 +207,14 @@ export default function ConversationPage() {
       try {
         const [msgRes, conv] = await Promise.all([
           fetchApi<MsgEnvelope>(`/chat/conversations/${conversationId}/messages`),
-          fetchApi<{ user_a_id: string; user_b_id: string }>(`/chat/conversations/${conversationId}`),
+          fetchApi<{ user_a_id: string; user_b_id: string; is_blocked: boolean; blocked_by: 'me' | 'them' | null }>(`/chat/conversations/${conversationId}`),
         ])
         setMessages(normalise(msgRes))
+        setIsBlocked(conv.is_blocked)
+        setBlockedBy(conv.blocked_by)
         const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
         const pid = conv.user_a_id === myId ? conv.user_b_id : conv.user_a_id
+        setPartnerUserId(pid)
         fetchApi<{ nickname: string }>(`/profile/user/${pid}`)
           .then(async (p) => {
             setPartnerNickname(p.nickname)
@@ -360,6 +378,39 @@ export default function ConversationPage() {
     }
   }
 
+  // ── Delete chat ────────────────────────────────────────────────────────────
+
+  async function handleDeleteChat() {
+    setDeletingChat(true)
+    try {
+      await fetchApi<unknown>(`/chat/conversations/${conversationId}`, { method: 'DELETE' })
+      router.replace('/chat')
+    } catch {
+      setDeletingChat(false)
+      setDeleteChatOpen(false)
+    }
+  }
+
+  // ── Block user ─────────────────────────────────────────────────────────────
+
+  async function handleBlock() {
+    if (!partnerUserId || blocking) return
+    setBlocking(true)
+    try {
+      await fetchApi<unknown>(`/profile/me/block/${partnerUserId}`, { method: 'POST' })
+      setBlockOpen(false)
+      const conv = await fetchApi<{ user_a_id: string; user_b_id: string; is_blocked: boolean; blocked_by: 'me' | 'them' | null }>(
+        `/chat/conversations/${conversationId}`
+      )
+      setIsBlocked(conv.is_blocked)
+      setBlockedBy(conv.blocked_by)
+    } catch {
+      // silent — sheet stays open
+    } finally {
+      setBlocking(false)
+    }
+  }
+
   // ── Partner ID ─────────────────────────────────────────────────────────────
 
   const partnerId =
@@ -387,15 +438,66 @@ export default function ConversationPage() {
           <User className="h-5 w-5 text-outline" />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-semibold text-on-surface text-sm truncate">
-            {partnerNickname ?? (partnerId ? shortId(partnerId) : 'Gespräch')}
+            {isBlocked ? 'XXXX' : partnerNickname ?? (partnerId ? shortId(partnerId) : 'Gespräch')}
           </p>
           <OnlineIndicator
             is_online={partnerIsOnline}
             status_message={partnerStatusMessage}
             size="sm"
           />
+        </div>
+
+        {/* Three-dot menu */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-surface-container transition-colors"
+            aria-label="Mehr Optionen"
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+          >
+            <MoreVertical className="h-5 w-5 text-on-surface" aria-hidden="true" />
+          </button>
+          {menuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setMenuOpen(false)}
+                aria-hidden="true"
+              />
+              <div
+                className="absolute right-0 top-10 z-20 min-w-[180px] rounded-xl bg-surface-container border border-outline-variant shadow-lg overflow-hidden"
+                role="menu"
+              >
+                <button
+                  onClick={() => { setMenuOpen(false); setDeleteChatOpen(true) }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-high transition-colors text-left min-h-[44px]"
+                  role="menuitem"
+                >
+                  <Trash2 className="h-4 w-4 text-error flex-shrink-0" aria-hidden="true" />
+                  Chat löschen
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); setReportOpen(true) }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-high transition-colors text-left min-h-[44px]"
+                  role="menuitem"
+                >
+                  <Flag className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+                  User melden
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); setBlockOpen(true) }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-on-surface hover:bg-surface-container-high transition-colors text-left min-h-[44px]"
+                  role="menuitem"
+                >
+                  <Ban className="h-4 w-4 text-error flex-shrink-0" aria-hidden="true" />
+                  Nutzer blockieren
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -472,6 +574,14 @@ export default function ConversationPage() {
 
       {/* Fixed input bar — above BottomNav on mobile */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-sm border-t border-outline-variant px-3 py-2.5">
+        {isBlocked && (
+          <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-2.5 text-sm" role="alert">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            {blockedBy === 'them'
+              ? 'Dieser Nutzer hat dich blockiert.'
+              : 'Du kannst diesem Nutzer keine Nachrichten senden.'}
+          </div>
+        )}
         <div className="flex items-center gap-2 max-w-3xl mx-auto">
           <input
             ref={inputRef}
@@ -482,11 +592,11 @@ export default function ConversationPage() {
             placeholder="Nachricht schreiben…"
             className="flex-1 rounded-full bg-surface-container border border-outline-variant px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
             aria-label="Nachricht eingeben"
-            disabled={loading || !!error}
+            disabled={loading || !!error || isBlocked}
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || sending || loading || !!error}
+            disabled={!input.trim() || sending || loading || !!error || isBlocked}
             className="flex-shrink-0 h-11 w-11 rounded-full bg-primary-fixed-dim text-on-primary-container flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             aria-label="Nachricht senden"
           >
@@ -499,7 +609,109 @@ export default function ConversationPage() {
         </div>
       </div>
 
-      {/* Delete confirmation bottom sheet */}
+      {/* Delete chat confirmation bottom sheet */}
+      {deleteChatOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-20 bg-black/50"
+            onClick={() => !deletingChat && setDeleteChatOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chat löschen"
+          >
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-container">
+                <Trash2 className="h-5 w-5 text-error" aria-hidden="true" />
+              </div>
+              <p className="font-semibold text-on-surface">Chat löschen?</p>
+              <p className="text-sm text-on-surface-variant">
+                Der Chat wird nur bei dir gelöscht. Die andere Person sieht ihn weiterhin.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                onClick={handleDeleteChat}
+                disabled={deletingChat}
+                className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all"
+              >
+                {deletingChat ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    Löschen…
+                  </span>
+                ) : (
+                  'Löschen'
+                )}
+              </button>
+              <button
+                onClick={() => setDeleteChatOpen(false)}
+                disabled={deletingChat}
+                className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Report modal */}
+      {reportOpen && (
+        <ReportModal
+          reportedUserId={partnerUserId ?? undefined}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
+
+      {/* Block user confirmation bottom sheet */}
+      {blockOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-20 bg-black/50"
+            onClick={() => !blocking && setBlockOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Nutzer blockieren"
+          >
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-container">
+                <Ban className="h-5 w-5 text-error" aria-hidden="true" />
+              </div>
+              <p className="font-semibold text-on-surface">Nutzer blockieren?</p>
+              <p className="text-sm text-on-surface-variant">
+                Der Nutzer wird aus deiner Suche entfernt. Du kannst ihm keine Nachrichten mehr senden. Diese Aktion kann rückgängig gemacht werden.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                onClick={handleBlock}
+                disabled={blocking}
+                className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              >
+                {blocking && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                Blockieren
+              </button>
+              <button
+                onClick={() => setBlockOpen(false)}
+                disabled={blocking}
+                className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete message confirmation bottom sheet */}
       {deleteTargetId && (
         <>
           <div
