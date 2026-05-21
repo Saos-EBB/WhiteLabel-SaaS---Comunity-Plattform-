@@ -5,6 +5,7 @@ import { MapPin, Loader2, AlertCircle, Camera, ChevronDown, Mic, Square, Upload,
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
+import AudioPlayer from '@/components/ui/AudioPlayer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -640,8 +641,7 @@ export default function ProfilePage() {
 
             {audioStatus === 'preview' && audioUrl && (
               <div className="space-y-3">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <audio controls src={audioUrl} className="w-full rounded-xl" />
+                <AudioPlayer src={audioUrl} />
                 <div className="flex gap-2 justify-center">
                   <button
                     type="button"
@@ -691,17 +691,18 @@ export default function ProfilePage() {
                     <CheckCircle2 className="h-3.5 w-3.5 text-primary-fixed-dim" aria-hidden="true" />
                     Freigegeben
                   </span>
-                  <button
-                    type="button"
-                    onClick={deleteAudio}
-                    className="flex items-center gap-1 text-xs text-error hover:underline transition-colors"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    Löschen
-                  </button>
+                  {editMode && (
+                    <button
+                      type="button"
+                      onClick={deleteAudio}
+                      className="flex items-center gap-1 text-xs text-error hover:underline transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      Löschen
+                    </button>
+                  )}
                 </div>
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <audio controls src={audioUrl} className="w-full rounded-xl" />
+                <AudioPlayer src={audioUrl} />
               </div>
             )}
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, MessageCircle, Heart, Info, Shield, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
+import { Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -11,6 +11,7 @@ import {
 } from '@/lib/store/notificationStore'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 
 const navLinks = [
   { href: '/discover', label: 'Discover' },
@@ -58,17 +59,6 @@ const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] =
   { value: 'do_not_disturb',   label: 'Nicht stören',   color: '#f87171' },
 ]
 
-function getDotColor(isAppActive: boolean, statusVisible: boolean, statusMessage: StatusMessage): string {
-  if (!isAppActive || !statusVisible) return '#52525b'
-  switch (statusMessage) {
-    case 'do_not_disturb':   return '#f87171'
-    case 'busy':             return '#f59e0b'
-    case 'looking_for_date': return '#c084fc'
-    case 'looking_for_chat': return '#60a5fa'
-    default:                 return '#4ade80' // available or null
-  }
-}
-
 // ─── relativeTime ─────────────────────────────────────────────────────────────
 
 function relativeTime(dateString: string): string {
@@ -113,7 +103,6 @@ export default function TopNav() {
 
   // Status dropdown
   const [statusOpen, setStatusOpen]       = useState(false)
-  const [isAppActive, setIsAppActive]     = useState(true)
   const [statusVisible, setStatusVisible] = useState(true)
   const [statusMessage, setStatusMessage] = useState<StatusMessage>(null)
   const [statusSaving, setStatusSaving]   = useState(false)
@@ -139,16 +128,6 @@ export default function TopNav() {
     }).catch(() => {})
   }, [])
 
-  // ── Track tab visibility ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    function onVisibilityChange() {
-      setIsAppActive(document.visibilityState === 'visible')
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [])
-
   // ── Poll notifications + pending requests ─────────────────────────────────
 
   useEffect(() => {
@@ -163,34 +142,13 @@ export default function TopNav() {
       try {
         const res = await fetchApi<IncomingEnvelope>('/chat/requests/incoming')
         const pending = normaliseRequests(res).filter((r) => r.status === 'pending')
-
-        if (isFirstRequestPollRef.current) {
-          pending.forEach((r) => seenRequestIdsRef.current.add(r.id))
-          isFirstRequestPollRef.current = false
-        } else {
-          const newRequests = pending.filter((r) => !seenRequestIdsRef.current.has(r.id))
-          newRequests.forEach((r) => seenRequestIdsRef.current.add(r.id))
-          if (newRequests.length > 0 && pathname !== '/requests') {
-            const latest = newRequests[newRequests.length - 1]
-            useNotificationStore.getState().addOrUpdateNotification({
-              id: 'local-requests',
-              type: 'request',
-              content: newRequests.length === 1 ? '1 neue Kontaktanfrage' : `${newRequests.length} neue Kontaktanfragen`,
-              is_read: false,
-              created_at: latest.created_at,
-              count: newRequests.length,
-              _local: true,
-            })
-          }
-        }
+        pending.forEach((r) => seenRequestIdsRef.current.add(r.id))
       } catch {
         // non-critical
       }
     }
 
     load()
-    const id = setInterval(load, 30_000)
-    return () => clearInterval(id)
   }, [])
 
   // ── Close bell on outside click ───────────────────────────────────────────
@@ -292,8 +250,6 @@ export default function TopNav() {
     .filter((n) => activeTab === 'neu' ? !n.is_read : n.is_read)
     .slice(0, 5)
 
-  const dotColor = getDotColor(isAppActive, statusVisible, statusMessage)
-
   return (
     <header className="sticky top-0 z-50 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant">
       <nav
@@ -339,11 +295,13 @@ export default function TopNav() {
               onClick={() => setStatusOpen((v) => !v)}
               className="p-2 rounded-lg hover:bg-surface-container transition-colors flex items-center justify-center"
             >
-              <span
-                aria-hidden="true"
-                className="block h-3 w-3 rounded-full transition-colors"
-                style={{ backgroundColor: dotColor }}
-              />
+              <span className="pointer-events-none [&>span>span:last-child]:hidden">
+                <OnlineIndicator
+                  is_online={statusVisible}
+                  status_message={statusMessage}
+                  size="sm"
+                />
+              </span>
             </button>
 
             {statusOpen && (
@@ -519,24 +477,10 @@ export default function TopNav() {
             )}
           </div>
 
-          {isAdmin && (
-            <Link
-              href="/admin"
-              aria-label="Admin"
-              className={`hidden md:inline-flex p-2 rounded-lg transition-colors ${
-                pathname.startsWith('/admin')
-                  ? 'text-primary-fixed-dim'
-                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
-              }`}
-            >
-              <Shield size={20} aria-hidden />
-            </Link>
-          )}
-
           <Link
             href="/settings"
             aria-label="Einstellungen"
-            className="hidden md:inline-flex p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+            className="inline-flex p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
           >
             <Settings size={20} aria-hidden />
           </Link>

@@ -76,6 +76,22 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             })
           }
         })
+
+        sock.on('notification', (notification) => {
+          useNotificationStore.getState().addOrUpdateNotification(notification)
+        })
+
+        sock.on('contact_request', (request) => {
+          const store = useNotificationStore.getState()
+          store.addOrUpdateNotification({
+            id: `temp-req-${request.id}`,
+            type: 'request',
+            content: 'Neue Kontaktanfrage',
+            is_read: false,
+            created_at: new Date().toISOString(),
+            _local: true,
+          })
+        })
       })
       .catch((err: unknown) => {
         // fetchApi already handles 401 → refresh → logout() + redirect to /login

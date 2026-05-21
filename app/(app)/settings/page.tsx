@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download,
@@ -207,6 +208,13 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const toastTimer        = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const router = useRouter()
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteError, setDeleteError]           = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading]       = useState(false)
+  const deleteDialogRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
   }, [])
@@ -239,6 +247,50 @@ export default function SettingsPage() {
     setToast({ msg, ok })
     toastTimer.current = setTimeout(() => setToast(null), 2500)
   }
+
+  // ── Delete account dialog ─────────────────────────────────────────────────
+
+  function closeDeleteDialog() {
+    setDeleteDialogOpen(false)
+    setDeleteError(null)
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteLoading(true)
+    setDeleteError(null)
+    try {
+      await fetchApi('/auth/account', { method: 'DELETE' })
+      useAuthStore.getState().logout()
+      router.replace('/login')
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Fehler beim Löschen des Kontos')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!deleteDialogOpen) return
+    const dialog = deleteDialogRef.current
+    if (!dialog) return
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>('button, [href], input, [tabindex]:not([tabindex="-1"])')
+    )
+    focusable[0]?.focus()
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { closeDeleteDialog(); return }
+      if (e.key !== 'Tab') return
+      const first = focusable[0]
+      const last  = focusable[focusable.length - 1]
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus() }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first?.focus() }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [deleteDialogOpen])
 
   // ── Accordion toggle ───────────────────────────────────────────────────────
 
@@ -701,7 +753,7 @@ export default function SettingsPage() {
 
           {/* Account actions */}
           <div className="space-y-2">
-            {(['Passwort ändern', 'E-Mail ändern', 'Konto löschen'] as const).map((label) => (
+            {(['Passwort ändern', 'E-Mail ändern'] as const).map((label) => (
               <div
                 key={label}
                 className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]"
@@ -710,6 +762,13 @@ export default function SettingsPage() {
                 <ComingSoonBadge />
               </div>
             ))}
+
+            <button
+              onClick={() => setDeleteDialogOpen(true)}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px] hover:bg-error-container/40 transition-colors text-left"
+            >
+              <span className="text-sm font-medium text-error">Konto löschen</span>
+            </button>
 
             <div>
               <button
@@ -748,6 +807,71 @@ export default function SettingsPage() {
         </AccordionItem>
 
       </div>
+
+      {/* ── Delete account dialog ───────────────────────────────────────────── */}
+      {deleteDialogOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/50"
+            aria-hidden="true"
+            onClick={closeDeleteDialog}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <div
+              ref={deleteDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-dialog-title"
+              className="relative bg-surface-container rounded-2xl p-6 max-w-sm w-full shadow-xl pointer-events-auto"
+            >
+              <h2
+                id="delete-dialog-title"
+                className="text-lg font-bold text-on-surface mb-4"
+              >
+                Konto löschen?
+              </h2>
+
+              <ul className="text-sm text-on-surface-variant space-y-2 mb-5 list-disc list-inside leading-relaxed">
+                <li>Dein Profil wird sofort unsichtbar für andere User</li>
+                <li>
+                  Du hast 30 Tage Zeit — wenn du dich in dieser Zeit einloggst,
+                  wird dein Konto automatisch reaktiviert
+                </li>
+                <li>
+                  Nach 30 Tagen werden deine Daten unwiderruflich
+                  pseudonymisiert (DSGVO Art. 17)
+                </li>
+              </ul>
+
+              {deleteError && (
+                <p role="alert" className="text-sm text-error mb-4 flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                  {deleteError}
+                </p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={closeDeleteDialog}
+                  className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors min-h-[44px]"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading}
+                  className="flex-1 py-3 rounded-full bg-error text-on-error text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+                >
+                  {deleteLoading && (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  )}
+                  Konto endgültig löschen
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </main>
   )
 }

@@ -98,7 +98,7 @@ View and edit own profile.
 - Interests: full list of available interests shown as toggleable chips; `POST`/`DELETE /profile/me/interests/:id` per toggle.
 - Save writes `PUT /profile/me`, then re-fetches to confirm.
 
-**Placeholder:** audio/voice message player — UI rendered at `opacity-40` with "Bald verfügbar" label, play button disabled.
+Audio voice message: `AudioPlayer` component renders the uploaded clip with play/pause, seek bar, and elapsed/total timestamp. Delete button shown only in edit mode.
 
 #### `/settings`
 
@@ -122,7 +122,8 @@ Accordion layout — single section open at a time, CSS `grid-rows` height trans
 **D) Konto:**
 - Subscription info sourced from `GET /profile/me` (`subscription` field) — shows plan badge, status label, and expiry date; displays "Kein aktives Abonnement" when `null`.
 - **Daten exportieren (PDF)** — calls `GET /gdpr/export`; downloads the response as a PDF blob (`paarship-daten-export.pdf`). Rate-limit (403) shows cooldown message in amber; other errors show red message. DSGVO hint ("max. 1× pro 30 Tage") shown below the button. Spinner while loading.
-- Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern, Konto löschen.
+- Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern.
+- **Konto löschen** — focus-trapped confirmation dialog; calls `DELETE /auth/account`, clears auth store and redirects to `/login` on success; shows inline error on failure with spinner during the request.
 - Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
 
 All saves show a toast (✓ success or ✗ error).
@@ -152,15 +153,15 @@ Sticky header, visible on all app pages.
 
 - Logo → `/dashboard`.
 - Desktop nav links (Discover, Requests, Chat) with active-page highlight.
-- **Status dot:** colored circle reflecting `status_visible` + `status_message` from `/profile/me`. Clicking opens a dropdown to set one of five statuses (Verfügbar, Suche Gespräch, Suche Date, Beschäftigt, Nicht stören) or toggle "Unsichtbar"; all save to `PUT /profile/me` optimistically.
+- **Status indicator:** `OnlineIndicator` (dot only, label suppressed) inside the status button, reflecting `status_visible` + `status_message` from `/profile/me`. Clicking opens a dropdown to set one of five statuses (Verfügbar, Suche Gespräch, Suche Date, Beschäftigt, Nicht stören) or toggle "Unsichtbar"; all save to `PUT /profile/me` optimistically.
 - **Bell icon:** unread badge (count, max "9+") + pulse ring when `unreadCount > 0`. Dropdown shows last 5 notifications in Neu/Verlauf tabs; per-notification click navigates and marks read; trash deletes; "Alle als gelesen" button. Links to `/notifications` for the full view.
 - Polls `GET /notifications` and `GET /chat/requests/incoming` every 30 s; injects a `_local` notification for newly seen pending requests.
-- Settings and Profile icon links shown on desktop only.
+- Settings icon link visible on all screen sizes; Profile icon link shown on desktop only.
 
 **Known gap:** user avatar in the top-right corner is a hardcoded `?` placeholder — profile photo is not loaded there.
 
 ### `BottomNav` — `components/nav/BottomNav.tsx`
-Fixed bottom bar, mobile only (`md:hidden`). Six items: Home, Discover, Requests, Chat, Profile, Einstellungen. Active item gets a filled icon in the primary color.
+Fixed bottom bar, mobile only (`md:hidden`). Five items: Home, Discover, Requests, Chat, Profile. Active item gets a filled icon in the primary color.
 
 **Known gap:** no unread badge on the Chat or Requests items — the badge only appears in TopNav's bell.
 
@@ -174,8 +175,7 @@ Fixed bottom bar, mobile only (`md:hidden`). Six items: Home, Discover, Requests
 | `chat/[id]` header | Generic user icon — partner photo not loaded |
 | `BottomNav` | No unread badge on Chat or Requests tabs |
 | `chat/[id]` | `read_at` exists on messages but read receipts not rendered |
-| `settings` → Konto | "Passwort ändern", "E-Mail ändern", "Konto löschen" — all show "Bald verfügbar", no functionality |
-| `profile` | Voice message player — rendered but fully disabled ("Bald verfügbar") |
+| `settings` → Konto | "Passwort ändern", "E-Mail ändern" — placeholder rows, no functionality |
 | `settings` → Einstellungen | UI language selector (de/en) — local state only, not persisted |
 
 ---
@@ -201,7 +201,10 @@ getSocket()     // returns the current Socket | null
 reconnect(token) // force-reconnects with a new token
 ```
 
-**Global listener** (`AuthProvider`): `new_message` → fires a bell notification for any incoming message across all conversations.
+**Global listeners** (`AuthProvider`):
+- `new_message` → fires a bell notification for any incoming message across all conversations.
+- `notification` → hydrates `notificationStore` with the incoming notification in real time (no polling needed).
+- `contact_request` → fires a bell notification for new incoming contact requests.
 
 **Chat page listeners** (`app/(app)/chat/[id]/page.tsx`):
 
@@ -248,6 +251,25 @@ Status translations: `available` → Verfügbar · `looking_for_chat` → Suche 
 
 Renders an accessible `aria-label` describing the combined state.
 
+### `AudioPlayer` — `components/ui/AudioPlayer.tsx`
+
+Custom audio player replacing native `<audio controls>` on profile pages.
+
+```tsx
+<AudioPlayer src="/uploads/audio/intro.webm" />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `src` | `string` | Audio file URL |
+
+- Play/Pause toggle with `lucide-react` icons.
+- Clickable seek bar (`onClick` on the track div).
+- `MM:SS / MM:SS` elapsed/total timestamp.
+- Progress driven by `requestAnimationFrame` loop — smooth animation at display refresh rate.
+- Resets state (`isPlaying`, `currentTime`, `duration`) when `src` changes.
+- Colors: `text-primary-fixed-dim` / `bg-primary-fixed-dim` (Tailwind v4 tokens).
+
 ---
 
 ## Key notes
@@ -260,6 +282,21 @@ Renders an accessible `aria-label` describing the combined state.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- Layouts: footer added to both `(app)` and `(public)` layouts — copyright, brand name, Impressum and Datenschutz links; `(app)` footer uses `mb-16 md:mb-0` to clear the fixed BottomNav on mobile
+- Legal pages: `app/(public)/impressum/page.tsx` — Impressum (§ 5 ECG / § 5 TMG) with company details from `NEXT_PUBLIC_COMPANY_*` env vars
+- Legal pages: `app/(public)/datenschutz/page.tsx` — full Datenschutzerklärung (7 sections: Verantwortlicher, Erhobene Daten, Zweck, Rechtsgrundlage, Speicherdauer, Rechte, Kontakt) sourced from env vars
+- B2B page: contact section (WhatsApp, Instagram, E-Mail, Telefon) wired to `NEXT_PUBLIC_CONTACT_*` env vars instead of hardcoded values
+- `.env.local`: `NEXT_PUBLIC_COMPANY_*` and `NEXT_PUBLIC_CONTACT_*` env var groups added
+- `TopNav`: admin icon (`Shield`) removed from desktop nav links
+- `TopNav`: status dot replaced — `OnlineIndicator` now renders inside the status button with label text suppressed via CSS wrapper (`[&>span>span:last-child]:hidden`)
+- `TopNav`: Settings link now visible on all screen sizes (was `hidden md:inline-flex`)
+- `BottomNav`: Settings item removed; nav now has 5 items (Home, Discover, Requests, Chat, Profile)
+- `AudioPlayer` component (`components/ui/AudioPlayer.tsx`): custom player replacing all native `<audio controls>` instances — Play/Pause toggle, clickable seek bar, `MM:SS / MM:SS` timestamp; progress driven by `requestAnimationFrame` for smooth animation; colors use `text-primary-fixed-dim` / `bg-primary-fixed-dim`
+- Own profile (`/profile`): both audio players replaced with `AudioPlayer`; audio delete button now only shown in edit mode
+- Public profile (`/profile/[nickname]`): audio player replaced with `AudioPlayer`
+- WebSocket (`AuthProvider`): global `notification` and `contact_request` socket event listeners added — real-time delivery without polling
+
+### 2026-05-21
 - Settings (`/settings`): full rewrite as 4-section accordion (Design & Barrierefreiheit, Benachrichtigungen, Sichtbarkeit, Konto) — single section open at a time with CSS grid-rows height transition
 - Settings: new Sichtbarkeit section — master `is_published` toggle + 7 field visibility toggles (`status_visible`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`); all auto-save via `PUT /profile/me`; sub-toggles dimmed (not reset) when `is_published = false`
 - Settings: Konto section — subscription info from `profile.subscription` (plan badge + status + expiry date, or "Kein aktives Abonnement"); placeholder rows for Passwort ändern, E-Mail ändern, Konto löschen (all "Bald verfügbar"); "Daten exportieren (PDF)" is fully functional — calls `GET /gdpr/export`, triggers blob download, shows cooldown/error feedback and DSGVO hint text

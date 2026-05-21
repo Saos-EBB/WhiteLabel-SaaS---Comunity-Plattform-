@@ -7,6 +7,7 @@ import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
+import AudioPlayer from '@/components/ui/AudioPlayer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -259,8 +260,7 @@ export default function PublicProfilePage() {
               <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide text-center mb-3">
                 Vorstellung
               </p>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <audio controls src={audioUrl} className="w-full rounded-xl" aria-label="Vorstellung" />
+              <AudioPlayer src={audioUrl} />
             </div>
           )}
 

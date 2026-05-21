@@ -174,20 +174,20 @@ const TIERS: TierDef[] = [
 ]
 
 const CONTACT: ContactDef[] = [
-  { icon: MessageSquare, label: 'WhatsApp',  value: '+43 xxx xxx xxxx',    href: 'https://wa.me/43xxxxxxxxx' },
-  { icon: AtSign,        label: 'Instagram', value: '@xxx',           href: 'https://instagram.com/xxx' },
-  { icon: Mail,          label: 'E-Mail',    value: 'kontakt@xxx.at', href: 'mailto:kontakt@xxx.at' },
-  { icon: Phone,         label: 'Telefon',   value: '+43 xxx xxx xxxx',    href: 'tel:+43xxxxxxxxx' },
+  { icon: MessageSquare, label: 'WhatsApp', value: process.env.NEXT_PUBLIC_CONTACT_WHATSAPP_LABEL ?? '', href: process.env.NEXT_PUBLIC_CONTACT_WHATSAPP ?? '' },
+  { icon: AtSign,        label: 'Instagram', value: process.env.NEXT_PUBLIC_CONTACT_INSTAGRAM_LABEL ?? '', href: process.env.NEXT_PUBLIC_CONTACT_INSTAGRAM ?? '' },
+  { icon: Mail,          label: 'E-Mail',    value: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? '', href: `mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? ''}` },
+  { icon: Phone,         label: 'Telefon',   value: process.env.NEXT_PUBLIC_CONTACT_PHONE_LABEL ?? '', href: process.env.NEXT_PUBLIC_CONTACT_PHONE_TEL ?? '' },
 ]
 
 const TIER_CARD_CLASS: Record<TierKey, string> = {
-  core:    'border-outline-variant    bg-surface-container-low',
+  core: 'border-outline-variant    bg-surface-container-low',
   connect: 'border-primary-fixed-dim bg-surface-container',
   premium: 'border-tertiary-fixed-dim bg-surface-container-low',
 }
 
 const TIER_ICON_CLASS: Record<TierKey, string> = {
-  core:    'text-on-surface-variant',
+  core: 'text-on-surface-variant',
   connect: 'text-primary-fixed-dim',
   premium: 'text-tertiary-fixed-dim',
 }
@@ -198,9 +198,9 @@ const CONTENT = {
   de: {
     langToggle: 'EN',
     hero: {
-      badge:  'Ihre Plattform. Ihre Community.',
-      line1:  'Die barrierefreie Dating-Plattform.',
-      line2:  'White-Label für Ihre Organisation.',
+      badge: 'Ihre Plattform. Ihre Community.',
+      line1: 'Die barrierefreie Dating-Plattform.',
+      line2: 'White-Label für Ihre Organisation.',
       subtitle:
         'XXX ist eine lizenzierbare SaaS-Lösung für Organisationen, die eine eigene soziale Kontaktplattform betreiben möchten — DSGVO-konform, zugänglich und sicher für vulnerable Nutzergruppen.',
       cta: 'Jetzt anfragen',
@@ -219,15 +219,15 @@ const CONTENT = {
       sub: 'Wir stehen Ihnen für Demos, Angebote und technische Fragen zur Verfügung.',
     },
     tech: {
-      toggle:  'Technische Details',
+      toggle: 'Technische Details',
       heading: 'Für Entscheider mit technischem Hintergrund',
       rows: [
-        { label: 'Architektur',         value: 'NestJS Backend · Next.js 16 · PostgreSQL 16 + PostGIS · TypeORM' },
-        { label: 'Sicherheit',          value: 'AES-256-CBC · bcrypt · JWT + HttpOnly Refresh Token · SHA-256+Salt E-Mail-Hashing' },
-        { label: 'Deployment',          value: 'Railway-ready · Docker · 1 Backend — separate DB pro Kunde möglich' },
-        { label: 'APIs',                value: 'REST + WebSocket (Socket.io) · Stripe Webhooks' },
+        { label: 'Architektur', value: 'NestJS Backend · Next.js 16 · PostgreSQL 16 + PostGIS · TypeORM' },
+        { label: 'Sicherheit', value: 'AES-256-CBC · bcrypt · JWT + HttpOnly Refresh Token · SHA-256+Salt E-Mail-Hashing' },
+        { label: 'Deployment', value: 'Railway-ready · Docker · 1 Backend — separate DB pro Kunde möglich' },
+        { label: 'APIs', value: 'REST + WebSocket (Socket.io) · Stripe Webhooks' },
         { label: 'DSGVO-Infrastruktur', value: 'pseudonymize_user() · 30-Tage Cronjob · consent_logs · Art.15 Export Endpoint' },
-        { label: 'Lizenzierung',        value: 'Core / Connect / Premium — Module per Lizenzschlüssel aktiviert' },
+        { label: 'Lizenzierung', value: 'Core / Connect / Premium — Module per Lizenzschlüssel aktiviert' },
       ],
     },
     footer: '© 2025 XXX · Barrierefreie soziale Plattformen für Organisationen',
@@ -235,9 +235,9 @@ const CONTENT = {
   en: {
     langToggle: 'DE',
     hero: {
-      badge:  'Your Platform. Your Community.',
-      line1:  'The Accessible Dating Platform.',
-      line2:  'White-Label for Your Organization.',
+      badge: 'Your Platform. Your Community.',
+      line1: 'The Accessible Dating Platform.',
+      line2: 'White-Label for Your Organization.',
       subtitle:
         'XXX is a licensable SaaS solution for organizations looking to operate their own social connection platform — GDPR-compliant, accessible, and safe for vulnerable user groups.',
       cta: 'Request a demo',
@@ -256,15 +256,15 @@ const CONTENT = {
       sub: "We're available for demos, quotes, and technical inquiries.",
     },
     tech: {
-      toggle:  'Technical Details',
+      toggle: 'Technical Details',
       heading: 'For decision-makers with a technical background',
       rows: [
-        { label: 'Architecture',        value: 'NestJS backend · Next.js 16 · PostgreSQL 16 + PostGIS · TypeORM' },
-        { label: 'Security',            value: 'AES-256-CBC field encryption · bcrypt · JWT + HttpOnly refresh token · SHA-256+salt email hashing' },
-        { label: 'Deployment',          value: 'Railway-ready · Docker · single backend — separate DB per client possible' },
-        { label: 'APIs',                value: 'REST + WebSocket (Socket.io) · Stripe webhooks' },
+        { label: 'Architecture', value: 'NestJS backend · Next.js 16 · PostgreSQL 16 + PostGIS · TypeORM' },
+        { label: 'Security', value: 'AES-256-CBC field encryption · bcrypt · JWT + HttpOnly refresh token · SHA-256+salt email hashing' },
+        { label: 'Deployment', value: 'Railway-ready · Docker · single backend — separate DB per client possible' },
+        { label: 'APIs', value: 'REST + WebSocket (Socket.io) · Stripe webhooks' },
         { label: 'GDPR infrastructure', value: 'pseudonymize_user() DB function · 30-day cronjob · consent_logs · Art.15 export endpoint' },
-        { label: 'Licensing',           value: 'Core / Connect / Premium — modules activated via license key' },
+        { label: 'Licensing', value: 'Core / Connect / Premium — modules activated via license key' },
       ],
     },
     footer: '© 2025 XXX · Accessible social platforms for organizations',
@@ -423,11 +423,10 @@ export default function B2BPage() {
 
                   <a
                     href="#contact"
-                    className={`mt-7 block w-full text-center py-2.5 rounded-full text-sm font-semibold transition-all hover:opacity-90 active:scale-95 ${
-                      key === 'connect'
+                    className={`mt-7 block w-full text-center py-2.5 rounded-full text-sm font-semibold transition-all hover:opacity-90 active:scale-95 ${key === 'connect'
                         ? 'bg-primary-fixed-dim text-on-primary-container'
                         : 'border border-outline-variant text-on-surface hover:bg-surface-container-high'
-                    }`}
+                      }`}
                   >
                     {t.tiers.cta}
                   </a>
@@ -481,9 +480,8 @@ export default function B2BPage() {
             <ChevronDown
               size={18}
               aria-hidden
-              className={`text-on-surface-variant flex-shrink-0 transition-transform duration-200 ${
-                techOpen ? 'rotate-180' : ''
-              }`}
+              className={`text-on-surface-variant flex-shrink-0 transition-transform duration-200 ${techOpen ? 'rotate-180' : ''
+                }`}
             />
           </button>
 
@@ -512,11 +510,7 @@ export default function B2BPage() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
-      <footer className="border-t border-outline-variant">
-        <div className="mx-auto max-w-screen-lg px-6 py-6 text-center">
-          <p className="text-xs text-on-surface-variant">{t.footer}</p>
-        </div>
-      </footer>
+
 
     </div>
   )

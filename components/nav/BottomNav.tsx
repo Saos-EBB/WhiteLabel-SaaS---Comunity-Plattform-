@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Compass, Heart, MessageCircle, User, Settings, Shield } from 'lucide-react'
+import { Home, Compass, Heart, MessageCircle, User, Shield } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
 
 const navItems = [
@@ -11,7 +11,6 @@ const navItems = [
   { href: '/requests',  label: 'Requests',       Icon: Heart },
   { href: '/chat',      label: 'Chat',           Icon: MessageCircle },
   { href: '/profile',   label: 'Profile',        Icon: User },
-  { href: '/settings',  label: 'Einstellungen',  Icon: Settings },
 ]
 
 function getJwtRole(token: string | null): string | null {
