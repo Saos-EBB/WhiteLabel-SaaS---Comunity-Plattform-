@@ -292,7 +292,7 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-21 (latest)
-- GDPR: new `GdprModule` — `GET /gdpr/export` streams a PDF (Art. 15 DSGVO) with 14 data sections; rate-limited to once per 30 days via new `users.last_gdpr_export_at` column (migration `013_users_last_gdpr_export_at.sql`); decrypts email and disability type in-place; never exposes third-party UUIDs or hashed fields
+- GDPR: new `GdprModule` — `GET /gdpr/export` streams a PDF (Art. 15 DSGVO) with 14 data sections; rate-limited to once per 30 days via new `users.last_gdpr_export_at` column (migration `013_users_last_gdpr_export_at.sql`); decrypts email and disability type in-place; never exposes third-party UUIDs or hashed fields; pdfkit recursion fixed via `bufferPages: true` + post-render footer loop (removes `pageAdded` handler); long text truncated (bio 500 chars, all other free-text 300 chars); empty sections skip `addPage()`; message limit reduced to 100; profile SELECT corrected to actual entity columns
 - Profile visibility: 6 new boolean columns on `profiles` (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`, all `NOT NULL DEFAULT true`) — migration `012_profile_visibility_fields.sql`
 - Profile: `PUT /profile/me` now accepts all six `show_*` fields as optional booleans
 - Profile: `GET /profile/me` now returns all `show_*` flags and `subscription: { plan, status, current_period_end } | null` (queries `subscriptions` table for the active row)

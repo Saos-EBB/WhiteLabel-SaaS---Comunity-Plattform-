@@ -3,7 +3,6 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { createDecipheriv } from 'crypto';
-import { PassThrough } from 'stream';
 import PDFDocument from 'pdfkit';
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -18,14 +17,14 @@ export class GdprService {
         private readonly dataSource: DataSource,
     ) {}
 
-    private decrypt(buf: Buffer | null): string | null {
-        if (!buf) return null;
+    private decrypt(buf: Buffer | null): string {
+        if (!buf) return '—';
         try {
             const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
             const iv = buf.subarray(0, 16);
             const encrypted = buf.subarray(16);
             const decipher = createDecipheriv('aes-256-cbc', key, iv);
-            return decipher.update(encrypted).toString('utf8') + decipher.final().toString('utf8');
+            return String(decipher.update(encrypted).toString('utf8') + decipher.final().toString('utf8'));
         } catch {
             return '[Entschlüsselung fehlgeschlagen]';
         }
@@ -70,10 +69,11 @@ export class GdprService {
                 [userId],
             ),
             this.dataSource.query(
-                `SELECT nickname, bio, city, birthdate, gender, looking_for, height_cm,
-                        occupation, status, status_visible, profanity_filter,
+                `SELECT nickname, bio, city, birthdate, search_radius_km, is_published,
+                        lang_simple, font_size, high_contrast, onboarding_completed,
+                        gender, looking_for, profanity_filter, status_visible, status_message,
                         show_bio, show_city, show_age, show_gender, show_interests, show_audio,
-                        created_at, updated_at
+                        updated_at
                  FROM profiles WHERE user_id = $1`,
                 [userId],
             ),
@@ -114,7 +114,7 @@ export class GdprService {
             ),
             this.dataSource.query(
                 `SELECT content, type, sent_at, is_deleted
-                 FROM messages WHERE sender_id = $1 ORDER BY sent_at DESC LIMIT 500`,
+                 FROM messages WHERE sender_id = $1 ORDER BY sent_at DESC LIMIT 100`,
                 [userId],
             ),
             this.dataSource.query(
@@ -147,11 +147,17 @@ export class GdprService {
             ),
         ]);
 
-        const buffer = await this.buildPdf(
-            userRows, profileRows, sensitiveRows, consentRows, interestRows,
-            mediaRows, subscriptionRows, paymentRows, messageRows, notifRows,
-            contactSentRows, contactReceivedRows, blockRows, reportRows, strikeRows,
-        );
+        let buffer: Buffer;
+        try {
+            buffer = await this.buildPdf(
+                userRows, profileRows, sensitiveRows, consentRows, interestRows,
+                mediaRows, subscriptionRows, paymentRows, messageRows, notifRows,
+                contactSentRows, contactReceivedRows, blockRows, reportRows, strikeRows,
+            );
+        } catch (err) {
+            console.error('GDPR PDF build error:', err);
+            throw err;
+        }
 
         await this.dataSource.query(
             'UPDATE users SET last_gdpr_export_at = NOW() WHERE id = $1',
@@ -168,14 +174,12 @@ export class GdprService {
         blockRows: any[], reportRows: any[], strikeRows: any[],
     ): Promise<Buffer> {
         return new Promise((resolve, reject) => {
-            const doc = new PDFDocument({ size: 'A4', margin: M, autoFirstPage: true });
-            const pass = new PassThrough();
+            const doc = new PDFDocument({ size: 'A4', margin: M, autoFirstPage: true, bufferPages: true });
             const chunks: Buffer[] = [];
 
-            doc.pipe(pass);
-            pass.on('data', (chunk: Buffer) => chunks.push(chunk));
-            pass.on('end', () => resolve(Buffer.concat(chunks)));
-            pass.on('error', reject);
+            doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
 
             const pageW = doc.page.width - M * 2;
 
@@ -184,20 +188,13 @@ export class GdprService {
 
             const bool = (v: boolean | null | undefined): string => v ? 'Ja' : 'Nein';
 
-            let pageNum = 0;
-            doc.on('pageAdded', () => {
-                pageNum++;
-                const footerY = doc.page.height - doc.page.margins.bottom + 10;
-                doc.save();
-                doc.fontSize(8).fillColor('#9ca3af').text(
-                    `Paarship – Datenschutz-Export – Seite ${pageNum}`,
-                    M, footerY, { width: pageW, align: 'center' },
-                );
-                doc.restore();
-                doc.y = doc.page.margins.top;
-            });
+            const trunc = (val: string | null | undefined, max = 300): string => {
+                if (!val) return '—';
+                const s = String(val);
+                return s.length > max ? s.slice(0, max) + '…' : s;
+            };
 
-            // Title page content (first pageAdded already fired at this point)
+            // Title page
             doc.fontSize(24).fillColor('#111827').text('Ihre persönlichen Daten', M, doc.page.margins.top, { width: pageW });
             doc.moveDown(0.5);
             doc.fontSize(11).fillColor('#6b7280').text(
@@ -248,7 +245,7 @@ export class GdprService {
             kv('E-Mail bestätigt', bool(u.is_verified));
             kv('Konto gesperrt', bool(u.is_banned));
             if (u.is_banned) {
-                kv('Sperrgrund', u.ban_reason);
+                kv('Sperrgrund', trunc(u.ban_reason));
                 kv('Gesperrt bis', fmt(u.ban_expires_at));
             }
             kv('Schutz-Flag', bool(u.vulnerable_flag));
@@ -260,30 +257,20 @@ export class GdprService {
             section('2. Profil');
             const p = profileRows[0] ?? {};
             kv('Nickname', p.nickname);
-            kv('Biografie', p.bio);
+            kv('Biografie', trunc(p.bio, 500));
             kv('Wohnort', p.city);
             kv('Geburtsdatum', p.birthdate ? new Date(p.birthdate).toLocaleDateString('de-DE') : '—');
-            kv('Geschlecht', p.gender);
-            kv('Suche', p.looking_for);
-            kv('Größe (cm)', p.height_cm != null ? String(p.height_cm) : '—');
-            kv('Beruf', p.occupation);
-            kv('Status', p.status);
-            kv('Status sichtbar', bool(p.status_visible));
-            kv('Profanity-Filter', bool(p.profanity_filter));
             kv('Bio anzeigen', bool(p.show_bio));
             kv('Stadt anzeigen', bool(p.show_city));
             kv('Alter anzeigen', bool(p.show_age));
             kv('Geschlecht anzeigen', bool(p.show_gender));
             kv('Interessen anzeigen', bool(p.show_interests));
             kv('Audio anzeigen', bool(p.show_audio));
-            kv('Erstellt am', fmt(p.created_at));
             kv('Aktualisiert am', fmt(p.updated_at));
 
             // 3. Sensitive Daten
-            section('3. Sensitive Daten');
-            if (sensitiveRows.length === 0) {
-                empty('Keine sensitiven Daten gespeichert.');
-            } else {
+            if (sensitiveRows.length > 0) {
+                section('3. Sensitive Daten');
                 const sd = sensitiveRows[0];
                 kv('Behinderungstyp', this.decrypt(sd.disability_type));
                 kv('Sichtbar', bool(sd.disability_visible));
@@ -323,10 +310,8 @@ export class GdprService {
             }
 
             // 6. Medien
-            section('6. Medienuploads');
-            if (mediaRows.length === 0) {
-                empty('Keine Medienuploads gespeichert.');
-            } else {
+            if (mediaRows.length > 0) {
+                section('6. Medienuploads');
                 mediaRows.forEach((m: any, i: number) => {
                     if (i > 0) doc.moveDown(0.3);
                     kv('Typ', m.file_type);
@@ -337,10 +322,8 @@ export class GdprService {
             }
 
             // 7. Abonnements
-            section('7. Abonnements');
-            if (subscriptionRows.length === 0) {
-                empty('Kein Abonnement gespeichert.');
-            } else {
+            if (subscriptionRows.length > 0) {
+                section('7. Abonnements');
                 subscriptionRows.forEach((s: any, i: number) => {
                     if (i > 0) doc.moveDown(0.5);
                     kv('Plan', s.plan);
@@ -352,10 +335,8 @@ export class GdprService {
             }
 
             // 8. Zahlungen
-            section('8. Zahlungshistorie');
-            if (paymentRows.length === 0) {
-                empty('Keine Zahlungen gespeichert.');
-            } else {
+            if (paymentRows.length > 0) {
+                section('8. Zahlungshistorie');
                 paymentRows.forEach((pay: any, i: number) => {
                     if (i > 0) doc.moveDown(0.3);
                     kv('Betrag', `${pay.amount} ${pay.currency}`);
@@ -365,12 +346,10 @@ export class GdprService {
             }
 
             // 9. Nachrichten
-            section('9. Gesendete Nachrichten (max. 500)');
-            if (messageRows.length === 0) {
-                empty('Keine gesendeten Nachrichten gespeichert.');
-            } else {
+            if (messageRows.length > 0) {
+                section('9. Gesendete Nachrichten (max. 100)');
                 doc.fontSize(9).fillColor('#6b7280').text(
-                    'Hinweis: Nur Ihre eigenen gesendeten Nachrichten werden aufgeführt.',
+                    'Es werden maximal 100 eigene Nachrichten exportiert.',
                     M, doc.y, { width: pageW },
                 );
                 doc.moveDown(0.5);
@@ -379,7 +358,7 @@ export class GdprService {
                     kv('Typ', msg.type);
                     kv('Gesendet am', fmt(msg.sent_at));
                     kv('Gelöscht', bool(msg.is_deleted));
-                    kv('Inhalt', msg.is_deleted ? '[gelöscht]' : msg.content);
+                    kv('Inhalt', msg.is_deleted ? '[gelöscht]' : trunc(msg.content));
                 });
             }
 
@@ -419,10 +398,8 @@ export class GdprService {
             }
 
             // 12. Blockierungen
-            section('12. Blockierungen');
-            if (blockRows.length === 0) {
-                empty('Keine Blockierungen gespeichert.');
-            } else {
+            if (blockRows.length > 0) {
+                section('12. Blockierungen');
                 doc.fontSize(9).fillColor('#6b7280').text(
                     'Aus Datenschutzgründen werden blockierte Nutzer nicht namentlich aufgeführt.',
                     M, doc.y, { width: pageW },
@@ -435,33 +412,38 @@ export class GdprService {
             }
 
             // 13. Meldungen
-            section('13. Eingereichte Meldungen');
-            if (reportRows.length === 0) {
-                empty('Keine Meldungen eingereicht.');
-            } else {
+            if (reportRows.length > 0) {
+                section('13. Eingereichte Meldungen');
                 reportRows.forEach((r: any, i: number) => {
                     if (i > 0) doc.moveDown(0.5);
-                    kv('Grund', r.reason);
-                    kv('Beschreibung', r.description);
+                    kv('Grund', trunc(r.reason));
+                    kv('Beschreibung', trunc(r.description));
                     kv('Status', r.status);
                     kv('Eingereicht am', fmt(r.created_at));
                 });
             }
 
             // 14. Strikes
-            section('14. Verwarnungen');
-            if (strikeRows.length === 0) {
-                empty('Keine Verwarnungen gespeichert.');
-            } else {
+            if (strikeRows.length > 0) {
+                section('14. Verwarnungen');
                 strikeRows.forEach((s: any, i: number) => {
                     if (i > 0) doc.moveDown(0.5);
                     kv('Typ', s.type);
-                    kv('Grund', s.reason);
+                    kv('Grund', trunc(s.reason));
                     kv('Ausgesprochen am', fmt(s.created_at));
                     kv('Läuft ab', s.expires_at ? fmt(s.expires_at) : '—');
                 });
             }
 
+            const range = doc.bufferedPageRange();
+            for (let i = 0; i < range.count; i++) {
+                doc.switchToPage(i);
+                const footerY = doc.page.height - doc.page.margins.bottom + 10;
+                doc.fontSize(8).fillColor('#9ca3af')
+                   .text(`Paarship – Datenschutz-Export – Seite ${i + 1}`,
+                         M, footerY, { width: pageW, align: 'center' });
+            }
+            doc.flushPages();
             doc.end();
         });
     }

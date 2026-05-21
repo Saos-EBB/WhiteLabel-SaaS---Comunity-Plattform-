@@ -11,12 +11,10 @@ export class GdprController {
     @Get('export')
     async exportData(@Request() req: any, @Res() res: Response) {
         const buffer = await this.gdprService.generateExport(req.user.sub);
-        const filename = `paarship-daten-${new Date().toISOString().slice(0, 10)}.pdf`;
         res.set({
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-            'Content-Length': buffer.length.toString(),
+            'Content-Disposition': 'attachment; filename="paarship-daten-export.pdf"',
         });
-        res.end(buffer);
+        res.send(buffer);
     }
 }
