@@ -121,7 +121,8 @@ Accordion layout — single section open at a time, CSS `grid-rows` height trans
 
 **D) Konto:**
 - Subscription info sourced from `GET /profile/me` (`subscription` field) — shows plan badge, status label, and expiry date; displays "Kein aktives Abonnement" when `null`.
-- Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern, Daten exportieren, Konto löschen.
+- **Daten exportieren (PDF)** — calls `GET /gdpr/export`; downloads the response as a PDF blob (`paarship-daten-export.pdf`). Rate-limit (403) shows cooldown message in amber; other errors show red message. DSGVO hint ("max. 1× pro 30 Tage") shown below the button. Spinner while loading.
+- Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern, Konto löschen.
 - Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
 
 All saves show a toast (✓ success or ✗ error).
@@ -173,7 +174,7 @@ Fixed bottom bar, mobile only (`md:hidden`). Six items: Home, Discover, Requests
 | `chat/[id]` header | Generic user icon — partner photo not loaded |
 | `BottomNav` | No unread badge on Chat or Requests tabs |
 | `chat/[id]` | `read_at` exists on messages but read receipts not rendered |
-| `settings` → Konto | "Passwort ändern", "E-Mail ändern", "Daten exportieren", "Konto löschen" — all show "Bald verfügbar", no functionality |
+| `settings` → Konto | "Passwort ändern", "E-Mail ändern", "Konto löschen" — all show "Bald verfügbar", no functionality |
 | `profile` | Voice message player — rendered but fully disabled ("Bald verfügbar") |
 | `settings` → Einstellungen | UI language selector (de/en) — local state only, not persisted |
 
@@ -261,7 +262,7 @@ Renders an accessible `aria-label` describing the combined state.
 ### 2026-05-21 (latest)
 - Settings (`/settings`): full rewrite as 4-section accordion (Design & Barrierefreiheit, Benachrichtigungen, Sichtbarkeit, Konto) — single section open at a time with CSS grid-rows height transition
 - Settings: new Sichtbarkeit section — master `is_published` toggle + 7 field visibility toggles (`status_visible`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`); all auto-save via `PUT /profile/me`; sub-toggles dimmed (not reset) when `is_published = false`
-- Settings: Konto section — subscription info from `profile.subscription` (plan badge + status + expiry date, or "Kein aktives Abonnement"); placeholder rows for Passwort ändern, E-Mail ändern, Daten exportieren, Konto löschen (all "Bald verfügbar")
+- Settings: Konto section — subscription info from `profile.subscription` (plan badge + status + expiry date, or "Kein aktives Abonnement"); placeholder rows for Passwort ändern, E-Mail ändern, Konto löschen (all "Bald verfügbar"); "Daten exportieren (PDF)" is fully functional — calls `GET /gdpr/export`, triggers blob download, shows cooldown/error feedback and DSGVO hint text
 - Public profile (`/profile/[nickname]`): city hidden when `null` (was showing `—`); gender and looking_for shown as chips when non-null (German labels, `not_specified` excluded)
 - Discover (`/discover`): `calcAge` now accepts `string | null | undefined` and returns `number | null`; age hidden in card when `null` (birthdate not returned by backend when `show_age = false`); `birthdate` typed as `string | null`
 

@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut,
+  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useThemeStore } from '@/lib/store/themeStore'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -198,6 +200,10 @@ export default function SettingsPage() {
   const [publishSaving, setPublishSaving] = useState(false)
   const [visSaving, setVisSaving]         = useState<Set<string>>(new Set())
 
+  const [gdprLoading, setGdprLoading]     = useState(false)
+  const [gdprError, setGdprError]         = useState<string | null>(null)
+  const [gdprCooldown, setGdprCooldown]   = useState<string | null>(null)
+
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const toastTimer        = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -339,6 +345,41 @@ export default function SettingsPage() {
       // backend unreachable — still clear local state
     }
     useAuthStore.getState().logout()
+  }
+
+  // ── GDPR export ───────────────────────────────────────────────────────────
+
+  const handleGdprExport = async () => {
+    setGdprLoading(true)
+    setGdprError(null)
+    setGdprCooldown(null)
+    try {
+      const token = useAuthStore.getState().accessToken
+      const res = await fetch(`${API_BASE}/gdpr/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string }
+        if (res.status === 403 || res.status === 429) {
+          setGdprCooldown(body.message ?? 'Export noch nicht verfügbar.')
+        } else {
+          setGdprError('Export fehlgeschlagen. Bitte versuche es später erneut.')
+        }
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'paarship-daten-export.pdf'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setGdprError('Export fehlgeschlagen. Bitte versuche es später erneut.')
+    } finally {
+      setGdprLoading(false)
+    }
   }
 
   // ── Loading / error ────────────────────────────────────────────────────────
@@ -658,9 +699,9 @@ export default function SettingsPage() {
 
           <Divider />
 
-          {/* Placeholder account actions */}
+          {/* Account actions */}
           <div className="space-y-2">
-            {(['Passwort ändern', 'E-Mail ändern', 'Daten exportieren', 'Konto löschen'] as const).map((label) => (
+            {(['Passwort ändern', 'E-Mail ändern', 'Konto löschen'] as const).map((label) => (
               <div
                 key={label}
                 className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]"
@@ -669,6 +710,29 @@ export default function SettingsPage() {
                 <ComingSoonBadge />
               </div>
             ))}
+
+            <div>
+              <button
+                onClick={handleGdprExport}
+                disabled={gdprLoading}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px] hover:bg-surface-container transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <span className="text-sm font-medium text-on-surface">Daten exportieren (PDF)</span>
+                {gdprLoading
+                  ? <Loader2 className="h-4 w-4 text-on-surface-variant animate-spin flex-shrink-0" aria-hidden="true" />
+                  : <Download className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+                }
+              </button>
+              <p className="text-xs text-on-surface-variant mt-1 px-1">
+                Gemäß Art. 15 DSGVO · max. 1× pro 30 Tage
+              </p>
+              {gdprCooldown && (
+                <p className="text-xs text-amber-500 mt-1 px-1">{gdprCooldown}</p>
+              )}
+              {gdprError && (
+                <p className="text-xs text-red-500 mt-1 px-1">{gdprError}</p>
+              )}
+            </div>
           </div>
 
           <Divider />
