@@ -5,6 +5,7 @@ import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import TopNav from '@/components/nav/TopNav'
 import BottomNav from '@/components/nav/BottomNav'
 import AuthProvider from '@/components/AuthProvider'
+import ToastNotification from '@/components/ui/ToastNotification'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const fontSizeClass = useAccessibilityStore((s) => s.fontSizeClass)
@@ -23,6 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link href="/datenschutz" className="hover:text-on-surface transition-colors">Datenschutz</Link>
         </footer>
         <BottomNav />
+        <ToastNotification />
       </div>
     </AuthProvider>
   )

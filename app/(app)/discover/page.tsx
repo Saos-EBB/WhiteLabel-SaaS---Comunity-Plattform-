@@ -1,10 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
+
+type ConnectionStatus = 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED'
 
 interface ProfileInterest {
   id: string
@@ -29,6 +32,9 @@ interface Profile {
   interests: ProfileInterest[]
   onboarding_completed: boolean
   is_published: boolean
+  connection_status: ConnectionStatus
+  conversation_id: string | null
+  request_id: string | null
 }
 
 interface ProfilesResponse {
@@ -42,6 +48,7 @@ const DEFAULT_FILTERS = {
   min_age: '',
   max_age: '',
   online_only: false,
+  connection_status: '',
 }
 
 function calcAge(birthdate: string | null | undefined): number | null {
@@ -53,38 +60,122 @@ function calcAge(birthdate: string | null | undefined): number | null {
 
 function buildQuery(f: typeof DEFAULT_FILTERS): string {
   const params = new URLSearchParams()
-  if (f.city.trim())   params.set('city', f.city.trim())
-  if (f.gender)        params.set('gender', f.gender)
-  if (f.looking_for)   params.set('looking_for', f.looking_for)
-  if (f.min_age)       params.set('min_age', f.min_age)
-  if (f.max_age)       params.set('max_age', f.max_age)
-  if (f.online_only)   params.set('online_only', 'true')
+  if (f.city.trim())        params.set('city', f.city.trim())
+  if (f.gender)             params.set('gender', f.gender)
+  if (f.looking_for)        params.set('looking_for', f.looking_for)
+  if (f.min_age)            params.set('min_age', f.min_age)
+  if (f.max_age)            params.set('max_age', f.max_age)
+  if (f.online_only)        params.set('online_only', 'true')
+  if (f.connection_status)  params.set('connection_status', f.connection_status)
   const qs = params.toString()
   return qs ? `/profile/search?${qs}` : '/profile/search'
 }
 
-type RequestStatus = 'idle' | 'loading' | 'sent' | 'error'
+function Spinner() {
+  return (
+    <span className="inline-flex items-center justify-center gap-2">
+      <span
+        className="h-3.5 w-3.5 rounded-full border-2 border-on-primary-container/30 border-t-on-primary-container animate-spin"
+        aria-hidden="true"
+      />
+      Sende…
+    </span>
+  )
+}
 
-function ProfileCard({ profile }: { profile: Profile }) {
-  const [status, setStatus] = useState<RequestStatus>('idle')
+function ProfileCard({
+  profile,
+  onUpdate,
+}: {
+  profile: Profile
+  onUpdate: (userId: string, changes: Partial<Profile>) => void
+}) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
   async function handleConnect() {
-    setStatus('loading')
+    setBusy(true)
     setErrorMsg('')
     try {
       await fetchApi<unknown>('/chat/requests', {
         method: 'POST',
         body: JSON.stringify({ receiver_id: profile.user_id }),
       })
-      setStatus('sent')
+      onUpdate(profile.user_id, { connection_status: 'SENT' })
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Anfrage fehlgeschlagen')
-      setStatus('idle')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleAccept() {
+    if (!profile.request_id) return
+    setBusy(true)
+    setErrorMsg('')
+    try {
+      const conv = await fetchApi<{ id: string }>(`/chat/requests/${profile.request_id}/accept`, {
+        method: 'PATCH',
+      })
+      onUpdate(profile.user_id, { connection_status: 'CONNECTED', conversation_id: conv.id, request_id: null })
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Annehmen')
+    } finally {
+      setBusy(false)
     }
   }
 
   const age = calcAge(profile.birthdate)
+  const cs = profile.connection_status ?? 'NONE'
+
+  function renderAction() {
+    if (cs === 'CONNECTED') {
+      return (
+        <button
+          onClick={() => profile.conversation_id && router.push(`/chat/${profile.conversation_id}`)}
+          disabled={!profile.conversation_id}
+          className="w-full py-2.5 rounded-full bg-emerald-600 text-white text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          aria-label={`Mit ${profile.nickname} chatten`}
+        >
+          Chatten →
+        </button>
+      )
+    }
+    if (cs === 'SENT') {
+      return (
+        <div
+          className="w-full py-2.5 rounded-full bg-surface-container-high text-primary-fixed-dim text-xs sm:text-sm font-semibold text-center"
+          role="status"
+          aria-live="polite"
+        >
+          Anfrage gesendet ✓
+        </div>
+      )
+    }
+    if (cs === 'RECEIVED') {
+      return (
+        <button
+          onClick={handleAccept}
+          disabled={busy}
+          className="w-full py-2.5 rounded-full bg-tertiary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          aria-label={`Anfrage von ${profile.nickname} annehmen`}
+        >
+          {busy ? <Spinner /> : 'Anfrage annehmen'}
+        </button>
+      )
+    }
+    return (
+      <button
+        onClick={handleConnect}
+        disabled={busy}
+        className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        aria-label={`Mit ${profile.nickname} verbinden`}
+      >
+        {busy ? <Spinner /> : 'Verbinden'}
+      </button>
+    )
+  }
 
   return (
     <article
@@ -159,34 +250,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
         )}
 
         <div className="mt-auto space-y-2">
-          {status === 'sent' ? (
-            <div
-              className="w-full py-2.5 rounded-full bg-surface-container-high text-primary-fixed-dim text-xs sm:text-sm font-semibold text-center"
-              role="status"
-              aria-live="polite"
-            >
-              Anfrage gesendet ✓
-            </div>
-          ) : (
-            <button
-              onClick={handleConnect}
-              disabled={status === 'loading'}
-              className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              aria-label={`Mit ${profile.nickname} verbinden`}
-            >
-              {status === 'loading' ? (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <span
-                    className="h-3.5 w-3.5 rounded-full border-2 border-on-primary-container/30 border-t-on-primary-container animate-spin"
-                    aria-hidden="true"
-                  />
-                  Sende…
-                </span>
-              ) : (
-                'Verbinden'
-              )}
-            </button>
-          )}
+          {renderAction()}
           {errorMsg && (
             <p className="text-xs text-error text-center leading-tight" role="alert">
               {errorMsg}
@@ -219,6 +283,8 @@ export default function DiscoverPage() {
   const [error, setError]       = useState<string | null>(null)
   const [filters, setFilters]   = useState(DEFAULT_FILTERS)
 
+  const receivedCount = profiles.filter(p => p.connection_status === 'RECEIVED').length
+
   async function loadProfiles(f: typeof DEFAULT_FILTERS) {
     setLoading(true)
     setError(null)
@@ -240,6 +306,10 @@ export default function DiscoverPage() {
   function handleReset() {
     setFilters(DEFAULT_FILTERS)
     loadProfiles(DEFAULT_FILTERS)
+  }
+
+  function handleProfileUpdate(userId: string, changes: Partial<Profile>) {
+    setProfiles(ps => ps.map(p => p.user_id === userId ? { ...p, ...changes } : p))
   }
 
   return (
@@ -306,7 +376,7 @@ export default function DiscoverPage() {
             </div>
           </div>
 
-          {/* Row 2: Age range · Online toggle · Buttons */}
+          {/* Row 2: Age range · Verbindung · Online toggle · Buttons */}
           <div className="flex flex-wrap items-center gap-2">
 
             {/* Age inputs */}
@@ -331,6 +401,25 @@ export default function DiscoverPage() {
               className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
               aria-label="Höchstalter"
             />
+
+            {/* Connection status filter */}
+            <div className="relative">
+              <select
+                value={filters.connection_status}
+                onChange={(e) => setFilters(f => ({ ...f, connection_status: e.target.value }))}
+                className="appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
+                aria-label="Nach Verbindungsstatus filtern"
+              >
+                <option value="">Verbindung: Alle</option>
+                <option value="CONNECTED">Verbunden</option>
+                <option value="SENT">Anfrage gesendet</option>
+                <option value="RECEIVED">
+                  {receivedCount > 0 ? `Anfrage erhalten (${receivedCount})` : 'Anfrage erhalten'}
+                </option>
+                <option value="NONE">Keine Verbindung</option>
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
+            </div>
 
             {/* Online toggle */}
             <label className="flex items-center gap-2 cursor-pointer select-none ml-1">
@@ -413,7 +502,11 @@ export default function DiscoverPage() {
           aria-label="Entdeckte Profile"
         >
           {profiles.map((profile) => (
-            <ProfileCard key={profile.id} profile={profile} />
+            <ProfileCard
+              key={profile.id}
+              profile={profile}
+              onUpdate={handleProfileUpdate}
+            />
           ))}
         </div>
       )}

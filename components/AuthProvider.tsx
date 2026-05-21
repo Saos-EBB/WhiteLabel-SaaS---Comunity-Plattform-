@@ -8,6 +8,7 @@ import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { connect, disconnect } from '@/lib/socket'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { useConversationStore } from '@/lib/store/conversationStore'
+import { useToastStore } from '@/lib/store/toastStore'
 import { initProfanityFilter } from '@/lib/profanity'
 
 interface MessagePayload {
@@ -56,42 +57,51 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
 
         const sock = connect()
-        sock.on('new_message', (msg: MessagePayload) => {
-          useConversationStore.getState().applyMessage(msg)
 
-          const myId =
-            (useAuthStore.getState().user as any)?.user_id ??
-            useAuthStore.getState().user?.id
-          if (msg.sender_id !== myId) {
-            const store = useNotificationStore.getState()
-            if (store.activeConversationId === msg.conversation_id) return
-            store.addOrUpdateNotification({
-              id: `temp-msg-${msg.id}`,
-              type: 'message',
-              content: 'Neue Nachricht',
+        const socketHandlers: Record<string, (data: any) => void> = {
+          new_message: (msg: MessagePayload) => {
+            useConversationStore.getState().applyMessage(msg)
+            const myId =
+              (useAuthStore.getState().user as any)?.user_id ??
+              useAuthStore.getState().user?.id
+            if (msg.sender_id !== myId) {
+              const store = useNotificationStore.getState()
+              if (store.activeConversationId === msg.conversation_id) return
+              store.addOrUpdateNotification({
+                id: `temp-msg-${msg.id}`,
+                type: 'message',
+                content: 'Neue Nachricht',
+                is_read: false,
+                created_at: new Date().toISOString(),
+                conversation_id: msg.conversation_id,
+                _local: true,
+              })
+            }
+          },
+          notification: (notification) => {
+            useNotificationStore.getState().addOrUpdateNotification(notification)
+          },
+          contact_request: (request) => {
+            useNotificationStore.getState().addOrUpdateNotification({
+              id: `temp-req-${request.id}`,
+              type: 'request',
+              content: 'Neue Kontaktanfrage',
               is_read: false,
               created_at: new Date().toISOString(),
-              conversation_id: msg.conversation_id,
               _local: true,
             })
-          }
-        })
+          },
+          contact_request_accepted: (payload: { conversationId: string; acceptedByNickname: string }) => {
+            useToastStore.getState().addToast({
+              nickname: payload.acceptedByNickname,
+              conversationId: payload.conversationId,
+            })
+          },
+        }
 
-        sock.on('notification', (notification) => {
-          useNotificationStore.getState().addOrUpdateNotification(notification)
-        })
-
-        sock.on('contact_request', (request) => {
-          const store = useNotificationStore.getState()
-          store.addOrUpdateNotification({
-            id: `temp-req-${request.id}`,
-            type: 'request',
-            content: 'Neue Kontaktanfrage',
-            is_read: false,
-            created_at: new Date().toISOString(),
-            _local: true,
-          })
-        })
+        for (const [event, handler] of Object.entries(socketHandlers)) {
+          sock.on(event, handler)
+        }
       })
       .catch((err: unknown) => {
         // fetchApi already handles 401 → refresh → logout() + redirect to /login

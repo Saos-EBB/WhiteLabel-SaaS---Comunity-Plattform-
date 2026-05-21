@@ -15,6 +15,7 @@ Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backen
 | Real-time | socket.io-client |
 | Icons | lucide-react |
 | Image processing | Sharp (WebP conversion via Next.js image pipeline) |
+| Payments | @stripe/react-stripe-js + @stripe/stripe-js (Embedded Checkout) |
 
 ---
 
@@ -125,6 +126,11 @@ Accordion layout — single section open at a time, CSS `grid-rows` height trans
 - Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern.
 - **Konto löschen** — focus-trapped confirmation dialog; calls `DELETE /auth/account`, clears auth store and redirects to `/login` on success; shows inline error on failure with spinner during the request.
 - Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
+
+**E) Abonnement & Zahlung:**
+- Subscription detail fetched lazily from `GET /payment/subscriptions` when the accordion is first opened — not on page mount.
+- **Active subscription:** plan label (Monatlich / Jährlich / Lebenslang), "Aktiv" badge, expiry date in de-DE format (hidden for lifetime plan). Cancel button ("Abonnement kündigen") reveals an inline confirmation step ("Bist du sicher? Diese Aktion kann nicht rückgängig gemacht werden." + Bestätigen / Abbrechen) before calling `DELETE /payment/subscriptions/:id`; on success profile is re-fetched.
+- **No active subscription:** "Kein aktives Abonnement" message and three plan buttons (Monatlich / Jährlich / Lebenslang). Clicking any plan opens `StripeCheckoutModal` with the selected plan.
 
 All saves show a toast (✓ success or ✗ error).
 
@@ -251,6 +257,23 @@ Status translations: `available` → Verfügbar · `looking_for_chat` → Suche 
 
 Renders an accessible `aria-label` describing the combined state.
 
+### `StripeCheckoutModal` — `components/ui/StripeCheckoutModal.tsx`
+
+Modal wrapper for Stripe Embedded Checkout.
+
+```tsx
+<StripeCheckoutModal plan="monthly" onClose={() => setCheckoutPlan(null)} />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `plan` | `'monthly' \| 'yearly' \| 'lifetime'` | Plan to purchase |
+| `onClose` | `() => void` | Called when the backdrop or × button is clicked |
+
+On mount POSTs to `POST /payment/subscriptions` to obtain a `clientSecret`, then renders `EmbeddedCheckoutProvider` + `EmbeddedCheckout` from `@stripe/react-stripe-js`. After payment Stripe redirects to `STRIPE_RETURN_URL` automatically. Requires `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` in `.env.local`.
+
+---
+
 ### `AudioPlayer` — `components/ui/AudioPlayer.tsx`
 
 Custom audio player replacing native `<audio controls>` on profile pages.
@@ -282,6 +305,12 @@ Custom audio player replacing native `<audio controls>` on profile pages.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- Payment: `POST /payment/subscriptions` now returns `{ clientSecret }` (Stripe Embedded Checkout). `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` added to `.env.local`.
+- Settings: "Abonnement & Zahlung" accordion filled — active subscription shows plan label (Monatlich / Jährlich / Lebenslang), "Aktiv" badge, and expiry date (hidden for lifetime); inline cancel confirmation flow calls `DELETE /payment/subscriptions/:id`; no subscription shows three plan buttons opening `StripeCheckoutModal`; subscription detail lazy-loaded on accordion open.
+- New `StripeCheckoutModal` component (`components/ui/StripeCheckoutModal.tsx`) — Stripe Embedded Checkout in a fixed full-screen modal overlay; fetches `clientSecret` on mount via `POST /payment/subscriptions`.
+- `package.json`: added `@stripe/react-stripe-js` and `@stripe/stripe-js`.
+
+### 2026-05-21
 - Layouts: footer added to both `(app)` and `(public)` layouts — copyright, brand name, Impressum and Datenschutz links; `(app)` footer uses `mb-16 md:mb-0` to clear the fixed BottomNav on mobile
 - Legal pages: `app/(public)/impressum/page.tsx` — Impressum (§ 5 ECG / § 5 TMG) with company details from `NEXT_PUBLIC_COMPANY_*` env vars
 - Legal pages: `app/(public)/datenschutz/page.tsx` — full Datenschutzerklärung (7 sections: Verantwortlicher, Erhobene Daten, Zweck, Rechtsgrundlage, Speicherdauer, Rechte, Kontakt) sourced from env vars

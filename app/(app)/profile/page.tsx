@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, Loader2, AlertCircle, Camera, ChevronDown, Mic, Square, Upload, Clock, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
+import { MapPin, Loader2, AlertCircle, Camera, ChevronDown, Mic, Square, Upload, Clock, CheckCircle2, XCircle, Trash2, LogOut } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
@@ -162,6 +162,15 @@ export default function ProfilePage() {
     setPhotoPickError(null)
     setSaveError(null)
     setEditMode(false)
+  }
+
+  async function handleLogout() {
+    try {
+      await fetchApi('/auth/logout', { method: 'POST' })
+    } catch {
+      // backend unreachable — still clear local state
+    }
+    useAuthStore.getState().logout()
   }
 
   async function handleSave() {
@@ -876,6 +885,16 @@ export default function ProfilePage() {
           )}
 
         </div>
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors min-h-[52px] mt-12"
+        >
+          <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+          Abmelden
+        </button>
+
       </div>
     </main>
   )

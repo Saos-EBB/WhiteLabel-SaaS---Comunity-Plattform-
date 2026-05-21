@@ -3,24 +3,32 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download,
+  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download, CreditCard,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useThemeStore } from '@/lib/store/themeStore'
+import StripeCheckoutModal from '@/components/ui/StripeCheckoutModal'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FontSize = 'normal' | 'large' | 'xl'
-type AccordionSection = 'design' | 'notifications' | 'visibility' | 'account'
+type AccordionSection = 'design' | 'notifications' | 'visibility' | 'account' | 'payment'
 
 interface Subscription {
   plan: string
   status: string
   current_period_end: string | null
+}
+
+interface SubDetail {
+  id: string
+  plan: string
+  status: string
+  expires_at: string | null
 }
 
 interface Profile {
@@ -215,6 +223,13 @@ export default function SettingsPage() {
   const [deleteLoading, setDeleteLoading]       = useState(false)
   const deleteDialogRef = useRef<HTMLDivElement>(null)
 
+  const [subDetail, setSubDetail]         = useState<SubDetail | null>(null)
+  const [subLoading, setSubLoading]       = useState(false)
+  const [subFetched, setSubFetched]       = useState(false)
+  const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [checkoutPlan, setCheckoutPlan]   = useState<'monthly' | 'yearly' | 'lifetime' | null>(null)
+
   useEffect(() => {
     return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
   }, [])
@@ -239,6 +254,18 @@ export default function SettingsPage() {
     }
     load()
   }, [])
+
+  // ── Lazy-load subscription detail ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (openSection !== 'payment' || subFetched) return
+    setSubFetched(true)
+    setSubLoading(true)
+    fetchApi<SubDetail>('/payment/subscriptions')
+      .then(setSubDetail)
+      .catch(() => {})
+      .finally(() => setSubLoading(false))
+  }, [openSection, subFetched])
 
   // ── Toast ──────────────────────────────────────────────────────────────────
 
@@ -266,6 +293,26 @@ export default function SettingsPage() {
       setDeleteError(err instanceof Error ? err.message : 'Fehler beim Löschen des Kontos')
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  // ── Cancel subscription ────────────────────────────────────────────────────
+
+  async function handleCancelSubscription() {
+    if (!subDetail) return
+    setCancelLoading(true)
+    try {
+      await fetchApi(`/payment/subscriptions/${subDetail.id}`, { method: 'DELETE' })
+      const updated = await fetchApi<Profile>('/profile/me')
+      setProfile(updated)
+      setSubDetail(null)
+      setSubFetched(false)
+      setCancelConfirm(false)
+      showToast('Abonnement gekündigt')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler beim Kündigen', false)
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -721,6 +768,17 @@ export default function SettingsPage() {
           isOpen={openSection === 'account'}
           onToggle={() => toggleSection('account')}
         >
+          {/* Logout – top of Konto */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors min-h-[52px]"
+          >
+            <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            Abmelden
+          </button>
+
+          <Divider />
+
           {/* Subscription */}
           <div>
             <SectionLabel>Abonnement</SectionLabel>
@@ -794,19 +852,100 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <Divider />
+        </AccordionItem>
 
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container transition-colors min-h-[52px]"
-          >
-            <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            Abmelden
-          </button>
+        {/* ── E) Abonnement & Zahlung ───────────────────────────────────────── */}
+        <AccordionItem
+          title="Abonnement & Zahlung"
+          icon={<CreditCard className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
+          isOpen={openSection === 'payment'}
+          onToggle={() => toggleSection('payment')}
+        >
+          {subLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin" aria-label="Lädt Abonnement" />
+            </div>
+          ) : profile.subscription?.status === 'active' ? (
+            <div className="space-y-4">
+              <div className="px-4 py-3 rounded-xl bg-surface-container-high">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-on-surface">
+                    {({ monthly: 'Monatlich', yearly: 'Jährlich', lifetime: 'Lebenslang' } as Record<string, string>)[profile.subscription.plan] ?? profile.subscription.plan}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary-fixed-dim/20 text-primary-fixed-dim font-medium">
+                    Aktiv
+                  </span>
+                </div>
+                {profile.subscription.plan !== 'lifetime' && profile.subscription.current_period_end && (
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    Läuft bis {new Date(profile.subscription.current_period_end).toLocaleDateString('de-DE')}
+                  </p>
+                )}
+              </div>
+
+              {!cancelConfirm ? (
+                <button
+                  onClick={() => setCancelConfirm(true)}
+                  className="w-full py-3 rounded-full bg-error/10 text-error text-sm font-semibold hover:bg-error/20 transition-colors min-h-[44px]"
+                >
+                  Abonnement kündigen
+                </button>
+              ) : (
+                <div className="rounded-xl border border-error/30 bg-error-container/20 p-4 space-y-3">
+                  <p className="text-sm text-on-surface">
+                    Bist du sicher? Diese Aktion kann nicht rückgängig gemacht werden.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setCancelConfirm(false)}
+                      disabled={cancelLoading}
+                      className="flex-1 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors min-h-[44px] disabled:opacity-50"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={handleCancelSubscription}
+                      disabled={cancelLoading || !subDetail}
+                      className="flex-1 py-2.5 rounded-full bg-error text-on-error text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+                    >
+                      {cancelLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                      Bestätigen
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-on-surface-variant px-1">Kein aktives Abonnement</p>
+              <div className="space-y-2">
+                {([
+                  { plan: 'monthly',  label: 'Monatlich' },
+                  { plan: 'yearly',   label: 'Jährlich' },
+                  { plan: 'lifetime', label: 'Lebenslang' },
+                ] as const).map(({ plan, label }) => (
+                  <button
+                    key={plan}
+                    onClick={() => setCheckoutPlan(plan)}
+                    className="w-full py-3 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold hover:opacity-90 transition-opacity min-h-[44px]"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </AccordionItem>
 
       </div>
+
+      {/* ── Stripe Embedded Checkout modal ─────────────────────────────────── */}
+      {checkoutPlan && (
+        <StripeCheckoutModal
+          plan={checkoutPlan}
+          onClose={() => setCheckoutPlan(null)}
+        />
+      )}
 
       {/* ── Delete account dialog ───────────────────────────────────────────── */}
       {deleteDialogOpen && (
