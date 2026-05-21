@@ -14,6 +14,7 @@ import { ModerationModule } from './modules/core/moderation/moderation.module';
 import { PaymentModule } from './modules/core/payment/payment.module';
 import { AdminModule } from './modules/core/admin/admin.module';
 import { MediaModule } from './modules/core/media/media.module';
+import { GdprModule } from './modules/core/gdpr/gdpr.module';
 import { CommonModule } from './common/common.module';
 
 import appConfig from './config/app.config';
@@ -54,6 +55,7 @@ import databaseConfig from './config/database.config';
     PaymentModule,
     AdminModule,
     MediaModule,
+    GdprModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

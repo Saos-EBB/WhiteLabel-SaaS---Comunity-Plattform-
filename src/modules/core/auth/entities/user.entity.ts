@@ -65,4 +65,7 @@ export class User {
     @Column({ type: 'bytea', nullable: true })
     email!: Buffer | null;
 
+    @Column({ type: 'timestamptz', nullable: true })
+    last_gdpr_export_at!: Date | null;
+
 }

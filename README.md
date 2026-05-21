@@ -259,6 +259,16 @@ All admin routes require JWT with `role: admin`.
 
 ---
 
+### GDPR — `/gdpr`
+
+All GDPR routes require JWT.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/gdpr/export` | Generate and download a PDF containing all personal data stored for the authenticated user (Art. 15 DSGVO). Rate-limited to once every 30 days via `last_gdpr_export_at` on the `users` table. Returns a streamed `application/pdf` with 14 data sections: account, profile, sensitive data, consent logs, interests, media uploads, subscriptions, payment history, sent messages (max 500), notification settings, contact requests (sent + received), blockings, submitted reports, strikes. Sensitive fields (email, disability type) are AES-256-CBC decrypted before inclusion. `blocked_id` and third-party UUIDs are never exposed. |
+
+---
+
 ## Frontend
 
 The XXX frontend (`xxx-frontend`) runs on port 3001.
@@ -282,6 +292,7 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- GDPR: new `GdprModule` — `GET /gdpr/export` streams a PDF (Art. 15 DSGVO) with 14 data sections; rate-limited to once per 30 days via new `users.last_gdpr_export_at` column (migration `013_users_last_gdpr_export_at.sql`); decrypts email and disability type in-place; never exposes third-party UUIDs or hashed fields
 - Profile visibility: 6 new boolean columns on `profiles` (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`, all `NOT NULL DEFAULT true`) — migration `012_profile_visibility_fields.sql`
 - Profile: `PUT /profile/me` now accepts all six `show_*` fields as optional booleans
 - Profile: `GET /profile/me` now returns all `show_*` flags and `subscription: { plan, status, current_period_end } | null` (queries `subscriptions` table for the active row)
