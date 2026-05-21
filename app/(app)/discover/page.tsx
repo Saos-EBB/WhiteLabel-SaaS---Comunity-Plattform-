@@ -16,7 +16,7 @@ interface Profile {
   id: string
   user_id: string
   nickname: string
-  birthdate: string
+  birthdate: string | null
   city: string | null
   bio: string | null
   photo_id: string | null
@@ -44,7 +44,8 @@ const DEFAULT_FILTERS = {
   online_only: false,
 }
 
-function calcAge(birthdate: string): number {
+function calcAge(birthdate: string | null | undefined): number | null {
+  if (!birthdate) return null
   return Math.floor(
     (Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
   )
@@ -88,7 +89,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
   return (
     <article
       className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden flex flex-col"
-      aria-label={`Profil von ${profile.nickname}, ${age} Jahre`}
+      aria-label={age !== null ? `Profil von ${profile.nickname}, ${age} Jahre` : `Profil von ${profile.nickname}`}
     >
       {/* Photo or placeholder */}
       <div
@@ -125,7 +126,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
             <Link href={`/profile/${profile.nickname}`} className="hover:underline cursor-pointer">
               {profile.nickname}
             </Link>
-            {`, ${age}`}
+            {age !== null && `, ${age}`}
           </p>
           {profile.city && (
             <div className="flex items-center gap-1 mt-1">

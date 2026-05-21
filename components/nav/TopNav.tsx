@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
+import { Bell, MessageCircle, Heart, Info, Shield, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -10,12 +10,25 @@ import {
   type NotificationType,
 } from '@/lib/store/notificationStore'
 import { fetchApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store/authStore'
 
 const navLinks = [
   { href: '/discover', label: 'Discover' },
   { href: '/requests', label: 'Requests' },
   { href: '/chat', label: 'Chat' },
 ]
+
+function getJwtRole(token: string | null): string | null {
+  if (!token) return null
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    const decoded = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string }
+    return decoded.role ?? null
+  } catch {
+    return null
+  }
+}
 
 const TYPE_ICONS: Record<NotificationType, ElementType> = {
   message: MessageCircle,
@@ -86,6 +99,12 @@ function normaliseRequests(res: IncomingEnvelope): IncomingRequest[] {
 export default function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
+
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAdmin = getJwtRole(accessToken) === 'admin'
+  const activeNavLinks = isAdmin
+    ? navLinks.map((l) => l.href === '/requests' ? { href: '/admin', label: 'Admin' } : l)
+    : navLinks
 
   // Bell dropdown
   const [bellOpen, setBellOpen]     = useState(false)
@@ -290,7 +309,7 @@ export default function TopNav() {
         </Link>
 
         <ul className="hidden md:flex items-center gap-1 ml-8" role="list">
-          {navLinks.map(({ href, label }) => {
+          {activeNavLinks.map(({ href, label }) => {
             const isActive = pathname === href || pathname.startsWith(href + '/')
             return (
               <li key={href}>
@@ -499,6 +518,20 @@ export default function TopNav() {
               </div>
             )}
           </div>
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              aria-label="Admin"
+              className={`hidden md:inline-flex p-2 rounded-lg transition-colors ${
+                pathname.startsWith('/admin')
+                  ? 'text-primary-fixed-dim'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+              }`}
+            >
+              <Shield size={20} aria-hidden />
+            </Link>
+          )}
 
           <Link
             href="/settings"

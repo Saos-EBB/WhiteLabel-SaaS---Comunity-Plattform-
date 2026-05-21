@@ -102,23 +102,27 @@ View and edit own profile.
 
 #### `/settings`
 
-Two tabs — **Einstellungen** and **Konto**.
+Accordion layout — single section open at a time, CSS `grid-rows` height transition.
 
-**Einstellungen tab:**
-- Profile visibility (`is_published`) toggle — auto-saves to `PUT /profile/me`; disabled if onboarding is not complete.
-- Notification toggles — email (messages, matches, system) and push (messages, matches, system) — auto-save to `PUT /notifications/settings`.
+**A) Design & Barrierefreiheit:**
 - Theme toggle (dark/light) via `useThemeStore`.
+- Schimpfwortfilter toggle — auto-saves `profanity_filter` to `PUT /profile/me`.
 - Font size selector (Normal / Groß / Sehr groß) — auto-saves to `PUT /profile/me`.
 - High contrast and simple language toggles — auto-save to `PUT /profile/me`.
-- UI language selector (Deutsch / English) — UI only, no save wired up yet.
+- UI language selector (Deutsch / English) — UI only, not persisted.
 - Live accessibility preview box.
 
-**Konto tab:**
-- **"Passwort ändern"** — placeholder only, shows "Bald verfügbar", no action. _(not implemented)_
+**B) Benachrichtigungen:**
+- Email and push notification toggles (messages, matches, system) — auto-save to `PUT /notifications/settings`.
+
+**C) Sichtbarkeit:**
+- Master `is_published` toggle ("Profil öffentlich") — auto-saves to `PUT /profile/me`; disabled if onboarding not complete. Helper text: "Nickname und Profilbild sind immer sichtbar".
+- 7 individual field toggles (auto-save via `PUT /profile/me`, dimmed/disabled when `is_published = false`): Online-Status (`status_visible`), Bio (`show_bio`), Stadt (`show_city`), Alter (`show_age`), Geschlecht & Suche (`show_gender`), Interessen (`show_interests`), Vorstellung / Audio (`show_audio`). Values are preserved while dimmed — not reset.
+
+**D) Konto:**
+- Subscription info sourced from `GET /profile/me` (`subscription` field) — shows plan badge, status label, and expiry date; displays "Kein aktives Abonnement" when `null`.
+- Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern, Daten exportieren, Konto löschen.
 - Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
-- **"Meine Daten exportieren" (DSGVO)** — placeholder only, shows "Bald verfügbar", no action. _(not implemented)_
-- DSGVO retention notice (30-day soft-delete copy).
-- "Konto löschen" — confirmation bottom sheet → `DELETE /auth/account` → clears auth store.
 
 All saves show a toast (✓ success or ✗ error).
 
@@ -169,8 +173,7 @@ Fixed bottom bar, mobile only (`md:hidden`). Six items: Home, Discover, Requests
 | `chat/[id]` header | Generic user icon — partner photo not loaded |
 | `BottomNav` | No unread badge on Chat or Requests tabs |
 | `chat/[id]` | `read_at` exists on messages but read receipts not rendered |
-| `settings` → Konto | "Passwort ändern" — shows "Bald verfügbar", no functionality |
-| `settings` → Konto | "Meine Daten exportieren" (DSGVO) — shows "Bald verfügbar", no functionality |
+| `settings` → Konto | "Passwort ändern", "E-Mail ändern", "Daten exportieren", "Konto löschen" — all show "Bald verfügbar", no functionality |
 | `profile` | Voice message player — rendered but fully disabled ("Bald verfügbar") |
 | `settings` → Einstellungen | UI language selector (de/en) — local state only, not persisted |
 
@@ -256,6 +259,13 @@ Renders an accessible `aria-label` describing the combined state.
 ## Changelog
 
 ### 2026-05-21 (latest)
+- Settings (`/settings`): full rewrite as 4-section accordion (Design & Barrierefreiheit, Benachrichtigungen, Sichtbarkeit, Konto) — single section open at a time with CSS grid-rows height transition
+- Settings: new Sichtbarkeit section — master `is_published` toggle + 7 field visibility toggles (`status_visible`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`); all auto-save via `PUT /profile/me`; sub-toggles dimmed (not reset) when `is_published = false`
+- Settings: Konto section — subscription info from `profile.subscription` (plan badge + status + expiry date, or "Kein aktives Abonnement"); placeholder rows for Passwort ändern, E-Mail ändern, Daten exportieren, Konto löschen (all "Bald verfügbar")
+- Public profile (`/profile/[nickname]`): city hidden when `null` (was showing `—`); gender and looking_for shown as chips when non-null (German labels, `not_specified` excluded)
+- Discover (`/discover`): `calcAge` now accepts `string | null | undefined` and returns `number | null`; age hidden in card when `null` (birthdate not returned by backend when `show_age = false`); `birthdate` typed as `string | null`
+
+### 2026-05-21
 - Admin panel (`/admin`): full admin UI — media moderation (approve/reject with reason), paginated user management (ban/unban/role), report management (status + note), strike creation, custom profanity word list (add/delete)
 - Admin auth guard: fixed premature redirect on first render — `useAuthStore.persist.hasHydrated()` + `onFinishHydration` subscription ensures Zustand `persist` has loaded before the JWT role is checked
 - Admin media tab: `toProxyUrl()` helper strips absolute origin from `file_url` before setting `<img src>`, routing photos through the Next.js `/uploads/` proxy

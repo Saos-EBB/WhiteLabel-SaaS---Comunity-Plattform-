@@ -2,19 +2,37 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Compass, Heart, MessageCircle, User, Settings } from 'lucide-react'
+import { Home, Compass, Heart, MessageCircle, User, Settings, Shield } from 'lucide-react'
+import { useAuthStore } from '@/lib/store/authStore'
 
 const navItems = [
-  { href: '/dashboard', label: 'Home',        Icon: Home },
-  { href: '/discover',  label: 'Discover',    Icon: Compass },
-  { href: '/requests',  label: 'Requests',    Icon: Heart },
-  { href: '/chat',      label: 'Chat',        Icon: MessageCircle },
-  { href: '/profile',   label: 'Profile',     Icon: User },
-  { href: '/settings',  label: 'Einstellungen', Icon: Settings },
-] as const
+  { href: '/dashboard', label: 'Home',           Icon: Home },
+  { href: '/discover',  label: 'Discover',       Icon: Compass },
+  { href: '/requests',  label: 'Requests',       Icon: Heart },
+  { href: '/chat',      label: 'Chat',           Icon: MessageCircle },
+  { href: '/profile',   label: 'Profile',        Icon: User },
+  { href: '/settings',  label: 'Einstellungen',  Icon: Settings },
+]
+
+function getJwtRole(token: string | null): string | null {
+  if (!token) return null
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    const decoded = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string }
+    return decoded.role ?? null
+  } catch {
+    return null
+  }
+}
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const isAdmin = getJwtRole(accessToken) === 'admin'
+  const displayItems = isAdmin
+    ? navItems.map((item) => item.href === '/requests' ? { href: '/admin', label: 'Admin', Icon: Shield } : item)
+    : navItems
 
   return (
     <nav
@@ -22,7 +40,7 @@ export default function BottomNav() {
       aria-label="Bottom navigation"
     >
       <ul className="flex items-center justify-around h-16 px-1" role="list">
-        {navItems.map(({ href, label, Icon }) => {
+        {displayItems.map(({ href, label, Icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <li key={href}>

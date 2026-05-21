@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { MapPin, Play, Loader2, AlertCircle } from 'lucide-react'
+import { MapPin, Loader2, AlertCircle } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
@@ -17,11 +17,28 @@ interface PublicProfile {
   birthdate: string | null
   bio: string | null
   city: string | null
+  gender: string | null
+  looking_for: string | null
   photo_id: string | null
   photo_url: string | null
   photo_needs_review: boolean
+  audio_url: string | null
   is_online: boolean
   status_message: string | null
+}
+
+const GENDER_LABELS: Record<string, string> = {
+  male:          'Mann',
+  female:        'Frau',
+  non_binary:    'Nicht-binär',
+  diverse:       'Divers',
+}
+
+const LOOKING_FOR_LABELS: Record<string, string> = {
+  friendship:   'Freundschaft',
+  relationship: 'Beziehung',
+  exchange:     'Austausch',
+  all:          'Offen für alles',
 }
 
 interface Interest {
@@ -59,6 +76,8 @@ export default function PublicProfilePage() {
   const [error, setError]               = useState<string | null>(null)
   const [photoUrl, setPhotoUrl]         = useState<string | null>(null)
 
+  const [audioUrl, setAudioUrl]           = useState<string | null>(null)
+
   const [requestStatus, setRequestStatus] = useState<RequestStatus>('idle')
   const [requestError, setRequestError]   = useState<string | null>(null)
 
@@ -90,6 +109,9 @@ export default function PublicProfilePage() {
         setProfile(prof)
         if (prof.photo_url) {
           try { setPhotoUrl(new URL(prof.photo_url).pathname) } catch { setPhotoUrl(prof.photo_url) }
+        }
+        if (prof.audio_url) {
+          try { setAudioUrl(new URL(prof.audio_url).pathname) } catch { setAudioUrl(prof.audio_url) }
         }
 
         if (ownResult.status === 'fulfilled') {
@@ -201,10 +223,12 @@ export default function PublicProfilePage() {
 
             {/* Location + online — bottom right */}
             <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm px-3 py-2 rounded-xl">
-              <div className="flex items-center gap-1.5 text-white text-sm mb-1">
-                <MapPin className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-                <span>{profile.city ?? '—'}</span>
-              </div>
+              {profile.city && (
+                <div className="flex items-center gap-1.5 text-white text-sm mb-1">
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+                  <span>{profile.city}</span>
+                </div>
+              )}
               <OnlineIndicator
                 is_online={profile.is_online}
                 status_message={profanityFilter && profile.status_message ? blurText(profile.status_message) : profile.status_message}
@@ -213,27 +237,32 @@ export default function PublicProfilePage() {
             </div>
           </div>
 
-          {/* ── Audio player (disabled placeholder) ───────────────────────── */}
-          <div className="w-full mb-5">
-            <div className="flex items-center gap-3 px-2 opacity-40">
-              <button
-                disabled
-                className="w-10 h-10 rounded-full bg-primary-fixed-dim flex items-center justify-center shrink-0"
-                aria-label="Sprachnachricht abspielen"
-              >
-                <Play className="w-4 h-4 text-on-primary-container ml-0.5" aria-hidden="true" />
-              </button>
-              <div className="flex-1">
-                <div className="w-full bg-outline-variant rounded-full h-1 mb-1">
-                  <div className="bg-primary-fixed-dim h-1 rounded-full" style={{ width: '0%' }} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-on-surface-variant">Sprachnachricht</span>
-                  <span className="text-xs text-on-surface-variant">Bald verfügbar</span>
-                </div>
-              </div>
+          {/* ── Gender / Looking for ───────────────────────────────────────── */}
+          {(profile.gender && profile.gender !== 'not_specified' || profile.looking_for) && (
+            <div className="w-full flex flex-wrap gap-2 mb-5">
+              {profile.gender && profile.gender !== 'not_specified' && GENDER_LABELS[profile.gender] && (
+                <span className="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm">
+                  {GENDER_LABELS[profile.gender]}
+                </span>
+              )}
+              {profile.looking_for && LOOKING_FOR_LABELS[profile.looking_for] && (
+                <span className="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm">
+                  {LOOKING_FOR_LABELS[profile.looking_for]}
+                </span>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* ── Audio ────────────────────────────────────────────────────── */}
+          {audioUrl && (
+            <div className="w-full mb-5">
+              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide text-center mb-3">
+                Vorstellung
+              </p>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <audio controls src={audioUrl} className="w-full rounded-xl" aria-label="Vorstellung" />
+            </div>
+          )}
 
           {/* ── Bio ───────────────────────────────────────────────────────── */}
           {profile.bio && (

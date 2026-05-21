@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, Play, Loader2, AlertCircle, Camera, ChevronDown } from 'lucide-react'
+import { MapPin, Loader2, AlertCircle, Camera, ChevronDown, Mic, Square, Upload, Clock, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
@@ -18,12 +18,21 @@ interface Profile {
   photo_id: string | null
   photo_url: string | null
   photo_needs_review: boolean
+  audio_id: string | null
+  audio_url: string | null
+  audio_moderation_status: string | null
   gender: string | null
   looking_for: string | null
   onboarding_completed: boolean
   is_published: boolean
   status_visible: boolean
   status_message: string | null
+}
+
+type AudioStatus = 'none' | 'recording' | 'preview' | 'uploading' | 'pending' | 'approved' | 'rejected'
+
+function formatTimer(s: number): string {
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
 interface Interest {
@@ -79,6 +88,17 @@ export default function ProfilePage() {
   const [pendingPhotoFile, setPendingPhotoFile]       = useState<File | null>(null)
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null)
 
+  const [audioStatus, setAudioStatus] = useState<AudioStatus>('none')
+  const [audioUrl, setAudioUrl]       = useState<string | null>(null)
+  const [audioBlob, setAudioBlob]     = useState<Blob | null>(null)
+  const [audioTimer, setAudioTimer]   = useState(0)
+  const [audioError, setAudioError]   = useState<string | null>(null)
+  const mediaRecorderRef   = useRef<MediaRecorder | null>(null)
+  const audioChunksRef     = useRef<Blob[]>([])
+  const timerIntervalRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const streamRef          = useRef<MediaStream | null>(null)
+  const audioFileRef       = useRef<HTMLInputElement>(null)
+
   // ── Load ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -92,6 +112,16 @@ export default function ProfilePage() {
         setProfile(prof)
         if (prof.photo_url) {
           try { setPhotoUrl(new URL(prof.photo_url).pathname) } catch { setPhotoUrl(prof.photo_url) }
+        }
+        if (prof.audio_url) {
+          if (prof.audio_moderation_status === 'approved') {
+            setAudioStatus('approved')
+            try { setAudioUrl(new URL(prof.audio_url).pathname) } catch { setAudioUrl(prof.audio_url) }
+          } else if (prof.audio_moderation_status === 'pending') {
+            setAudioStatus('pending')
+          } else if (prof.audio_moderation_status === 'rejected') {
+            setAudioStatus('rejected')
+          }
         }
         setUserInterests(normalise(ui))
         setAllInterests(normalise(ai))
@@ -239,6 +269,137 @@ export default function ProfilePage() {
     if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview)
     setPendingPhotoFile(file)
     setPendingPhotoPreview(URL.createObjectURL(file))
+  }
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current !== null) clearInterval(timerIntervalRef.current)
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
+
+  function clearTimer() {
+    if (timerIntervalRef.current !== null) {
+      clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+  }
+
+  async function startRecording() {
+    setAudioError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const recorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      audioChunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        setAudioBlob(blob)
+        setAudioUrl(URL.createObjectURL(blob))
+        setAudioStatus('preview')
+        stream.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+      }
+
+      recorder.start()
+      setAudioStatus('recording')
+      setAudioTimer(0)
+      let tick = 0
+      timerIntervalRef.current = setInterval(() => {
+        tick++
+        setAudioTimer(tick)
+        if (tick >= 45) {
+          clearTimer()
+          if (recorder.state !== 'inactive') recorder.stop()
+        }
+      }, 1000)
+    } catch {
+      setAudioError('Mikrofon nicht verfügbar')
+    }
+  }
+
+  function stopRecording() {
+    clearTimer()
+    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop()
+  }
+
+  function discardAudio() {
+    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl)
+    setAudioBlob(null)
+    setAudioUrl(null)
+    setAudioTimer(0)
+    setAudioError(null)
+    setAudioStatus('none')
+  }
+
+  async function uploadAudio() {
+    if (!audioBlob) return
+    setAudioStatus('uploading')
+    setAudioError(null)
+    const base = (audioBlob as File).type || 'audio/webm'
+    const ext = base.startsWith('audio/ogg') ? '.ogg'
+              : base.startsWith('audio/mp4') ? '.m4a'
+              : base.startsWith('audio/wav') ? '.wav'
+              : base.startsWith('audio/mpeg') ? '.mp3'
+              : '.webm'
+    try {
+      const formData = new FormData()
+      formData.append('audio', audioBlob, `recording${ext}`)
+      const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
+      useAuthStore.getState().setAccessToken(freshToken)
+      const uploadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/profile/audio`
+      const res = await fetch(uploadUrl, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Authorization: `Bearer ${freshToken}` },
+        body: formData,
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string }
+        throw new Error(body.message ?? 'Audio-Upload fehlgeschlagen')
+      }
+      if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl)
+      setAudioBlob(null)
+      setAudioUrl(null)
+      setAudioStatus('pending')
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : 'Fehler beim Hochladen')
+      setAudioStatus('preview')
+    }
+  }
+
+  async function deleteAudio() {
+    try {
+      await fetchApi<void>('/profile/audio', { method: 'DELETE' })
+      if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl)
+      setAudioUrl(null)
+      setAudioBlob(null)
+      setAudioStatus('none')
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : 'Fehler beim Löschen')
+    }
+  }
+
+  function handleAudioFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      setAudioError('Datei zu groß. Maximal 5 MB erlaubt.')
+      return
+    }
+    setAudioError(null)
+    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl)
+    setAudioBlob(file)
+    setAudioUrl(URL.createObjectURL(file))
+    setAudioStatus('preview')
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -432,28 +593,146 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* ── Audio player (disabled placeholder) ───────────────────────── */}
+          {/* ── Audio ────────────────────────────────────────────────────── */}
           <div className="w-full mb-5">
-            <div className="flex items-center gap-3 px-2 opacity-40">
-              <button
-                disabled
-                className="w-10 h-10 rounded-full bg-primary-fixed-dim flex items-center justify-center shrink-0"
-                aria-label="Sprachnachricht abspielen"
-              >
-                <Play className="w-4 h-4 text-on-primary-container ml-0.5" aria-hidden="true" />
-              </button>
-              <div className="flex-1">
-                <div className="w-full bg-outline-variant rounded-full h-1 mb-1">
-                  <div className="bg-primary-fixed-dim h-1 rounded-full" style={{ width: '0%' }} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-on-surface-variant">Sprachnachricht</span>
-                  <span className="text-xs text-on-surface-variant">
-                    {editMode ? 'Upload kommt bald' : 'Bald verfügbar'}
-                  </span>
+            <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide text-center mb-3">
+              Vorstellung
+            </p>
+
+            {audioStatus === 'none' && (
+              <div className="flex gap-2 justify-center flex-wrap">
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container-high transition-colors min-h-[44px]"
+                >
+                  <Mic className="h-4 w-4" aria-hidden="true" />
+                  Aufnehmen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => audioFileRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container-high transition-colors min-h-[44px]"
+                >
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  Datei wählen
+                </button>
+              </div>
+            )}
+
+            {audioStatus === 'recording' && (
+              <div className="flex items-center justify-center gap-4">
+                <span className="flex items-center gap-2 text-error font-medium text-sm">
+                  <span className="h-2 w-2 rounded-full bg-error animate-pulse" aria-hidden="true" />
+                  {formatTimer(audioTimer)}
+                  <span className="text-on-surface-variant text-xs font-normal">/ 00:45</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-error-container text-error text-sm font-medium hover:opacity-90 transition-opacity min-h-[44px]"
+                >
+                  <Square className="h-4 w-4" aria-hidden="true" />
+                  Stop
+                </button>
+              </div>
+            )}
+
+            {audioStatus === 'preview' && audioUrl && (
+              <div className="space-y-3">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <audio controls src={audioUrl} className="w-full rounded-xl" />
+                <div className="flex gap-2 justify-center">
+                  <button
+                    type="button"
+                    onClick={discardAudio}
+                    className="px-4 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container-high transition-colors min-h-[44px]"
+                  >
+                    Nochmal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={uploadAudio}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-medium hover:opacity-90 transition-opacity min-h-[44px]"
+                  >
+                    Hochladen
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
+
+            {audioStatus === 'uploading' && (
+              <div className="flex items-center justify-center gap-2 text-on-surface-variant text-sm py-3">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Wird hochgeladen…
+              </div>
+            )}
+
+            {audioStatus === 'pending' && (
+              <div className="flex flex-col items-center gap-3">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium">
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                  Warte auf Freigabe
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAudioStatus('none')}
+                  className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
+                >
+                  Ersetzen
+                </button>
+              </div>
+            )}
+
+            {audioStatus === 'approved' && audioUrl && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary-fixed-dim" aria-hidden="true" />
+                    Freigegeben
+                  </span>
+                  <button
+                    type="button"
+                    onClick={deleteAudio}
+                    className="flex items-center gap-1 text-xs text-error hover:underline transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Löschen
+                  </button>
+                </div>
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <audio controls src={audioUrl} className="w-full rounded-xl" />
+              </div>
+            )}
+
+            {audioStatus === 'rejected' && (
+              <div className="flex flex-col items-center gap-3">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-error-container text-error text-xs font-medium">
+                  <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                  Abgelehnt
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAudioStatus('none')}
+                  className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
+                >
+                  Neue Aufnahme
+                </button>
+              </div>
+            )}
+
+            {audioError && (
+              <p className="text-xs text-error mt-2 text-center" role="alert">{audioError}</p>
+            )}
+
+            <input
+              ref={audioFileRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={handleAudioFileSelect}
+              aria-hidden="true"
+            />
           </div>
 
           {/* ── Bio ───────────────────────────────────────────────────────── */}
