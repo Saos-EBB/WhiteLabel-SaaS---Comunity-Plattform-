@@ -14,6 +14,7 @@ import { MediaUpload } from '../media/entities/media-upload.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MailModule } from '../../../common/mail/mail.module';
+import { SystemSettingsModule } from '../system-settings/system-settings.module';
 
 @Module({
     imports: [
@@ -28,6 +29,7 @@ import { MailModule } from '../../../common/mail/mail.module';
         }),
         NotificationsModule,
         MailModule,
+        SystemSettingsModule,
     ],
     controllers: [ModerationController],
     providers: [ModerationService, ProfanityService, JwtGuard, RolesGuard],

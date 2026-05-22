@@ -13,6 +13,7 @@ import { decryptEmail } from '../../../common/crypto/crypto.helper';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CreateStrikeDto, StrikeType } from './dto/create-strike.dto';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 
 const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -36,6 +37,7 @@ export class ModerationService {
         private readonly notificationsService: NotificationsService,
         private readonly mailService: MailService,
         private readonly eventEmitter: EventEmitter2,
+        private readonly systemSettingsService: SystemSettingsService,
     ) { }
 
     async createReport(reporterId: string, dto: CreateReportDto) {
@@ -65,6 +67,8 @@ export class ModerationService {
     }
 
     async checkAutoSuspend(reportedUserId: string, reportId: string): Promise<void> {
+        const threshold = await this.systemSettingsService.getNumber('auto_suspend_threshold', 10);
+
         const result = await this.dataSource.query<[{ count: string }]>(
             `SELECT COUNT(DISTINCT reporter_id) AS count
              FROM reports
@@ -74,13 +78,13 @@ export class ModerationService {
             [reportedUserId],
         );
 
-        if (parseInt(result[0]?.count ?? '0', 10) < 10) return;
+        if (parseInt(result[0]?.count ?? '0', 10) < threshold) return;
 
         const user = await this.userRepository.findOne({ where: { id: reportedUserId } });
         if (!user || user.is_banned) return;
 
         user.is_banned      = true;
-        user.ban_reason     = 'Automatische Sperre: 10 unabhängige Meldungen eingegangen.';
+        user.ban_reason     = `Automatische Sperre: ${threshold} unabhängige Meldungen eingegangen.`;
         user.ban_expires_at = null;
         await this.userRepository.save(user);
 
@@ -91,7 +95,7 @@ export class ModerationService {
             report_id:  reportId,
             issued_by:  SYSTEM_USER_ID,
             type:       StrikeType.PERMANENT,
-            reason:     'Auto-Suspend: 10 offene Reports von verschiedenen Nutzern.',
+            reason:     `Auto-Suspend: ${threshold} offene Reports von verschiedenen Nutzern.`,
             expires_at: null,
         });
         await this.strikeRepository.save(strike);

@@ -12,6 +12,7 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AdminCreateStrikeDto } from './dto/admin-create-strike.dto';
 import { AddProfanityWordDto } from './dto/add-profanity-word.dto';
+import { UpdateSettingDto } from './dto/update-setting.dto';
 import { RejectMediaDto } from '../moderation/dto/reject-media.dto';
 
 @Controller('admin')
@@ -152,5 +153,21 @@ export class AdminController {
     @Delete('profanity/:word')
     removeProfanityWord(@Param('word') word: string) {
         return this.adminService.removeProfanityWord(word);
+    }
+
+    // ── System settings ────────────────────────────────────────────────────────
+
+    @Get('settings')
+    getSettings() {
+        return this.adminService.getSettings();
+    }
+
+    @Patch('settings/:key')
+    updateSetting(
+        @Request() req: any,
+        @Param('key') key: string,
+        @Body() dto: UpdateSettingDto,
+    ) {
+        return this.adminService.updateSetting(key, dto.value, req.user.sub);
     }
 }

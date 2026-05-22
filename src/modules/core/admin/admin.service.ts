@@ -16,6 +16,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MailService } from '../../../common/mail/mail.service';
 import { decryptEmail } from '../../../common/crypto/crypto.helper';
 import { ProfanityService } from '../moderation/profanity.service';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { StrikeType } from '../moderation/dto/create-strike.dto';
 import { BanUserDto, BanDuration } from './dto/ban-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
@@ -44,6 +45,7 @@ export class AdminService {
         private readonly mailService: MailService,
         private readonly eventEmitter: EventEmitter2,
         private readonly profanityService: ProfanityService,
+        private readonly systemSettingsService: SystemSettingsService,
     ) {}
 
     private calcBanExpiry(duration: BanDuration): Date | null {
@@ -466,5 +468,15 @@ export class AdminService {
 
     removeProfanityWord(word: string) {
         return this.profanityService.removeCustomWord(word);
+    }
+
+    // ── System settings ────────────────────────────────────────────────────────
+
+    getSettings() {
+        return this.systemSettingsService.getAll();
+    }
+
+    updateSetting(key: string, value: string, adminId: string) {
+        return this.systemSettingsService.set(key, value, adminId);
     }
 }

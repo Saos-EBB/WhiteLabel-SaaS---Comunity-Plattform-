@@ -15,6 +15,7 @@ import { PseudonymizationTask } from './tasks/pseudonymization.task';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { MailModule } from '../../../common/mail/mail.module';
+import { SystemSettingsModule } from '../system-settings/system-settings.module';
 
 @Module({
     imports: [
@@ -30,6 +31,7 @@ import { MailModule } from '../../../common/mail/mail.module';
         NotificationsModule,
         ModerationModule,
         MailModule,
+        SystemSettingsModule,
     ],
     controllers: [AdminController],
     providers: [AdminService, JwtGuard, RolesGuard, PseudonymizationTask],
