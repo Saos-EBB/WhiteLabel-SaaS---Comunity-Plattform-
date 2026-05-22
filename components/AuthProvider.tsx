@@ -10,6 +10,7 @@ import { useNotificationStore } from '@/lib/store/notificationStore'
 import { useConversationStore } from '@/lib/store/conversationStore'
 import { useToastStore } from '@/lib/store/toastStore'
 import { initProfanityFilter } from '@/lib/profanity'
+import BanScreen from '@/components/ui/BanScreen'
 
 interface MessagePayload {
   id: string
@@ -22,6 +23,8 @@ interface MessagePayload {
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasFetched = useRef(false)
   const router = useRouter()
+  const isBanned  = useAuthStore((s) => s.isBanned)
+  const setBanned = useAuthStore((s) => s.setBanned)
 
   // ── Heartbeat — keeps last_active_at fresh every 2 min ───────────────────
   useEffect(() => {
@@ -46,13 +49,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     fetchApi<User>('/profile/me')
       .then((user) => {
         setUser(user)
+        if (user.is_banned === true) {
+          setBanned(true)
+        }
         initProfanityFilter().catch(() => {})
         useAccessibilityStore.getState().applySettings({
           font_size: user.font_size,
           high_contrast: user.high_contrast,
           lang_simple: user.lang_simple,
         })
-        if (!user.onboarding_completed && !window.location.pathname.startsWith('/onboarding')) {
+        if (!user.is_banned && !user.onboarding_completed && !window.location.pathname.startsWith('/onboarding')) {
           router.push('/onboarding')
         }
 
@@ -97,6 +103,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
               conversationId: payload.conversationId,
             })
           },
+          'user.banned': () => {
+            useAuthStore.getState().clearAuth()
+            setBanned(true)
+          },
+          'user.unbanned': () => {
+            setBanned(false)
+          },
         }
 
         for (const [event, handler] of Object.entries(socketHandlers)) {
@@ -113,5 +126,5 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return () => { disconnect() }
   }, [router])
 
-  return <>{children}</>
+  return <>{isBanned && <BanScreen />}{children}</>
 }

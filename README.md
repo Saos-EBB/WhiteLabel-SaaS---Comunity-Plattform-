@@ -154,9 +154,9 @@ Five tabs:
 | Tab | Description |
 |---|---|
 | Medien | Photo moderation queue. Approve or reject each pending upload with a reason. Photos proxied via Next.js (`/uploads/…`) to avoid CORS. |
-| Nutzer | Paginated user list with role/banned filters and nickname search. Inline role selector; ban/unban actions via modal. |
+| Nutzer | Paginated user list with role/banned filters and nickname search. Inline role selector; ban/unban actions via `BanModal`. |
 | Meldungen | Paginated report list filtered by status. Inline status + note editing per report. |
-| Strikes | Paginated strike list. "Neuer Strike" modal — type (`warning`, `temp`, `permanent`), target user UUID, reason, optional expiry. |
+| Strikes | Paginated strike list. "Neuer Strike" modal — type (`warning`, `temp`, `permanent`), **nickname search** (debounced lookup, select from results), reason, optional expiry. |
 | Schimpfwörter | Custom profanity word list. Add / delete words; persisted to `profanity_words` table via backend. |
 
 ---
@@ -199,7 +199,9 @@ Fixed bottom bar, mobile only (`md:hidden`). Five items: Home, Discover, Request
 
 - JWT access token (15 min) stored in Zustand + persisted to `localStorage` via `persist` middleware.
 - Refresh token stored as httpOnly cookie; rotated automatically by `fetchApi` on 401.
-- `AuthProvider` (`components/AuthProvider.tsx`) fetches `/profile/me` on mount, populates the user store, applies accessibility settings, and establishes the global WebSocket connection.
+- `AuthProvider` (`components/AuthProvider.tsx`) fetches `/profile/me` on mount, populates the user store, applies accessibility settings, and establishes the global WebSocket connection. If the response includes `is_banned: true`, `setBanned(true)` is called immediately and the ban screen is shown.
+- `isBanned` in `authStore` is **in-memory only** — not persisted to `localStorage`. Ban state is always derived from the backend on startup (via `/profile/me`) or in real-time (via `user.banned` / `user.unbanned` socket events). This prevents stale ban state surviving across sessions.
+- Ban screen (`components/ui/BanScreen.tsx`): full-screen overlay shown when `isBanned` is true. Plays a random audio clip from `public/ban-audio/`. Shows a logout button that calls `POST /auth/logout`, clears auth store, and redirects to `/login`.
 
 ---
 
@@ -220,6 +222,8 @@ reconnect(token) // force-reconnects with a new token
 - `new_message` → fires a bell notification for any incoming message across all conversations.
 - `notification` → hydrates `notificationStore` with the incoming notification in real time (no polling needed).
 - `contact_request` → fires a bell notification for new incoming contact requests.
+- `user.banned` → calls `clearAuth()` + `setBanned(true)`; shows the ban screen overlay.
+- `user.unbanned` → calls `setBanned(false)`; hides the ban screen overlay.
 
 **Chat page listeners** (`app/(app)/chat/[id]/page.tsx`):
 
@@ -320,6 +324,51 @@ Custom audio player replacing native `<audio controls>` on profile pages.
 - Resets state (`isPlaying`, `currentTime`, `duration`) when `src` changes.
 - Colors: `text-primary-fixed-dim` / `bg-primary-fixed-dim` (Tailwind v4 tokens).
 
+### `BanModal` — `components/ui/BanModal.tsx`
+
+Admin modal for banning a user. Used from the `/admin` Nutzer tab.
+
+```tsx
+<BanModal userId="uuid" nickname="alice" reportId="uuid" onSuccess={() => loadUsers()} onClose={() => setBanModal(null)} />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `userId` | `string` | Target user UUID |
+| `nickname` | `string` | Displayed in the modal title |
+| `reportId` | `string \| undefined` | Optional report UUID attached to the ban |
+| `onSuccess` | `() => void` | Called after a successful ban (before closing) |
+| `onClose` | `() => void` | Called when backdrop or × is clicked |
+
+Duration dropdown (24h / 7d / 30d / permanent), reason dropdown (5 presets), optional free-text note (appended to reason, 500 char limit). Posts `PATCH /admin/users/:id/ban` with `{ duration, reason, report_id? }`.
+
+---
+
+### `BanScreen` — `components/ui/BanScreen.tsx`
+
+Full-screen overlay rendered by `AuthProvider` when `isBanned` is `true` in the auth store.
+
+- Plays a random audio clip from `public/ban-audio/` on mount (looped).
+- Displays configurable ban text (rubber-stamp styling, 10° rotation). Text sourced from `PUBLIC_CONFIG.banScreen.text` → falls back to `NEXT_PUBLIC_BAN_SCREEN_TEXT` env var or `'Dein Account wurde gesperrt.'`.
+- "Abmelden" button: calls `POST /auth/logout`, clears auth store, redirects to `/login`.
+- `z-[9999]` — covers all other content.
+- Audio file list managed in `config/public.config.ts`.
+
+---
+
+## Config
+
+### `config/public.config.ts`
+
+Static runtime config exported as `PUBLIC_CONFIG`. Currently holds ban screen settings:
+
+```ts
+PUBLIC_CONFIG.banScreen.text        // ban overlay message
+PUBLIC_CONFIG.banScreen.audioFiles  // array of filenames from public/ban-audio/
+```
+
+Text falls back to `process.env.NEXT_PUBLIC_BAN_SCREEN_TEXT` or the default string. Audio files are served statically from `public/ban-audio/`.
+
 ---
 
 ## Key notes
@@ -332,6 +381,18 @@ Custom audio player replacing native `<audio controls>` on profile pages.
 ## Changelog
 
 ### 2026-05-22 (latest)
+- Auth: ban state now derived from backend on every app startup — `AuthProvider` checks `user.is_banned` in the `/profile/me` response and calls `setBanned(true)` if true. Stale ban state no longer survives across sessions.
+- Auth: `isBanned` removed from Zustand `partialize` — no longer written to `localStorage`. In-memory only; reset to `false` on logout.
+- Auth: `User` interface gains optional `is_banned?: boolean` field.
+- Auth: `AuthProvider` onboarding redirect now also guards on `!user.is_banned` (banned users are not redirected to `/onboarding`).
+- New component: `BanScreen` (`components/ui/BanScreen.tsx`) — full-screen ban overlay; plays a random looping audio from `public/ban-audio/`; shows configurable ban text in rubber-stamp style; "Abmelden" button clears auth and redirects to `/login`. Rendered by `AuthProvider` when `isBanned` is true.
+- New component: `BanModal` (`components/ui/BanModal.tsx`) — admin ban form; duration dropdown (24h/7d/30d/permanent), reason dropdown (5 presets), optional note (500 chars). Posts `{ duration, reason, report_id? }` to `PATCH /admin/users/:id/ban`.
+- Admin (`/admin`): Nutzer tab uses `BanModal` instead of the old inline form; `banModal` state now carries `{ userId, nickname, reportId? }`.
+- Admin (`/admin`): Strike modal replaced UUID text input with a debounced nickname search — type a nickname, pick from results, `user_id` resolved automatically.
+- New `config/public.config.ts` — `PUBLIC_CONFIG` with `banScreen.text` (from `NEXT_PUBLIC_BAN_SCREEN_TEXT` env var) and `banScreen.audioFiles` array.
+- New `public/ban-audio/` — 8 audio files served statically for the ban screen.
+
+### 2026-05-22
 - Chat (`/chat/[id]`): three-dot menu in the header — "Chat löschen" (soft-delete own copy, navigates to `/chat`), "User melden" (opens `ReportModal`), "Nutzer blockieren" (bottom sheet confirmation → `POST /profile/me/block/:userId`).
 - Chat (`/chat/[id]`): block state loaded from `is_blocked` / `blocked_by` on conversation fetch; input and send button disabled when blocked; block banner shown in the input bar; partner name replaced with "XXXX" when blocked.
 - Discover (`/discover`): connected profiles now show a "Verbindung trennen" button below "Chatten →"; confirmation bottom sheet calls `DELETE /chat/connections/:userId` and resets connection status to NONE.

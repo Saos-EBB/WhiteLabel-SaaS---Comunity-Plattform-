@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import BanModal from '@/components/ui/BanModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -278,10 +279,7 @@ export default function AdminPage() {
   const [userRoleFilter, setUserRoleFilter] = useState('')
   const [userBannedFilter, setUserBannedFilter] = useState('')
   const [userPage, setUserPage]         = useState(1)
-  const [banModal, setBanModal]         = useState<{ userId: string; nickname: string | null } | null>(null)
-  const [banReason, setBanReason]       = useState('')
-  const [banExpires, setBanExpires]     = useState('')
-  const [banSaving, setBanSaving]       = useState(false)
+  const [banModal, setBanModal]         = useState<{ userId: string; nickname: string; reportId?: string } | null>(null)
 
   async function loadUsers(page = userPage) {
     setUsersLoading(true)
@@ -297,29 +295,6 @@ export default function AdminPage() {
       showToast(err instanceof Error ? err.message : 'Fehler beim Laden', false)
     } finally {
       setUsersLoading(false)
-    }
-  }
-
-  async function submitBan() {
-    if (!banModal || !banReason.trim()) return
-    setBanSaving(true)
-    try {
-      await fetchApi<void>(`/admin/users/${banModal.userId}/ban`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          reason: banReason.trim(),
-          ...(banExpires ? { expires_at: new Date(banExpires).toISOString() } : {}),
-        }),
-      })
-      setBanModal(null)
-      setBanReason('')
-      setBanExpires('')
-      showToast('Nutzer gesperrt')
-      await loadUsers(userPage)
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Fehler', false)
-    } finally {
-      setBanSaving(false)
     }
   }
 
@@ -399,7 +374,11 @@ export default function AdminPage() {
   const [strikeType, setStrikeType]     = useState<'warning' | 'temp' | 'permanent'>('warning')
   const [strikeReason, setStrikeReason] = useState('')
   const [strikeExpires, setStrikeExpires] = useState('')
-  const [strikeSaving, setStrikeSaving] = useState(false)
+  const [strikeSaving, setStrikeSaving]           = useState(false)
+  const [strikeNicknameQuery, setStrikeNicknameQuery] = useState('')
+  const [strikeSearchResults, setStrikeSearchResults] = useState<AdminUser[]>([])
+  const [strikeSearchLoading, setStrikeSearchLoading] = useState(false)
+  const strikeSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function loadStrikes(page = strikePage) {
     setStrikesLoading(true)
@@ -430,6 +409,8 @@ export default function AdminPage() {
       })
       setStrikeModal(false)
       setStrikeUserId('')
+      setStrikeNicknameQuery('')
+      setStrikeSearchResults([])
       setStrikeType('warning')
       setStrikeReason('')
       setStrikeExpires('')
@@ -769,7 +750,7 @@ export default function AdminPage() {
                               </button>
                             ) : (
                               <button
-                                onClick={() => { setBanModal({ userId: u.id, nickname: u.nickname }); setBanReason(''); setBanExpires('') }}
+                                onClick={() => setBanModal({ userId: u.id, nickname: u.nickname ?? u.id.slice(0, 8) })}
                                 className="text-xs px-3 py-1.5 rounded-full border border-error/40 text-error hover:bg-error-container transition-colors flex items-center gap-1"
                               >
                                 <Ban className="h-3 w-3" />
@@ -837,13 +818,22 @@ export default function AdminPage() {
                             <p className="text-xs text-on-surface-variant">{r.reason}</p>
                             <p className="text-xs text-on-surface-variant">{fmtDate(r.created_at)}</p>
                           </div>
-                          <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full ${
-                            r.status === 'closed'   ? 'bg-surface-container text-on-surface-variant' :
-                            r.status === 'reviewed' ? 'bg-primary-fixed-dim/30 text-on-primary-container' :
-                            'bg-error-container text-error'
-                          }`}>
-                            {r.status}
-                          </span>
+                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              r.status === 'closed'   ? 'bg-surface-container text-on-surface-variant' :
+                              r.status === 'reviewed' ? 'bg-primary-fixed-dim/30 text-on-primary-container' :
+                              'bg-error-container text-error'
+                            }`}>
+                              {r.status}
+                            </span>
+                            <button
+                              onClick={() => setBanModal({ userId: r.reported_user_id, nickname: r.reported_nickname ?? r.reported_user_id.slice(0, 8), reportId: r.id })}
+                              className="text-xs px-2 py-1 rounded-full border border-error/40 text-error hover:bg-error-container transition-colors flex items-center gap-1"
+                            >
+                              <Ban className="h-3 w-3" aria-hidden="true" />
+                              Sperren
+                            </button>
+                          </div>
                         </div>
 
                         {!closed && (
@@ -895,7 +885,7 @@ export default function AdminPage() {
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Strike-Liste</p>
               <button
-                onClick={() => { setStrikeModal(true); setStrikeUserId(''); setStrikeType('warning'); setStrikeReason(''); setStrikeExpires('') }}
+                onClick={() => { setStrikeModal(true); setStrikeUserId(''); setStrikeNicknameQuery(''); setStrikeSearchResults([]); setStrikeType('warning'); setStrikeReason(''); setStrikeExpires('') }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-fixed-dim text-on-primary-container text-sm font-medium hover:opacity-90 transition-opacity min-h-[40px]"
               >
                 <Plus className="h-4 w-4" />
@@ -1047,65 +1037,74 @@ export default function AdminPage() {
 
       {/* ── Modal: Nutzer sperren ─────────────────────────────────────────────── */}
       {banModal && (
-        <ModalOverlay
-          title={`${banModal.nickname ?? banModal.userId.slice(0, 8)} sperren`}
+        <BanModal
+          userId={banModal.userId}
+          nickname={banModal.nickname}
+          reportId={banModal.reportId}
+          onSuccess={() => {
+            showToast('Nutzer gesperrt')
+            if (activeTab === 'users')   void loadUsers(userPage)
+            if (activeTab === 'reports') void loadReports(reportPage)
+          }}
           onClose={() => setBanModal(null)}
-        >
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm text-on-surface-variant block mb-1" htmlFor="ban-reason">Grund *</label>
-              <textarea
-                id="ban-reason"
-                value={banReason}
-                onChange={(e) => setBanReason(e.target.value)}
-                placeholder="Sperrgrund (mind. 5 Zeichen)…"
-                rows={3}
-                className={`${inputCls} resize-none`}
-              />
-            </div>
-            <div>
-              <label className="text-sm text-on-surface-variant block mb-1" htmlFor="ban-expires">
-                Ablaufdatum <span className="text-xs">(leer = dauerhaft)</span>
-              </label>
-              <input
-                id="ban-expires"
-                type="datetime-local"
-                value={banExpires}
-                onChange={(e) => setBanExpires(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row-reverse">
-            <button
-              onClick={submitBan}
-              disabled={banSaving || banReason.trim().length < 5}
-              className={`${btnPrimary} flex-1 justify-center bg-error-container text-error`}
-            >
-              {banSaving && <Spinner size={4} />}
-              Sperren
-            </button>
-            <button onClick={() => setBanModal(null)} className={`${btnOutline} flex-1 justify-center`}>
-              Abbrechen
-            </button>
-          </div>
-        </ModalOverlay>
+        />
       )}
 
       {/* ── Modal: Neuer Strike ───────────────────────────────────────────────── */}
       {strikeModal && (
         <ModalOverlay title="Neuer Strike" onClose={() => setStrikeModal(false)}>
           <div className="space-y-3">
-            <div>
-              <label className="text-sm text-on-surface-variant block mb-1" htmlFor="strike-user">Nutzer-ID (UUID) *</label>
+            <div className="relative">
+              <label className="text-sm text-on-surface-variant block mb-1" htmlFor="strike-nickname">Nickname suchen *</label>
               <input
-                id="strike-user"
+                id="strike-nickname"
                 type="text"
-                value={strikeUserId}
-                onChange={(e) => setStrikeUserId(e.target.value)}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                value={strikeNicknameQuery}
+                onChange={(e) => {
+                  const q = e.target.value
+                  setStrikeNicknameQuery(q)
+                  setStrikeUserId('')
+                  if (strikeSearchTimer.current) clearTimeout(strikeSearchTimer.current)
+                  if (!q.trim()) { setStrikeSearchResults([]); return }
+                  strikeSearchTimer.current = setTimeout(async () => {
+                    setStrikeSearchLoading(true)
+                    try {
+                      const res = await fetchApi<Paginated<AdminUser>>(`/admin/users?search=${encodeURIComponent(q.trim())}&limit=5`)
+                      setStrikeSearchResults(res.data)
+                    } catch { setStrikeSearchResults([]) }
+                    finally { setStrikeSearchLoading(false) }
+                  }, 300)
+                }}
+                onBlur={() => { setTimeout(() => setStrikeSearchResults([]), 200) }}
+                placeholder="Nickname eingeben…"
+                autoComplete="off"
                 className={inputCls}
               />
+              {(strikeSearchLoading || strikeSearchResults.length > 0) && (
+                <div className="absolute z-10 left-0 right-0 top-full mt-1 rounded-xl bg-surface-container-high border border-outline-variant shadow-lg overflow-hidden">
+                  {strikeSearchLoading ? (
+                    <div className="flex justify-center py-3"><Spinner size={4} /></div>
+                  ) : (
+                    strikeSearchResults.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onMouseDown={() => {
+                          setStrikeUserId(u.id)
+                          setStrikeNicknameQuery(u.nickname ?? u.id.slice(0, 8))
+                          setStrikeSearchResults([])
+                        }}
+                        className="w-full text-left px-3 py-2.5 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2 transition-colors"
+                      >
+                        <span>{u.nickname ?? '—'}</span>
+                        {u.vulnerable_flag && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-error-container text-error">Vulnerabel</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="text-sm text-on-surface-variant block mb-1" htmlFor="strike-type">Typ *</label>
