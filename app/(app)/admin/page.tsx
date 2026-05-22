@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   AlertCircle, Ban, BookOpen, Check, CheckCircle2,
   ChevronLeft, ChevronRight, FileText, Image as ImageIcon,
-  Loader2, Music, Plus, Shield, Trash2, Users, X, Zap,
+  Loader2, Music, Plus, Settings, Shield, Trash2, Users, X, Zap,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
@@ -13,7 +13,7 @@ import BanModal from '@/components/ui/BanModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AdminTab = 'media' | 'users' | 'reports' | 'strikes' | 'profanity'
+type AdminTab = 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings'
 
 interface PendingMedia {
   id: string
@@ -66,6 +66,13 @@ interface ProfanityWord {
   word: string
   added_by: string | null
   added_at: string
+}
+
+interface SystemSetting {
+  key: string
+  value: string
+  updated_at: string
+  updated_by: string | null
 }
 
 interface Paginated<T> {
@@ -280,6 +287,8 @@ export default function AdminPage() {
   const [userBannedFilter, setUserBannedFilter] = useState('')
   const [userPage, setUserPage]         = useState(1)
   const [banModal, setBanModal]         = useState<{ userId: string; nickname: string; reportId?: string } | null>(null)
+  const [usersBanMap, setUsersBanMap]   = useState<Record<string, { is_banned: boolean; ban_reason: string | null }>>({})
+
 
   async function loadUsers(page = userPage) {
     setUsersLoading(true)
@@ -291,6 +300,11 @@ export default function AdminPage() {
       const data = await fetchApi<Paginated<AdminUser>>(`/admin/users?${params}`)
       setUsers(data)
       setUserPage(page)
+      setUsersBanMap((prev) => {
+        const next = { ...prev }
+        data.data.forEach((u) => { next[u.id] = { is_banned: u.is_banned, ban_reason: u.ban_reason } })
+        return next
+      })
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Fehler beim Laden', false)
     } finally {
@@ -476,6 +490,41 @@ export default function AdminPage() {
     }
   }
 
+  // ── Settings ───────────────────────────────────────────────────────────────
+  const [settingsLoading, setSettingsLoading]       = useState(false)
+  const [settingsSaving, setSettingsSaving]         = useState(false)
+  const [autoSuspendThreshold, setAutoSuspendThreshold] = useState('10')
+
+  async function loadSettings() {
+    setSettingsLoading(true)
+    try {
+      const data = await fetchApi<SystemSetting[]>('/admin/settings')
+      const threshold = data.find((s) => s.key === 'auto_suspend_threshold')
+      if (threshold) setAutoSuspendThreshold(threshold.value)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler beim Laden', false)
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  async function saveAutoSuspendThreshold() {
+    const val = parseInt(autoSuspendThreshold, 10)
+    if (isNaN(val) || val < 1 || val > 100) return
+    setSettingsSaving(true)
+    try {
+      await fetchApi<unknown>('/admin/settings/auto_suspend_threshold', {
+        method: 'PATCH',
+        body: JSON.stringify({ value: String(val) }),
+      })
+      showToast('Einstellung gespeichert')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler', false)
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
   // ── Load on tab change ─────────────────────────────────────────────────────
   useEffect(() => {
     if (getJwtRole(accessToken) !== 'admin') return
@@ -484,16 +533,18 @@ export default function AdminPage() {
     if (activeTab === 'reports')   loadReports(1)
     if (activeTab === 'strikes')   loadStrikes(1)
     if (activeTab === 'profanity') loadProfanity()
+    if (activeTab === 'settings')  loadSettings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   // ── Tab definitions ────────────────────────────────────────────────────────
   const TABS: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'media',     label: 'Medien',       icon: <ImageIcon className="h-4 w-4" /> },
-    { key: 'users',     label: 'Nutzer',        icon: <Users className="h-4 w-4" /> },
-    { key: 'reports',   label: 'Meldungen',     icon: <FileText className="h-4 w-4" /> },
-    { key: 'strikes',   label: 'Strikes',       icon: <Zap className="h-4 w-4" /> },
-    { key: 'profanity', label: 'Schimpfwörter', icon: <BookOpen className="h-4 w-4" /> },
+    { key: 'media',     label: 'Medien',        icon: <ImageIcon className="h-4 w-4" /> },
+    { key: 'users',     label: 'Nutzer',         icon: <Users className="h-4 w-4" /> },
+    { key: 'reports',   label: 'Meldungen',      icon: <FileText className="h-4 w-4" /> },
+    { key: 'strikes',   label: 'Strikes',        icon: <Zap className="h-4 w-4" /> },
+    { key: 'profanity', label: 'Schimpfwörter',  icon: <BookOpen className="h-4 w-4" /> },
+    { key: 'settings',  label: 'Einstellungen',  icon: <Settings className="h-4 w-4" /> },
   ]
 
   const inputCls = 'w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]'
@@ -734,7 +785,12 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-3">
                             {u.is_banned ? (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-error-container text-error">Gesperrt</span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-error-container text-error">Gesperrt</span>
+                                {u.ban_reason?.startsWith('Automatische Sperre') && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-error-container/50 text-error">Auto-Suspend</span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant">Aktiv</span>
                             )}
@@ -826,6 +882,10 @@ export default function AdminPage() {
                             }`}>
                               {r.status}
                             </span>
+                            {usersBanMap[r.reported_user_id]?.is_banned &&
+                              usersBanMap[r.reported_user_id]?.ban_reason?.startsWith('Automatische Sperre') && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-error-container/50 text-error">Auto-Suspend</span>
+                            )}
                             <button
                               onClick={() => setBanModal({ userId: r.reported_user_id, nickname: r.reported_nickname ?? r.reported_user_id.slice(0, 8), reportId: r.id })}
                               className="text-xs px-2 py-1 rounded-full border border-error/40 text-error hover:bg-error-container transition-colors flex items-center gap-1"
@@ -998,6 +1058,53 @@ export default function AdminPage() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Einstellungen ────────────────────────────────────────────── */}
+        {activeTab === 'settings' && (
+          <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
+
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+              System-Einstellungen
+            </p>
+
+            {settingsLoading ? (
+              <div className="flex justify-center py-8"><Spinner size={6} /></div>
+            ) : (
+              <div className="space-y-3">
+
+                {/* Auto-Suspend threshold */}
+                <div className="rounded-xl border border-outline-variant bg-surface-container-high p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-on-surface">Auto-Suspend Schwellenwert</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      Anzahl unabhängiger offener Meldungen bis zur automatischen Sperre
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={autoSuspendThreshold}
+                      onChange={(e) => setAutoSuspendThreshold(e.target.value)}
+                      className="w-24 px-3 py-2 rounded-xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[40px]"
+                      aria-label="Auto-Suspend Schwellenwert"
+                    />
+                    <button
+                      onClick={saveAutoSuspendThreshold}
+                      disabled={settingsSaving || !autoSuspendThreshold || Number(autoSuspendThreshold) < 1 || Number(autoSuspendThreshold) > 100}
+                      className={btnPrimary}
+                    >
+                      {settingsSaving && <Spinner size={4} />}
+                      Speichern
+                    </button>
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
