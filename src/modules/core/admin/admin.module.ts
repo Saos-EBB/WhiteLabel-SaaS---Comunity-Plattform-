@@ -14,6 +14,7 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { PseudonymizationTask } from './tasks/pseudonymization.task';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ModerationModule } from '../moderation/moderation.module';
+import { MailModule } from '../../../common/mail/mail.module';
 
 @Module({
     imports: [
@@ -28,6 +29,7 @@ import { ModerationModule } from '../moderation/moderation.module';
         }),
         NotificationsModule,
         ModerationModule,
+        MailModule,
     ],
     controllers: [AdminController],
     providers: [AdminService, JwtGuard, RolesGuard, PseudonymizationTask],

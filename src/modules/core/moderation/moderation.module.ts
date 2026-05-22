@@ -13,6 +13,7 @@ import { User } from '../auth/entities/user.entity';
 import { MediaUpload } from '../media/entities/media-upload.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { MailModule } from '../../../common/mail/mail.module';
 
 @Module({
     imports: [
@@ -26,6 +27,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
             inject: [ConfigService],
         }),
         NotificationsModule,
+        MailModule,
     ],
     controllers: [ModerationController],
     providers: [ModerationService, ProfanityService, JwtGuard, RolesGuard],

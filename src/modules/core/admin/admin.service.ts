@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,9 +12,12 @@ import { Report } from '../moderation/entities/report.entity';
 import { Strike } from '../moderation/entities/strike.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MailService } from '../../../common/mail/mail.service';
+import { decryptEmail } from '../../../common/crypto/crypto.helper';
 import { ProfanityService } from '../moderation/profanity.service';
 import { StrikeType } from '../moderation/dto/create-strike.dto';
-import { BanUserDto } from './dto/ban-user.dto';
+import { BanUserDto, BanDuration } from './dto/ban-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { AdminCreateStrikeDto } from './dto/admin-create-strike.dto';
@@ -22,6 +26,8 @@ import { SetVulnerableFlagDto } from './dto/set-vulnerable-flag.dto';
 
 @Injectable()
 export class AdminService {
+    private readonly logger = new Logger(AdminService.name);
+
     constructor(
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
@@ -35,8 +41,19 @@ export class AdminService {
         private readonly profileRepo: Repository<Profile>,
         private readonly dataSource: DataSource,
         private readonly notificationsService: NotificationsService,
+        private readonly mailService: MailService,
+        private readonly eventEmitter: EventEmitter2,
         private readonly profanityService: ProfanityService,
     ) {}
+
+    private calcBanExpiry(duration: BanDuration): Date | null {
+        const ms: Record<Exclude<BanDuration, 'permanent'>, number> = {
+            '24h': 1 * 24 * 60 * 60 * 1000,
+            '7d':  7 * 24 * 60 * 60 * 1000,
+            '30d': 30 * 24 * 60 * 60 * 1000,
+        };
+        return duration === 'permanent' ? null : new Date(Date.now() + ms[duration]);
+    }
 
     // ── Existing ───────────────────────────────────────────────────────────────
 
@@ -266,22 +283,49 @@ export class AdminService {
         return { data: rows, total: parseInt(total, 10), page, limit };
     }
 
-    async banUser(adminId: string, userId: string, dto: BanUserDto): Promise<void> {
+    async banUser(adminId: string, userId: string, dto: BanUserDto): Promise<{ success: true; ban_expires_at: Date | null; type: 'temp' | 'permanent' }> {
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('Benutzer nicht gefunden');
+        if (user.is_banned) throw new BadRequestException('Benutzer ist bereits gesperrt');
+
+        const ban_expires_at = this.calcBanExpiry(dto.duration);
+        const type: 'temp' | 'permanent' = dto.duration === 'permanent' ? 'permanent' : 'temp';
 
         user.is_banned      = true;
         user.ban_reason     = dto.reason;
-        user.ban_expires_at = dto.expires_at ?? null;
+        user.ban_expires_at = ban_expires_at;
         await this.userRepo.save(user);
+
+        const strike = this.strikeRepo.create({
+            user_id:    userId,
+            report_id:  dto.report_id ?? null,
+            issued_by:  adminId,
+            type:       type === 'permanent' ? StrikeType.PERMANENT : StrikeType.TEMP,
+            reason:     dto.reason,
+            expires_at: ban_expires_at,
+        });
+        await this.strikeRepo.save(strike);
 
         await this.notificationsService.createNotification(
             userId,
             'ban',
-            dto.expires_at
-                ? `Dein Konto wurde gesperrt bis ${dto.expires_at.toISOString()}: ${dto.reason}`
+            ban_expires_at
+                ? `Dein Konto wurde gesperrt bis ${ban_expires_at.toISOString()}: ${dto.reason}`
                 : `Dein Konto wurde dauerhaft gesperrt: ${dto.reason}`,
         );
+
+        const email = decryptEmail(user.email as Buffer | null);
+        if (email) {
+            try {
+                await this.mailService.sendBanEmail(email, dto.reason, ban_expires_at);
+            } catch (err) {
+                this.logger.error(`Ban-E-Mail an ${userId} fehlgeschlagen`, err);
+            }
+        }
+
+        this.eventEmitter.emit('user.banned', { userId });
+
+        return { success: true, ban_expires_at, type };
     }
 
     async unbanUser(userId: string): Promise<void> {
@@ -293,6 +337,8 @@ export class AdminService {
         user.ban_reason     = null;
         user.ban_expires_at = null;
         await this.userRepo.save(user);
+
+        this.eventEmitter.emit('user.unbanned', { userId });
     }
 
     async setUserRole(userId: string, dto: UpdateUserRoleDto): Promise<Partial<User>> {

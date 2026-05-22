@@ -89,6 +89,16 @@ for (const conv of conversations) {
         });
     }
 
+    @OnEvent('user.banned')
+    handleUserBanned(payload: { userId: string }) {
+        this.emitToUser(payload.userId, 'user.banned', {});
+    }
+
+    @OnEvent('user.unbanned')
+    handleUserUnbanned(payload: { userId: string }) {
+        this.emitToUser(payload.userId, 'user.unbanned', {});
+    }
+
     @SubscribeMessage('join_conversation')
     async handleJoinConversation(
         @ConnectedSocket() client: Socket,

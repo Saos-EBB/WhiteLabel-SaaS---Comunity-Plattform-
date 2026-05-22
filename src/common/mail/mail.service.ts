@@ -38,4 +38,33 @@ export class MailService {
       `,
         });
     }
+
+    async sendBanEmail(to: string, reason: string, expiresAt: Date | null) {
+        const durationText = expiresAt
+            ? `bis ${expiresAt.toLocaleDateString('de-DE')}`
+            : 'dauerhaft';
+
+        await this.resend.emails.send({
+            from: 'onboarding@resend.dev',
+            to,
+            subject: 'Dein Account wurde gesperrt',
+            html: `
+        <h2>Dein Account wurde gesperrt</h2>
+        <p><strong>Grund:</strong> ${reason}</p>
+        <p><strong>Dauer:</strong> ${durationText}</p>
+      `,
+        });
+    }
+
+    async sendAutoSuspendEmail(to: string) {
+        await this.resend.emails.send({
+            from: 'onboarding@resend.dev',
+            to,
+            subject: 'Dein Account wurde vorübergehend gesperrt',
+            html: `
+        <h2>Dein Account wurde vorübergehend gesperrt</h2>
+        <p>Dein Profil wurde aufgrund mehrerer Meldungen automatisch gesperrt. Ein Admin wird den Fall prüfen.</p>
+      `,
+        });
+    }
 }

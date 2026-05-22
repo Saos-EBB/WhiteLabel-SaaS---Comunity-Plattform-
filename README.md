@@ -104,7 +104,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
-| GET | `/profile/me` | JWT | Get own profile. Returns `photo_url`, `photo_needs_review`, `audio_url`, `audio_moderation_status`, all six `show_*` visibility flags (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`), and `subscription: { plan, status, current_period_end } \| null` (active subscription row, or `null`). |
+| GET | `/profile/me` | JWT | Get own profile. Returns `photo_url`, `photo_needs_review`, `audio_url`, `audio_moderation_status`, all six `show_*` visibility flags (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`), `subscription: { plan, status, current_period_end } \| null` (active subscription row, or `null`), and `is_banned: boolean` (sourced from `users` table — source of truth for the frontend ban screen). |
 | PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, birthdate, gender, looking_for, `is_published`, `status_visible`, `status_message`, `profanity_filter`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`). Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
@@ -230,8 +230,8 @@ All admin routes require JWT with `role: admin`.
 | Method | Path | Description |
 |---|---|---|
 | GET | `/admin/users` | Paginated user list. Query: `role`, `is_banned`, `search` (nickname), `page`, `limit`. Returns `{ data, total, page, limit }`. |
-| PATCH | `/admin/users/:id/ban` | Ban a user. Body: `{ reason: string, expires_at?: ISO date }`. |
-| PATCH | `/admin/users/:id/unban` | Lift a ban. |
+| PATCH | `/admin/users/:id/ban` | Ban a user. Body: `{ duration: '24h' \| '7d' \| '30d' \| 'permanent', reason: string, report_id?: UUID }`. Auto-calculates `ban_expires_at` from `duration`. Auto-creates a strike record. Sends ban email via `MailService`. Emits `user.banned` via EventEmitter → ChatGateway pushes `user.banned` socket event to the target user. Returns `{ success: true, ban_expires_at, type }`. |
+| PATCH | `/admin/users/:id/unban` | Lift a ban. Emits `user.unbanned` via EventEmitter → ChatGateway pushes `user.unbanned` socket event to the target user. |
 | PATCH | `/admin/users/:id/role` | Change role. Body: `{ role: 'user' \| 'admin' \| 'org' }`. |
 | PATCH | `/admin/users/:id/vulnerable-flag` | Set or unset `vulnerable_flag`. Body: `{ vulnerable_flag: boolean }`. |
 | GET | `/admin/users/:id/export` | DSGVO data export for a user. Returns all rows across profiles, interests, sensitive data, consent logs, notifications, reports, strikes, blocks, contact requests, media uploads, and vulnerable flag audit. |
@@ -287,12 +287,25 @@ The XXX frontend (`xxx-frontend`) runs on port 3001.
 | Server → Client | `new_message` | `Message` | New message delivered to conversation participants. |
 | Server → Client | `user_typing` | `{ userId, conversationId }` | Typing indicator forwarded to other participant. |
 | Server → Client | `messages_read` | `{ conversationId, userId }` | Notifies that messages have been read. |
+| Server → Client | `user.banned` | `{}` | Pushed to the banned user's personal room when an admin bans them or the auto-suspend threshold is reached. Frontend shows the ban screen. |
+| Server → Client | `user.unbanned` | `{}` | Pushed to the user's personal room when an admin lifts a ban. Frontend hides the ban screen. |
 
 ---
 
 ## Changelog
 
 ### 2026-05-22 (latest)
+- Admin: `PATCH /admin/users/:id/ban` reworked — body now `{ duration: '24h'|'7d'|'30d'|'permanent', reason, report_id? }`; `ban_expires_at` calculated server-side; auto-creates a `strikes` row; sends ban email; emits `user.banned` via EventEmitter; returns `{ success, ban_expires_at, type }`.
+- Admin: `PATCH /admin/users/:id/unban` now emits `user.unbanned` via EventEmitter.
+- Real-time: `ChatGateway` handles `user.banned` / `user.unbanned` EventEmitter events and pushes them to the user's personal socket room.
+- Moderation: auto-suspend (`POST /moderation/reports`, threshold ≥ 10) refactored into `checkAutoSuspend()`; now emits `user.banned`, creates a strike with `issued_by = SYSTEM_USER_ID`, and sends an auto-suspend email.
+- Mail: new `MailService.sendBanEmail(to, reason, expiresAt)` and `sendAutoSuspendEmail(to)` methods; `MailModule` imported into `AdminModule` and `ModerationModule`.
+- Profile: `GET /profile/me` now returns `is_banned: boolean` (fetched from `users` table) — frontend uses this as the source of truth for the ban screen on startup.
+- Chat: `acceptContactRequest` now detects an existing soft-deleted conversation and restores it (`deleted_at_a/b`, `purged_at` → `null`) instead of creating a duplicate.
+- DB: migration `014_strikes_report_id_nullable.sql` — makes `strikes.report_id` nullable (auto-strikes and admin bans may not have an originating report).
+- Common: new `src/common/crypto/crypto.helper.ts` — `decryptEmail(buf)` helper (AES-256-CBC decrypt, returns `null` on failure).
+
+### 2026-05-22
 - Chat: new `DELETE /chat/connections/:userId` — disconnect from a connected user; sets `deleted_at_a`, `deleted_at_b`, and `purged_at` on the conversation, reverts the accepted contact request to `declined`. Both sides lose access to the chat history.
 - Chat: `GET /chat/conversations/:id` now returns `is_blocked: boolean` and `blocked_by: 'me' | 'them' | null` (checked against the `blocks` table for both directions).
 - Chat: `ContactRequestStatus` enum gains `CANCELLED` value.

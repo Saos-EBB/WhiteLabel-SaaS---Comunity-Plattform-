@@ -73,7 +73,7 @@ export class ProfileService {
         return profile;
     }
 
-    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean; audio_url: string | null; audio_moderation_status: string | null; subscription: { plan: string; status: string; current_period_end: string | null } | null }> {
+    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean; audio_url: string | null; audio_moderation_status: string | null; subscription: { plan: string; status: string; current_period_end: string | null } | null; is_banned: boolean }> {
         const profile = await this.getOwnProfile(userId);
 
         let photo_url: string | null = null;
@@ -108,7 +108,13 @@ export class ProfileService {
             ? { plan: subRows[0].plan, status: subRows[0].status, current_period_end: subRows[0].expires_at ? new Date(subRows[0].expires_at).toISOString() : null }
             : null;
 
-        return { ...profile, photo_url, photo_needs_review, audio_url, audio_moderation_status, subscription };
+        const userRows = await this.profileRepo.manager.query<{ is_banned: boolean }[]>(
+            'SELECT is_banned FROM users WHERE id = $1',
+            [userId],
+        );
+        const is_banned = userRows[0]?.is_banned ?? false;
+
+        return { ...profile, photo_url, photo_needs_review, audio_url, audio_moderation_status, subscription, is_banned };
     }
 
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {

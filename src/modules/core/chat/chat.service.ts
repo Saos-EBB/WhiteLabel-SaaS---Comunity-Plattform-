@@ -91,13 +91,30 @@ export class ChatService {
         request.status = ContactRequestStatus.ACCEPTED;
         await this.contactRequestRepository.save(request);
 
-        const conversation = this.conversationRepository.create({
-            user_a_id: request.sender_id,
-            user_b_id: request.receiver_id,
-            contact_request_id: request.id,
-        });
+        const existingConversation = await this.conversationRepository
+            .createQueryBuilder('c')
+            .where(
+                '(c.user_a_id = :a AND c.user_b_id = :b) OR (c.user_a_id = :b AND c.user_b_id = :a)',
+                { a: request.sender_id, b: request.receiver_id },
+            )
+            .getOne();
 
-        const savedConversation = await this.conversationRepository.save(conversation);
+        let savedConversation: Conversation;
+
+        if (existingConversation) {
+            existingConversation.deleted_at_a = null;
+            existingConversation.deleted_at_b = null;
+            existingConversation.purged_at = null;
+            existingConversation.contact_request_id = request.id;
+            savedConversation = await this.conversationRepository.save(existingConversation);
+        } else {
+            const conversation = this.conversationRepository.create({
+                user_a_id: request.sender_id,
+                user_b_id: request.receiver_id,
+                contact_request_id: request.id,
+            });
+            savedConversation = await this.conversationRepository.save(conversation);
+        }
 
         const acceptorProfile = await this.profileRepository.findOne({
             where: { user_id: userId },
