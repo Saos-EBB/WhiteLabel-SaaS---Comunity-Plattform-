@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   AlertCircle, Ban, BookOpen, Check, CheckCircle2,
   ChevronLeft, ChevronRight, FileText, Image as ImageIcon,
-  Loader2, Music, Plus, Settings, Shield, Trash2, Users, X, Zap,
+  Inbox, Loader2, Music, Plus, Settings, Shield, Trash2, Users, X, Zap,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
@@ -13,7 +13,7 @@ import BanModal from '@/components/ui/BanModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AdminTab = 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings'
+type AdminTab = 'tickets' | 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings'
 
 interface PendingMedia {
   id: string
@@ -197,7 +197,7 @@ export default function AdminPage() {
   const router = useRouter()
   const { accessToken } = useAuthStore()
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('media')
+  const [activeTab, setActiveTab] = useState<AdminTab>('tickets')
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -332,6 +332,25 @@ export default function AdminPage() {
       await loadUsers(userPage)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Fehler', false)
+    }
+  }
+
+  // ── Tickets ────────────────────────────────────────────────────────────────
+  const [tickets, setTickets]           = useState<AdminReport[]>([])
+  const [ticketsLoading, setTicketsLoading] = useState(false)
+
+  async function loadTickets() {
+    setTicketsLoading(true)
+    try {
+      const data = await fetchApi<Paginated<AdminReport>>('/admin/reports?status=open&limit=50&page=1')
+      const sorted = [...data.data].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      )
+      setTickets(sorted)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Fehler beim Laden', false)
+    } finally {
+      setTicketsLoading(false)
     }
   }
 
@@ -528,6 +547,7 @@ export default function AdminPage() {
   // ── Load on tab change ─────────────────────────────────────────────────────
   useEffect(() => {
     if (getJwtRole(accessToken) !== 'admin') return
+    if (activeTab === 'tickets')   loadTickets()
     if (activeTab === 'media')     loadMedia()
     if (activeTab === 'users')     loadUsers(1)
     if (activeTab === 'reports')   loadReports(1)
@@ -539,12 +559,13 @@ export default function AdminPage() {
 
   // ── Tab definitions ────────────────────────────────────────────────────────
   const TABS: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'media',     label: 'Medien',        icon: <ImageIcon className="h-4 w-4" /> },
-    { key: 'users',     label: 'Nutzer',         icon: <Users className="h-4 w-4" /> },
-    { key: 'reports',   label: 'Meldungen',      icon: <FileText className="h-4 w-4" /> },
-    { key: 'strikes',   label: 'Strikes',        icon: <Zap className="h-4 w-4" /> },
-    { key: 'profanity', label: 'Schimpfwörter',  icon: <BookOpen className="h-4 w-4" /> },
-    { key: 'settings',  label: 'Einstellungen',  icon: <Settings className="h-4 w-4" /> },
+    { key: 'tickets',   label: 'Tickets',        icon: <Inbox className="h-4 w-4" /> },
+    { key: 'media',     label: 'Medien',         icon: <ImageIcon className="h-4 w-4" /> },
+    { key: 'users',     label: 'Nutzer',          icon: <Users className="h-4 w-4" /> },
+    { key: 'reports',   label: 'Meldungen',       icon: <FileText className="h-4 w-4" /> },
+    { key: 'strikes',   label: 'Strikes',         icon: <Zap className="h-4 w-4" /> },
+    { key: 'profanity', label: 'Schimpfwörter',   icon: <BookOpen className="h-4 w-4" /> },
+    { key: 'settings',  label: 'Einstellungen',   icon: <Settings className="h-4 w-4" /> },
   ]
 
   const inputCls = 'w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]'
@@ -598,6 +619,54 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
+
+        {/* ── Tab: Tickets ──────────────────────────────────────────────────── */}
+        {activeTab === 'tickets' && (
+          <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-4">
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                Offene Tickets
+              </p>
+              <button onClick={loadTickets} className="text-xs text-on-surface-variant hover:text-on-surface underline">
+                Aktualisieren
+              </button>
+            </div>
+
+            <Divider />
+
+            {ticketsLoading ? (
+              <div className="flex justify-center py-10"><Spinner size={6} /></div>
+            ) : tickets.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-on-surface-variant">
+                <CheckCircle2 className="h-8 w-8" aria-hidden="true" />
+                <p className="text-sm">Keine offenen Tickets</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tickets.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-sm font-medium text-on-surface truncate">
+                        {t.reporter_nickname ?? t.reporter_id.slice(0, 8)}
+                        <span className="text-on-surface-variant font-normal mx-1.5">→</span>
+                        {t.reported_nickname ?? t.reported_user_id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-on-surface-variant">{t.reason}</p>
+                      <p className="text-xs text-on-surface-variant/60">{fmtDate(t.created_at)}</p>
+                    </div>
+                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-error-container text-error">
+                      {t.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Tab: Medien ───────────────────────────────────────────────────── */}
         {activeTab === 'media' && (
