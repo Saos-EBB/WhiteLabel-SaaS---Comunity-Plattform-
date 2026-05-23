@@ -4,7 +4,7 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { FileType, MediaUpload, ModerationStatus } from '../media/entities/media-upload.entity';
@@ -40,6 +40,7 @@ export class AdminService {
         private readonly strikeRepo: Repository<Strike>,
         @InjectRepository(Profile)
         private readonly profileRepo: Repository<Profile>,
+        @InjectDataSource()
         private readonly dataSource: DataSource,
         private readonly notificationsService: NotificationsService,
         private readonly mailService: MailService,
@@ -288,6 +289,7 @@ export class AdminService {
     async banUser(adminId: string, userId: string, dto: BanUserDto): Promise<{ success: true; ban_expires_at: Date | null; type: 'temp' | 'permanent' }> {
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('Benutzer nicht gefunden');
+        if (userId === adminId) throw new BadRequestException('Du kannst deinen eigenen Account nicht sperren.');
         if (user.is_banned) throw new BadRequestException('Benutzer ist bereits gesperrt');
 
         const ban_expires_at = this.calcBanExpiry(dto.duration);
@@ -339,6 +341,17 @@ export class AdminService {
         user.ban_reason     = null;
         user.ban_expires_at = null;
         await this.userRepo.save(user);
+
+        await this.dataSource.query(
+            `UPDATE strikes SET ban_lifted_at = NOW()
+             WHERE id = (
+                 SELECT id FROM strikes
+                 WHERE user_id = $1 AND ban_lifted_at IS NULL AND type != 'warning'
+                 ORDER BY created_at DESC
+                 LIMIT 1
+             )`,
+            [userId],
+        );
 
         this.eventEmitter.emit('user.unbanned', { userId });
     }

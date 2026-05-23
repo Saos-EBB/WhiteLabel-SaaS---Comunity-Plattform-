@@ -121,7 +121,7 @@ export class Profile {
     @Column({ type: 'boolean', nullable: false, default: true })
     show_audio!: boolean;
 
-    @Column({ type: 'enum', enum: StatusMessageOption, nullable: true, default: null })
+    @Column({ type: 'enum', enum: StatusMessageOption, nullable: true, default: StatusMessageOption.AVAILABLE })
     status_message!: StatusMessageOption | null;
 
     @Column({ type: 'timestamptz' })

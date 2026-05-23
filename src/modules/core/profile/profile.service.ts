@@ -24,6 +24,7 @@ import { Block } from './entities/block.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitSensitiveDataDto } from './dto/submit-sensitive-data.dto';
 import { ProfanityService } from '../moderation/profanity.service';
+import { encryptField } from '../../../common/crypto/crypto.helper';
 
 @Injectable()
 export class ProfileService {
@@ -50,16 +51,6 @@ export class ProfileService {
         @InjectDataSource()
         private readonly dataSource: DataSource,
     ) { }
-
-    private encryptField(value: string): Buffer {
-        const rawKey = process.env.APP_ENCRYPTION_KEY;
-        if (!rawKey) throw new Error('APP_ENCRYPTION_KEY is not set');
-        const key = Buffer.from(rawKey, 'hex');
-        const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-        const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-        return Buffer.concat([iv, encrypted]);
-    }
 
     async getOwnProfile(userId: string): Promise<Profile> {
         const profile = await this.profileRepo
@@ -260,7 +251,7 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean; audio_url: string | null }> {
+    async getPublicProfile(nickname: string, viewerId: string | null = null): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean; audio_url: string | null; connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED' | 'BLOCKED'; request_id: string | null; conversation_id: string | null }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -303,6 +294,54 @@ export class ProfileService {
         const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
         const is_online = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
 
+        type ConnRow = { connection_status: string; conversation_id: string | null; request_id: string | null };
+        let connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED' | 'BLOCKED' = 'NONE';
+        let request_id: string | null = null;
+        let conversation_id: string | null = null;
+
+        if (viewerId && viewerId !== profile.user_id) {
+            const rows = await this.profileRepo.manager.query<ConnRow[]>(
+                `SELECT
+                   CASE
+                     WHEN EXISTS (
+                       SELECT 1 FROM blocks b
+                       WHERE b.blocker_id = $1 AND b.blocked_id = $2
+                     ) THEN 'BLOCKED'
+                     WHEN EXISTS (
+                       SELECT 1 FROM conversations c
+                       WHERE ((c.user_a_id = $1 AND c.user_b_id = $2)
+                           OR (c.user_a_id = $2 AND c.user_b_id = $1))
+                         AND c.purged_at IS NULL
+                     ) THEN 'CONNECTED'
+                     WHEN EXISTS (
+                       SELECT 1 FROM contact_requests cr
+                       WHERE cr.sender_id = $1 AND cr.receiver_id = $2 AND cr.status = 'pending'
+                     ) THEN 'SENT'
+                     WHEN EXISTS (
+                       SELECT 1 FROM contact_requests cr
+                       WHERE cr.sender_id = $2 AND cr.receiver_id = $1 AND cr.status = 'pending'
+                     ) THEN 'RECEIVED'
+                     ELSE 'NONE'
+                   END AS connection_status,
+                   (
+                     SELECT c.id FROM conversations c
+                     WHERE ((c.user_a_id = $1 AND c.user_b_id = $2)
+                         OR (c.user_a_id = $2 AND c.user_b_id = $1))
+                       AND c.purged_at IS NULL
+                     LIMIT 1
+                   ) AS conversation_id,
+                   (
+                     SELECT cr.id FROM contact_requests cr
+                     WHERE cr.sender_id = $2 AND cr.receiver_id = $1 AND cr.status = 'pending'
+                     LIMIT 1
+                   ) AS request_id`,
+                [viewerId, profile.user_id],
+            );
+            connection_status = (rows[0]?.connection_status ?? 'NONE') as typeof connection_status;
+            request_id = rows[0]?.request_id ?? null;
+            conversation_id = rows[0]?.conversation_id ?? null;
+        }
+
         return {
             ...profile,
             bio:        profile.show_bio      ? profile.bio        : null,
@@ -314,6 +353,9 @@ export class ProfileService {
             is_online,
             photo_needs_review,
             audio_url,
+            connection_status,
+            request_id,
+            conversation_id,
         };
     }
 
@@ -607,7 +649,7 @@ export class ProfileService {
             throw new ForbiddenException('Ungültige oder fehlende Einwilligung');
         }
 
-        const encryptedType = this.encryptField(dto.disability_type);
+        const encryptedType = encryptField(dto.disability_type);
         const now = new Date();
 
         // profile_sensitive_data has FORCE ROW LEVEL SECURITY.
@@ -719,7 +761,7 @@ export class ProfileService {
         fs.mkdirSync(uploadDir, { recursive: true });
         fs.writeFileSync(path.join(uploadDir, filename), file.buffer);
 
-        const fileUrl = `http://localhost:3000/uploads/audio/${filename}`;
+        const fileUrl = `${process.env.BACKEND_URL ?? 'http://localhost:3000'}/uploads/audio/${filename}`;
 
         const profile = await this.getOwnProfile(userId);
         if (profile.audio_id) {

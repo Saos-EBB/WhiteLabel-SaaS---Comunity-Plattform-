@@ -18,6 +18,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
+import { OptionalJwtGuard } from '../../../common/guards/optional-jwt.guard';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SearchProfileDto } from './dto/search-profile.dto';
@@ -162,8 +163,9 @@ export class ProfileController {
     }
 
     @Get(':nickname')
-    getPublicProfile(@Param('nickname') nickname: string) {
-        return this.profileService.getPublicProfile(nickname);
+    @UseGuards(OptionalJwtGuard)
+    getPublicProfile(@Request() req: any, @Param('nickname') nickname: string) {
+        return this.profileService.getPublicProfile(nickname, req.user?.sub ?? null);
     }
 
 }

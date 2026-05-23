@@ -13,6 +13,7 @@ import { Profile } from '../profile/entities/profile.entity';
 import { AgbVersion } from '../profile/entities/agb-version.entity';
 import { ConsentLog } from '../profile/entities/consent-log.entity';
 import { MailService } from '../../../common/mail/mail.service';
+import { encryptField, decryptField } from '../../../common/crypto/crypto.helper';
 
 @Injectable()
 export class AuthService {
@@ -52,26 +53,6 @@ export class AuthService {
         return crypto.createHash('sha256').update(token).digest('hex');
     }
 
-    private encryptEmail(email: string): Buffer {
-        const rawKey = process.env.APP_ENCRYPTION_KEY;
-        if (!rawKey) throw new Error('APP_ENCRYPTION_KEY is not set');
-        const key = Buffer.from(rawKey, 'hex');
-        const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-        const encrypted = Buffer.concat([cipher.update(email, 'utf8'), cipher.final()]);
-        return Buffer.concat([iv, encrypted]);
-    }
-
-    private decryptEmail(data: Buffer): string {
-        const rawKey = process.env.APP_ENCRYPTION_KEY;
-        if (!rawKey) throw new Error('APP_ENCRYPTION_KEY is not set');
-        const key = Buffer.from(rawKey, 'hex');
-        const iv = data.subarray(0, 16);
-        const encrypted = data.subarray(16);
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-        return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-    }
-
     private generateRefreshToken(): string {
         return crypto.randomBytes(64).toString('hex');
     }
@@ -89,7 +70,7 @@ export class AuthService {
         const user = this.userRepository.create({
             email_search_hash: emailHash,
             password_hash: passwordHash,
-            email: this.encryptEmail(dto.email),
+            email: encryptField(dto.email),
         });
 
         await this.userRepository.save(user);
@@ -164,6 +145,8 @@ export class AuthService {
         user.last_login = new Date();
         await this.userRepository.save(user);
 
+        await this.profileRepository.update({ user_id: user.id }, { last_active_at: new Date() });
+
         await this.refreshTokenRepository.save(refreshToken);
 
         const currentVersions = await this.agbVersionRepository.find({ where: { is_current: true } });
@@ -220,7 +203,7 @@ export class AuthService {
     async sendVerificationEmail(userId: string) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
         if (!user?.email) throw new NotFoundException('User nicht gefunden');
-        const email = this.decryptEmail(user.email);
+        const email = decryptField(user.email as Buffer)!;
 
         const token = crypto.randomBytes(32).toString('hex');
         const tokenHash = this.hashToken(token);
@@ -272,20 +255,12 @@ export class AuthService {
             password_reset_expires_at: new Date(Date.now() + 60 * 60 * 1000),
         });
 
-        const contactEmail = this.decryptEmail(user.email!);
+        const contactEmail = decryptField(user.email as Buffer)!;
         try {
             await this.mailService.sendPasswordResetEmail(contactEmail, token);
         } catch {
         }
         return { message: 'Falls die Email existiert, wurde eine Mail gesendet' };
-    }
-
-    // @dev-only — must never exist in production
-    async devDeleteUser(email: string) {
-        const emailHash = this.hashEmail(email);
-        const user = await this.userRepository.findOne({ where: { email_search_hash: emailHash } });
-        if (user) await this.userRepository.remove(user);
-        return { message: 'User deleted' };
     }
 
     async resetPassword(token: string, newPassword: string) {

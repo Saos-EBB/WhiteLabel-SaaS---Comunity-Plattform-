@@ -2,8 +2,8 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
-import { createDecipheriv } from 'crypto';
 import PDFDocument from 'pdfkit';
+import { decryptField } from '../../../common/crypto/crypto.helper';
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const M = 50;
@@ -16,19 +16,6 @@ export class GdprService {
         @InjectDataSource()
         private readonly dataSource: DataSource,
     ) {}
-
-    private decrypt(buf: Buffer | null): string {
-        if (!buf) return '—';
-        try {
-            const key = Buffer.from(process.env.APP_ENCRYPTION_KEY ?? '', 'hex');
-            const iv = buf.subarray(0, 16);
-            const encrypted = buf.subarray(16);
-            const decipher = createDecipheriv('aes-256-cbc', key, iv);
-            return String(decipher.update(encrypted).toString('utf8') + decipher.final().toString('utf8'));
-        } catch {
-            return '[Entschlüsselung fehlgeschlagen]';
-        }
-    }
 
     async generateExport(userId: string): Promise<Buffer> {
         const [rateRow] = await this.dataSource.query<{ last_gdpr_export_at: Date | null }[]>(
@@ -240,7 +227,7 @@ export class GdprService {
             // 1. Account
             section('1. Kontodaten');
             const u = userRows[0] ?? {};
-            kv('E-Mail', this.decrypt(u.email));
+            kv('E-Mail', decryptField(u.email) ?? '—');
             kv('Rolle', u.role);
             kv('E-Mail bestätigt', bool(u.is_verified));
             kv('Konto gesperrt', bool(u.is_banned));
@@ -272,7 +259,7 @@ export class GdprService {
             if (sensitiveRows.length > 0) {
                 section('3. Sensitive Daten');
                 const sd = sensitiveRows[0];
-                kv('Behinderungstyp', this.decrypt(sd.disability_type));
+                kv('Behinderungstyp', decryptField(sd.disability_type) ?? '—');
                 kv('Sichtbar', bool(sd.disability_visible));
                 kv('Gespeichert am', fmt(sd.collected_at));
                 kv('Aktualisiert am', fmt(sd.updated_at));

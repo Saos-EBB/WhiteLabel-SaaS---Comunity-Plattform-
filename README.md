@@ -140,7 +140,6 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | GET | `/auth/agb-versions` | — | List all current AGB/privacy policy versions. Used by frontend to display consent. |
 | POST | `/auth/consent` | JWT | Bulk upsert consent logs. Body: `{ consents: [{ agb_version_id, accepted }] }`. |
 | DELETE | `/auth/account` | JWT | Soft-delete own account (DSGVO Art. 17). Sets `deleted_at`. Clears `refreshToken` cookie. Idempotent — returns 400 if already deleted. |
-| DELETE | `/auth/dev/delete-user` | JWT (admin) | **Dev only — remove before production.** Hard-delete user by email. |
 
 ---
 
@@ -375,6 +374,7 @@ Copy `.env.example` to `.env` and fill in all values.
 | `APP_ENCRYPTION_KEY` | 32-byte hex key for AES-256-CBC (email, sensitive data) |
 | `EMAIL_SALT` | Salt for email search hash (SHA-256) |
 | `APP_URL` | Base URL used in verification email links |
+| `BACKEND_URL` | Base URL for file URLs stored in media records (default `http://localhost:3000`) |
 | `CORS_ORIGIN` | Allowed CORS origin (e.g. `http://localhost:3001`) — **required** |
 | `RESEND_API_KEY` | Resend API key for transactional email |
 | `STRIPE_SECRET_KEY` | Stripe secret API key |
@@ -407,6 +407,13 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-23 (latest)
+- Security: removed `DELETE /auth/dev/delete-user` endpoint and `devDeleteUser()` service method — no longer present in any environment
+- Crypto: `src/common/crypto/crypto.helper.ts` — added `encryptField(value)` and `decryptField(buf)` shared helpers; removed duplicated AES-256-CBC encrypt/decrypt from `AuthService`, `GdprService`, and `ProfileService`; `APP_ENCRYPTION_KEY` now throws immediately on missing key instead of silently using an empty key
+- Media / Profile: hardcoded `http://localhost:3000` URLs in profile photo and audio upload paths replaced with `process.env.BACKEND_URL ?? 'http://localhost:3000'`; `BACKEND_URL` added to `.env.example`
+- Admin: `@InjectDataSource()` decorator was missing on `DataSource` in `AdminService` constructor — added
+- Cleanup: deleted `src/app.controller.spec.ts` scaffold leftover
+
+### 2026-05-23
 - Admin: new `GET /admin/settings` and `PUT /admin/settings/:key` endpoints — read and write key/value pairs from the `system_settings` table
 - `SystemSettingsService`: in-memory cache (60 s TTL) for settings reads; cache invalidated on write
 

@@ -14,6 +14,7 @@ import { MediaUpload } from '../media/entities/media-upload.entity';
 import { ProfileService } from './profile.service';
 import { ProfileController } from './profile.controller';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
+import { OptionalJwtGuard } from '../../../common/guards/optional-jwt.guard';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
@@ -30,6 +31,6 @@ import { ModerationModule } from '../moderation/moderation.module';
         }),
     ],
     controllers: [ProfileController],
-    providers: [ProfileService, JwtGuard],
+    providers: [ProfileService, JwtGuard, OptionalJwtGuard],
 })
 export class ProfileModule {}

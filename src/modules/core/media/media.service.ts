@@ -66,7 +66,7 @@ export class MediaService {
                 .toFile(filepath);
 
             const fileSizeKb = Math.ceil(fs.statSync(filepath).size / 1024);
-            const fileUrl = `http://localhost:3000/uploads/profiles/${filename}`;
+            const fileUrl = `${process.env.BACKEND_URL ?? 'http://localhost:3000'}/uploads/profiles/${filename}`;
 
             const media = this.mediaRepository.create({
                 uploaded_by: userId,
