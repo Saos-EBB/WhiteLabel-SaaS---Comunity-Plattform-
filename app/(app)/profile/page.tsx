@@ -554,6 +554,12 @@ export default function ProfilePage() {
             aria-hidden="true"
           />
 
+          {editMode && (
+            <p className="text-xs text-on-surface-variant text-center -mt-2 mb-2">
+              Dein Foto wird mit deiner Profil-ID markiert zum Schutz vor Missbrauch.
+            </p>
+          )}
+
           {/* ── Gender + looking_for (edit mode) ──────────────────────────── */}
           {editMode && (
             <div className="w-full space-y-3 mb-5">

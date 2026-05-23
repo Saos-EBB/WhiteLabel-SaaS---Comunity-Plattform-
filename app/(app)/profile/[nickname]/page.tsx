@@ -31,6 +31,7 @@ interface PublicProfile {
   connection_status?: ConnectionStatus
   request_id?: string | null
   conversation_id?: string | null
+  public_id?: string | null
 }
 
 const GENDER_LABELS: Record<string, string> = {
@@ -212,6 +213,9 @@ export default function PublicProfilePage() {
               <h1 className="text-2xl font-bold text-white leading-tight">{profile.nickname}</h1>
               {profile.birthdate && (
                 <p className="text-sm text-white/70 mt-0.5">{calcAge(profile.birthdate)} Jahre</p>
+              )}
+              {profile.public_id && (
+                <p className="text-xs text-white/50 mt-0.5 font-mono">#ID-{profile.public_id}</p>
               )}
             </div>
 
