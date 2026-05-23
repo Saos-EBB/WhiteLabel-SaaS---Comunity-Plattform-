@@ -38,6 +38,8 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 | `MediaModule` | `src/modules/core/media` | Profile photo upload, resize, WebP conversion |
 | `PaymentModule` | `src/modules/core/payment` | Stripe subscriptions, webhooks, payment history |
 | `SystemSettingsModule` | `src/modules/core/system-settings` | Admin-editable key/value settings with in-memory cache |
+| `SetupModule` | `src/modules/core/setup` | One-time owner account bootstrap; setup-status check |
+| `SupportModule` | `src/modules/core/support` | Anonymous contact-support tickets (public endpoint) |
 | `CommonModule` | `src/common` | `PremiumGuard`, `@RequiresPremium()`, `HttpExceptionFilter`, RLS helpers |
 
 ---
@@ -91,12 +93,19 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 - Profanity detections logged to `profanity_flags`
 
 ### System Settings
-- `system_settings` table — admin-editable key/value pairs
+- `system_settings` table — owner-editable key/value pairs
 - `SystemSettingsService.getNumber(key, fallback)` with 60 s in-memory cache
-- Admin endpoints: `GET /admin/settings`, `PUT /admin/settings/:key`
+- Owner-only endpoints: `GET /admin/settings`, `PATCH /admin/settings/:key`
+
+### Owner Role
+- `role` column on `users`: `user | admin | org | owner`
+- `owner` is a super-admin role — exactly one owner can exist at any time (partial unique index enforces this, migration `019_owner_role.sql`)
+- `OwnerGuard` (`src/common/guards/owner.guard.ts`) — restricts endpoints to `owner` role only
+- `RolesGuard` updated: `owner` inherits all `admin` permissions (no separate decoration needed)
+- Owner-only admin endpoints: `POST /admin/users/create`, `PATCH /admin/users/:id/role`, `GET /admin/admins`, `GET /admin/settings`, `PATCH /admin/settings/:key`
 
 ### Multi-tenant / Licensing
-- `role` column on `users`: `user | admin | org`
+- `role` column on `users`: `user | admin | org | owner`
 - `managed_accounts` table present; `org` role reserved for licensed operators
 - `caretaker_access` RLS policy placeholder on `profile_sensitive_data`
 
@@ -130,7 +139,7 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/register` | — | Register with email + password. Creates profile, sends verification email. |
-| POST | `/auth/login` | — | Login. Returns `{ accessToken, needsConsent }`. Sets `refreshToken` HttpOnly cookie (30 days). Blocked if `is_banned`. Reactivates soft-deleted accounts within 30 days. |
+| POST | `/auth/login` | — | Login. Body: `{ identifier, password }` where `identifier` is email or nickname. Returns `{ accessToken, needsConsent }`. Sets `refreshToken` HttpOnly cookie (30 days). Blocked if `is_banned`. Reactivates soft-deleted accounts within 30 days. |
 | POST | `/auth/refresh` | — (cookie) | Rotate refresh token using `refreshToken` cookie. Old token is revoked. Returns `{ accessToken }` + new cookie. |
 | POST | `/auth/logout` | — (cookie) | Revoke refresh token from cookie and clear cookie. |
 | GET | `/auth/me` | JWT | Returns current JWT payload (`sub`, `role`). |
@@ -140,6 +149,8 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | GET | `/auth/agb-versions` | — | List all current AGB/privacy policy versions. Used by frontend to display consent. |
 | POST | `/auth/consent` | JWT | Bulk upsert consent logs. Body: `{ consents: [{ agb_version_id, accepted }] }`. |
 | DELETE | `/auth/account` | JWT | Soft-delete own account (DSGVO Art. 17). Sets `deleted_at`. Clears `refreshToken` cookie. Idempotent — returns 400 if already deleted. |
+| PATCH | `/auth/change-password` | JWT | Change own password. Body: `{ current_password, new_password }`. Verifies current password before updating. |
+| PATCH | `/auth/change-email` | JWT | Change own email address. Body: `{ current_password, new_email }`. Verifies current password; updates encrypted email + search hash. |
 
 ---
 
@@ -281,12 +292,15 @@ All admin routes require JWT with `role: admin`.
 
 | Method | Path | Description |
 |---|---|---|
+| POST | `/admin/users/create` | **Owner only.** Create a new admin account. Body: `{ email, password, nickname }`. Returns `{ id, nickname, public_id }`. |
 | GET | `/admin/users` | Paginated user list. Query: `role`, `is_banned`, `search` (nickname), `page`, `limit`. Returns `{ data, total, page, limit }`. |
 | PATCH | `/admin/users/:id/ban` | Ban a user. Body: `{ duration: '24h' \| '7d' \| '30d' \| 'permanent', reason: string, report_id?: UUID }`. Auto-calculates `ban_expires_at` from `duration`. Auto-creates a strike record. Sends ban email via `MailService`. Emits `user.banned` via EventEmitter → ChatGateway pushes `user.banned` socket event to the target user. Returns `{ success: true, ban_expires_at, type }`. |
 | PATCH | `/admin/users/:id/unban` | Lift a ban. Emits `user.unbanned` via EventEmitter → ChatGateway pushes `user.unbanned` socket event to the target user. |
-| PATCH | `/admin/users/:id/role` | Change role. Body: `{ role: 'user' \| 'admin' \| 'org' }`. |
+| PATCH | `/admin/users/:id/role` | **Owner only.** Change role. Body: `{ role: 'user' \| 'admin' \| 'org' }`. |
 | PATCH | `/admin/users/:id/vulnerable-flag` | Set or unset `vulnerable_flag`. Body: `{ vulnerable_flag: boolean }`. |
 | GET | `/admin/users/:id/export` | DSGVO data export for a user. Returns all rows across profiles, interests, sensitive data, consent logs, notifications, reports, strikes, blocks, contact requests, media uploads, and vulnerable flag audit. |
+| POST | `/admin/users/:id/send-password-reset` | Trigger a password-reset email for a user. Generates a 1-hour reset token and sends it via `MailService`. Returns `{ message }`. |
+| PATCH | `/admin/users/:id/email` | Override a user's email address. Body: `{ new_email: string }`. Updates encrypted email + search hash. |
 
 **Reports**
 
@@ -310,12 +324,52 @@ All admin routes require JWT with `role: admin`.
 | POST | `/admin/profanity` | Add a word. Body: `{ word: string }`. Persists to `profanity_words` table and loads into leo-profanity runtime. |
 | DELETE | `/admin/profanity/:word` | Remove a word. |
 
-**System settings**
+**Admin management (owner only)**
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/admin/settings` | List all system settings (`key`, `value`, `updated_by`, `updated_at`). |
-| PUT | `/admin/settings/:key` | Create or update a setting. Body: `{ value: string }`. |
+| GET | `/admin/admins` | **Owner only.** Paginated list of admin accounts with profile info. Query: `page`, `limit`. |
+
+**Conversations**
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/admin/conversations` | Create or retrieve a direct conversation between the calling admin and a target user. Body: `{ target_user_id: UUID }`. Returns `{ conversation_id }`. |
+
+**Admin tickets**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/tickets` | Paginated list of admin tickets. Query: `type` (`nickname \| image \| audio \| support_request \| other`), `status` (`open \| reviewed \| resolved \| dismissed`), `page`, `limit`. |
+| PATCH | `/admin/tickets/:id/status` | Update a ticket's status. Body: `{ status: string }`. |
+
+**System settings (owner only)**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/settings` | **Owner only.** List all system settings (`key`, `value`, `updated_by`, `updated_at`). |
+| PATCH | `/admin/settings/:key` | **Owner only.** Create or update a setting. Body: `{ value: string }`. |
+
+---
+
+### Setup — `/setup`
+
+Public, unauthenticated. Rate-limited per IP (max 5 attempts in-process).
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/setup/status` | Returns `{ setupComplete: boolean }`. `true` once an `owner` account exists. |
+| POST | `/setup` | Create the first owner account. Body: `{ email, password, nickname }`. Returns 403 if setup is already complete. Bypasses throttler. |
+
+---
+
+### Support — `/support`
+
+Public, unauthenticated.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/support/contact` | Submit an anonymous support ticket. Body: `{ email, message, nickname?, public_id? }`. Rate-limited to 3 requests/hour per IP. Inserts an `admin_tickets` row with `type = 'support_request'` and `source = 'login_screen'`. Returns `{ message: 'Anfrage übermittelt' }`. |
 
 ---
 
@@ -405,6 +459,26 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ---
 
 ## Changelog
+
+### 2026-05-24 (latest)
+- Auth: `POST /auth/login` now accepts `identifier` (email **or** nickname) instead of email only
+- Auth: new `PATCH /auth/change-password` (JWT) — change own password; verifies current password before updating
+- Auth: new `PATCH /auth/change-email` (JWT) — change own email; verifies current password; updates encrypted email + search hash
+- Roles: new `owner` role added to `user_role` enum (migration `019_owner_role.sql`); partial unique index enforces max-1 owner; `OwnerGuard` added (`src/common/guards/owner.guard.ts`)
+- Roles: `RolesGuard` updated — `owner` implicitly inherits all `admin` permissions
+- Admin: `POST /admin/users/create` (owner only) — create a verified admin account (email, password, nickname)
+- Admin: `POST /admin/users/:id/send-password-reset` — admin-triggered password reset email (1-hour token)
+- Admin: `PATCH /admin/users/:id/email` — override a user's encrypted email + search hash
+- Admin: `PATCH /admin/users/:id/role` is now **owner-only** (was admin)
+- Admin: `GET /admin/admins` (owner only) — paginated list of admin accounts
+- Admin: `GET /admin/tickets` — paginated admin ticket list, filterable by `type` and `status`
+- Admin: `PATCH /admin/tickets/:id/status` — update a ticket's status
+- Admin: `POST /admin/conversations` — create or retrieve a direct conversation between an admin and a user
+- Admin: `GET /admin/settings` and `PATCH /admin/settings/:key` are now **owner-only** (changed from `PUT` to `PATCH`)
+- Setup: new `SetupModule` — `GET /setup/status`, `POST /setup`; bootstraps the first owner account; IP-rate-limited (max 5 attempts); blocked once setup is complete
+- Support: new `SupportModule` — `POST /support/contact`; public anonymous support tickets inserted into `admin_tickets` as `support_request`; rate-limited 3/hour per IP; `admin_tickets.user_id` is now nullable (migration `018_support_tickets.sql`); `source` column added to `admin_tickets`
+- Profile: `status_message` column defaults to `'available'`; existing `NULL` rows backfilled (migration `016_profile_status_message_default.sql`)
+- Guards: new `OptionalJwtGuard` (`src/common/guards/optional-jwt.guard.ts`) — JWT is decoded if present but never required
 
 ### 2026-05-23 (latest)
 - Security: removed `DELETE /auth/dev/delete-user` endpoint and `devDeleteUser()` service method — no longer present in any environment
