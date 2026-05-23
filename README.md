@@ -80,16 +80,18 @@ Copy `.env.example` to `.env.local` and fill in the values.
 - Supported types: `message`, `match`, `system`, `ban`, `request`
 
 ### Admin Panel (`/admin`)
-Accessible to `role: admin` users only. Auth guard waits for Zustand `persist` hydration before checking role.
+Accessible to `role: admin` or `role: owner` users. Auth guard waits for Zustand `persist` hydration before checking role.
 
 | Tab | Description |
 |---|---|
-| Medien | Photo moderation queue — approve or reject with reason |
+| Tickets | Admin ticket queue (moderation + support requests); support tickets show email, optional nickname + public ID |
+| Medien | Photo moderation queue — swipe view (approve → / reject ←) or grid; type filter (Alle / Fotos / Audio) |
 | Nutzer | Paginated user list with role/ban filters; inline role change; `BanModal` for bans |
 | Meldungen | Paginated reports filtered by status; inline status + note editing |
 | Strikes | Paginated strikes; "Neuer Strike" modal with debounced nickname search |
 | Schimpfwörter | Custom profanity word list; add/delete words |
-| Einstellungen | System settings key/value editor (GET/PUT `/admin/settings`) |
+| Einstellungen | System settings key/value editor — `owner` only |
+| Verwaltung | **Owner only.** Admin account list (paginated) + "Admin erstellen" form; duplicates settings editor |
 
 ### Ban Screen
 - `BanScreen` component: full-screen overlay (`z-[9999]`) shown when `isBanned` is `true` in auth store
@@ -106,7 +108,7 @@ Accordion layout — one section open at a time with CSS `grid-rows` height tran
 | Design & Barrierefreiheit | Theme toggle, profanity filter, font size, high contrast, simple language, UI language selector |
 | Benachrichtigungen | Email + push notification toggles |
 | Sichtbarkeit | `is_published` master toggle + 7 field visibility toggles (`status_visible`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`) |
-| Konto | Subscription info, GDPR data export (PDF download), account delete |
+| Konto | Subscription info, GDPR data export (PDF download), **Passwort ändern** (fully functional — `PATCH /auth/change-password`), **E-Mail ändern** (fully functional — `PATCH /auth/change-email`), account delete |
 | Sicherheit & Blockierungen | Blocked user list with inline unblock |
 | Abonnement & Zahlung | Subscription detail, Stripe Embedded Checkout, cancel flow |
 | Support | Report modal (nickname-lookup mode) |
@@ -134,8 +136,9 @@ Accordion layout — one section open at a time with CSS `grid-rows` height tran
 
 | Route | Description |
 |---|---|
-| `/login` | Email + password login. Stores JWT access token in Zustand. |
+| `/login` | Email or nickname + password login. Stores JWT access token in Zustand. Shows a success banner when redirected from `/setup?setup=done`. "Support kontaktieren" button opens `ContactSupportModal`. |
 | `/register` | Registration form. Sends verification email via backend. |
+| `/setup` | One-time owner bootstrap wizard. Checks `GET /setup/status` on load; redirects to `/login` if setup is already complete. Form creates the first owner account via `POST /setup`. |
 | `/verify` | Email verification landing page (reads `?token=` from URL). |
 | `/consent` | AGB / privacy consent flow after registration. |
 
@@ -244,18 +247,20 @@ All saves show a toast (✓ success or ✗ error).
 Profile setup wizard — required before the profile can be published or the app fully accessed.
 
 #### `/admin`
-Admin panel — accessible to `role: admin` users only. Auth guard waits for Zustand `persist` hydration before evaluating the JWT role to prevent false redirects on first render.
+Admin panel — accessible to `role: admin` or `role: owner` users. Auth guard waits for Zustand `persist` hydration before evaluating the JWT role to prevent false redirects on first render.
 
-Six tabs:
+Eight tabs (`owner` sees all; `admin` does not see **Verwaltung**):
 
 | Tab | Description |
 |---|---|
-| Medien | Photo moderation queue. Approve or reject each pending upload with a reason. Photos proxied via Next.js (`/uploads/…`) to avoid CORS. |
+| Tickets | Admin ticket queue. Two sub-lists: moderation tickets (nickname / image / audio) and support requests. Support requests show submitter email, optional nickname and public ID, message body, and timestamp. |
+| Medien | Photo/audio moderation. **Swipe view**: full-screen one-card-at-a-time workflow — approve with → key / right-arrow button, reject with ← key / left-arrow button; audio cards show filename + Play/Pause (Spacebar); type filter (Alle / Fotos / Audio); counter ("3 von 12"); tilt animation. Photos proxied via Next.js (`/uploads/…`) to avoid CORS. |
 | Nutzer | Paginated user list with role/banned filters and nickname search. Inline role selector; ban/unban actions via `BanModal`. |
 | Meldungen | Paginated report list filtered by status. Inline status + note editing per report. |
 | Strikes | Paginated strike list. "Neuer Strike" modal — type (`warning`, `temp`, `permanent`), **nickname search** (debounced lookup, select from results), reason, optional expiry. |
 | Schimpfwörter | Custom profanity word list. Add / delete words; persisted to `profanity_words` table via backend. |
-| Einstellungen | System settings key/value editor. |
+| Einstellungen | System settings key/value editor. **Owner only.** |
+| Verwaltung | **Owner only.** Two sub-sections: (A) admin account list (paginated, `GET /admin/admins`) — shows nickname, role badge, verified status, last login; (B) "Admin erstellen" form (`POST /admin/users/create`) — email, password, nickname. |
 
 ### Public — `(public)`
 
@@ -439,6 +444,22 @@ Duration dropdown (24h / 7d / 30d / permanent), reason dropdown (5 presets), opt
 
 ---
 
+### `ContactSupportModal` — `components/ui/ContactSupportModal.tsx`
+
+Anonymous support contact form. Shown on the login page.
+
+```tsx
+<ContactSupportModal onClose={() => setShowSupportModal(false)} />
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `onClose` | `() => void` | Called when backdrop or × is clicked (disabled while loading) |
+
+Fields: email (required), nickname (optional), public ID (optional), message (required, 10–1000 chars). Submits to `POST /support/contact`. Rate-limited to 3 requests/hour by backend. Shows a success confirmation state after submission.
+
+---
+
 ### `BanScreen` — `components/ui/BanScreen.tsx`
 
 Full-screen overlay rendered by `AuthProvider` when `isBanned` is `true` in the auth store.
@@ -506,12 +527,23 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 | `chat/[id]` header | Generic user icon — partner photo not loaded |
 | `BottomNav` | No unread badge on Chat or Requests tabs |
 | `chat/[id]` | `read_at` exists on messages but read receipts not rendered |
-| `settings` → Konto | "Passwort ändern", "E-Mail ändern" — placeholder rows, no functionality |
 | `settings` → Einstellungen | UI language selector (de/en) — local state only, not persisted |
 
 ---
 
 ## Changelog
+
+### 2026-05-24 (latest)
+- Auth (`/login`): login now accepts email **or** nickname via `identifier` field; "Support kontaktieren" link opens `ContactSupportModal`; `?setup=done` query param shows a green success banner
+- New route: `/setup` — one-time owner bootstrap wizard; checks `GET /setup/status` on load, redirects to `/login` if setup is already complete; creates owner account via `POST /setup`
+- New component: `ContactSupportModal` (`components/ui/ContactSupportModal.tsx`) — anonymous support form (email required, nickname + public ID optional, message required); submits to `POST /support/contact`; shows success confirmation state; rate-limited by backend (3/hour)
+- Settings (`/settings`): "Passwort ändern" fully implemented — inline accordion sub-section with current password + new password (show/hide toggles); calls `PATCH /auth/change-password`; success toast + fields cleared on success
+- Settings (`/settings`): "E-Mail ändern" fully implemented — inline accordion sub-section with current password + new email; calls `PATCH /auth/change-email`; success toast + fields cleared on success
+- Admin (`/admin`): owner-aware access — `isOwner` flag derived from JWT role; auth guard now allows `admin` **or** `owner`; **Verwaltung** tab shown to owners only
+- Admin (`/admin`): new **Verwaltung** tab (owner only) — (A) paginated admin list via `GET /admin/admins`; (B) "Admin erstellen" form via `POST /admin/users/create`
+- Admin (`/admin`): **Einstellungen** tab now owner-only (was visible to all admins)
+- Admin (`/admin`): support tickets surfaced in **Tickets** tab alongside moderation tickets; `AdminTicket` interface with `source` and `context` fields (email, nickname, public_id, message)
+- i18n: `lib/i18n/` module introduced — `useTranslation()` hook, `languageStore` (Zustand), German source-of-truth with typed `en` / `leicht` stubs; used throughout login, setup, settings, and admin pages
 
 ### 2026-05-23 (latest)
 - Admin (`/admin`): new **Swipe View** for media moderation — full-screen overlay with one card at a time; approve with → key / right arrow button / right swipe, reject with ← key / left arrow button / left swipe; audio cards show filename + Play/Pause (Spacebar); type filter (Alle / Fotos / Audio); counter ("3 von 12"); tilt animation on action; replaces the grid-of-cards approach for faster review
