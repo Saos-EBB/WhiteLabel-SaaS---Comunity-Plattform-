@@ -57,6 +57,16 @@ export class AuthService {
         return crypto.randomBytes(64).toString('hex');
     }
 
+    private async generatePublicId(): Promise<string> {
+        const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        for (let attempt = 0; attempt < 100; attempt++) {
+            const id = Array.from({ length: 4 }, () => charset[Math.floor(Math.random() * 36)]).join('');
+            const existing = await this.userRepository.findOne({ where: { public_id: id } });
+            if (!existing) return id;
+        }
+        throw new Error('Could not generate unique public_id');
+    }
+
     async register(dto: RegisterDto) {
         const emailHash = this.hashEmail(dto.email);
 
@@ -71,6 +81,7 @@ export class AuthService {
             email_search_hash: emailHash,
             password_hash: passwordHash,
             email: encryptField(dto.email),
+            public_id: await this.generatePublicId(),
         });
 
         await this.userRepository.save(user);

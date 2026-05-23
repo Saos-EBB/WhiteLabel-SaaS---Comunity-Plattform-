@@ -64,7 +64,7 @@ export class ProfileService {
         return profile;
     }
 
-    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean; audio_url: string | null; audio_moderation_status: string | null; subscription: { plan: string; status: string; current_period_end: string | null } | null; is_banned: boolean }> {
+    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean; audio_url: string | null; audio_moderation_status: string | null; subscription: { plan: string; status: string; current_period_end: string | null } | null; is_banned: boolean; public_id: string | null }> {
         const profile = await this.getOwnProfile(userId);
 
         let photo_url: string | null = null;
@@ -99,13 +99,14 @@ export class ProfileService {
             ? { plan: subRows[0].plan, status: subRows[0].status, current_period_end: subRows[0].expires_at ? new Date(subRows[0].expires_at).toISOString() : null }
             : null;
 
-        const userRows = await this.profileRepo.manager.query<{ is_banned: boolean }[]>(
-            'SELECT is_banned FROM users WHERE id = $1',
+        const userRows = await this.profileRepo.manager.query<{ is_banned: boolean; public_id: string | null }[]>(
+            'SELECT is_banned, public_id FROM users WHERE id = $1',
             [userId],
         );
         const is_banned = userRows[0]?.is_banned ?? false;
+        const public_id = userRows[0]?.public_id ?? null;
 
-        return { ...profile, photo_url, photo_needs_review, audio_url, audio_moderation_status, subscription, is_banned };
+        return { ...profile, photo_url, photo_needs_review, audio_url, audio_moderation_status, subscription, is_banned, public_id };
     }
 
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {
@@ -251,7 +252,7 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string, viewerId: string | null = null): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean; audio_url: string | null; connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED' | 'BLOCKED'; request_id: string | null; conversation_id: string | null }> {
+    async getPublicProfile(nickname: string, viewerId: string | null = null): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean; audio_url: string | null; connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED' | 'BLOCKED'; request_id: string | null; conversation_id: string | null; public_id: string | null }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -342,6 +343,11 @@ export class ProfileService {
             conversation_id = rows[0]?.conversation_id ?? null;
         }
 
+        const [publicIdRow] = await this.profileRepo.manager.query<{ public_id: string | null }[]>(
+            'SELECT public_id FROM users WHERE id = $1',
+            [profile.user_id],
+        );
+
         return {
             ...profile,
             bio:        profile.show_bio      ? profile.bio        : null,
@@ -356,6 +362,7 @@ export class ProfileService {
             connection_status,
             request_id,
             conversation_id,
+            public_id: publicIdRow?.public_id ?? null,
         };
     }
 

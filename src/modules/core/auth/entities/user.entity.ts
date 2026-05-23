@@ -68,4 +68,7 @@ export class User {
     @Column({ type: 'timestamptz', nullable: true })
     last_gdpr_export_at!: Date | null;
 
+    @Column({ type: 'varchar', length: 12, unique: true, nullable: true })
+    public_id!: string | null;
+
 }

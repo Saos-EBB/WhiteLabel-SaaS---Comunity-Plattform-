@@ -6,7 +6,9 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { MediaUpload, FileType, FileContext, ModerationStatus } from './entities/media-upload.entity';
 import { Profile } from '../profile/entities/profile.entity';
+import { User } from '../auth/entities/user.entity';
 import { ProfanityService } from '../moderation/profanity.service';
+import { SystemSettingsService } from '../system-settings/system-settings.service';
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -17,8 +19,36 @@ export class MediaService {
         private readonly mediaRepository: Repository<MediaUpload>,
         @InjectRepository(Profile)
         private readonly profileRepository: Repository<Profile>,
+        @InjectRepository(User)
+        private readonly userRepository: Repository<User>,
         private readonly profanityService: ProfanityService,
+        private readonly systemSettingsService: SystemSettingsService,
     ) {}
+
+    private buildWatermarkSvg(text: string, imgWidth: number, imgHeight: number): Buffer {
+        const fontSize = 14;
+        const margin   = 12;
+        // text-anchor="end" means x is the right edge of the text — gives a clean right margin
+        const x = imgWidth - margin;
+        const y = margin + fontSize;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${imgWidth}" height="${imgHeight}">
+  <defs>
+    <filter id="ds">
+      <feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <text x="${x}" y="${y}"
+    font-family="'Courier New',monospace"
+    font-size="${fontSize}"
+    font-weight="bold"
+    fill="white"
+    fill-opacity="0.75"
+    text-anchor="end"
+    filter="url(#ds)"
+  >${text}</text>
+</svg>`;
+        return Buffer.from(svg);
+    }
 
     private validateMagicBytes(buffer: Buffer): boolean {
         if (buffer.length < 12) return false;
@@ -60,10 +90,26 @@ export class MediaService {
             const filename = `${userId}-${Date.now()}.webp`;
             const filepath = path.join(uploadDir, filename);
 
-            await sharp(file.buffer)
+            // Resize + convert to WebP buffer so we can inspect dimensions and composite the watermark.
+            const resizedBuf = await sharp(file.buffer)
                 .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
                 .webp({ quality: 80 })
-                .toFile(filepath);
+                .toBuffer();
+
+            const user = await this.userRepository.findOne({ where: { id: userId } });
+            const publicId = user?.public_id;
+
+            if (publicId) {
+                const prefix = await this.systemSettingsService.getString('watermark_prefix', 'ID');
+                const watermarkText = `#${prefix}-${publicId}`;
+                const { width = 800, height = 800 } = await sharp(resizedBuf).metadata();
+                const watermarkSvg = this.buildWatermarkSvg(watermarkText, width, height);
+                await sharp(resizedBuf)
+                    .composite([{ input: watermarkSvg, top: 0, left: 0 }])
+                    .toFile(filepath);
+            } else {
+                await sharp(resizedBuf).toFile(filepath);
+            }
 
             const fileSizeKb = Math.ceil(fs.statSync(filepath).size / 1024);
             const fileUrl = `${process.env.BACKEND_URL ?? 'http://localhost:3000'}/uploads/profiles/${filename}`;

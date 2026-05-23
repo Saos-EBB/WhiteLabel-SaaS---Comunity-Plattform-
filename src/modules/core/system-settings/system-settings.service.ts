@@ -28,6 +28,17 @@ export class SystemSettingsService {
         return isNaN(n) ? fallback : n;
     }
 
+    async getString(key: string, fallback: string): Promise<string> {
+        const cached = this.cache.get(key);
+        if (cached && Date.now() < cached.expiresAt) return cached.value;
+
+        const setting = await this.repo.findOne({ where: { key } });
+        if (!setting) return fallback;
+
+        this.cache.set(key, { value: setting.value, expiresAt: Date.now() + this.CACHE_TTL_MS });
+        return setting.value;
+    }
+
     async getAll(): Promise<SystemSetting[]> {
         return this.repo.find({ order: { key: 'ASC' } });
     }
