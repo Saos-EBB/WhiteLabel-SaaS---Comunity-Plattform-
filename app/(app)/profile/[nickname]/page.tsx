@@ -9,10 +9,9 @@ import { blurText } from '@/lib/profanity'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import ReportModal from '@/components/ui/ReportModal'
+import { useConnectionAction, type ConnectionStatus } from '@/hooks/useConnectionAction'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type ConnectionStatus = 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED'
 
 interface PublicProfile {
   id: string
@@ -30,6 +29,8 @@ interface PublicProfile {
   is_online: boolean
   status_message: string | null
   connection_status?: ConnectionStatus
+  request_id?: string | null
+  conversation_id?: string | null
 }
 
 const GENDER_LABELS: Record<string, string> = {
@@ -60,8 +61,6 @@ interface UserInterest {
   interest: Interest
 }
 
-type RequestStatus = 'idle' | 'loading' | 'sent' | 'error'
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function calcAge(birthdate: string): number {
@@ -83,18 +82,18 @@ export default function PublicProfilePage() {
 
   const [audioUrl, setAudioUrl]           = useState<string | null>(null)
 
-  const [requestStatus, setRequestStatus]           = useState<RequestStatus>('idle')
-  const [requestError, setRequestError]             = useState<string | null>(null)
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
-  const [disconnecting, setDisconnecting]           = useState(false)
-  const [disconnectError, setDisconnectError]       = useState<string | null>(null)
   const [reportOpen, setReportOpen]                 = useState(false)
   const [blockConfirmOpen, setBlockConfirmOpen]     = useState(false)
-  const [blocking, setBlocking]                     = useState(false)
-  const [blockError, setBlockError]                 = useState<string | null>(null)
 
   const router = useRouter()
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
+  const conn = useConnectionAction(
+    profile?.user_id ?? '',
+    profile?.connection_status ?? 'NONE',
+    profile?.request_id ?? null,
+    profile?.conversation_id ?? null,
+  )
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -140,58 +139,6 @@ export default function PublicProfilePage() {
     }
     load()
   }, [nickname])
-
-  // ── Contact request ────────────────────────────────────────────────────────
-
-  async function handleContactRequest() {
-    if (!profile || requestStatus === 'loading' || requestStatus === 'sent') return
-    setRequestStatus('loading')
-    setRequestError(null)
-    try {
-      await fetchApi<unknown>('/chat/requests', {
-        method: 'POST',
-        body: JSON.stringify({ receiver_id: profile.user_id }),
-      })
-      setRequestStatus('sent')
-    } catch (err) {
-      setRequestError(err instanceof Error ? err.message : 'Anfrage fehlgeschlagen')
-      setRequestStatus('idle')
-    }
-  }
-
-  // ── Disconnect ─────────────────────────────────────────────────────────────
-
-  async function handleDisconnect() {
-    if (!profile || disconnecting) return
-    setDisconnecting(true)
-    setDisconnectError(null)
-    try {
-      await fetchApi<unknown>(`/chat/connections/${profile.user_id}`, { method: 'DELETE' })
-      setProfile((p) => p ? { ...p, connection_status: 'NONE' } : p)
-      setDisconnectConfirmOpen(false)
-    } catch (err) {
-      setDisconnectError(err instanceof Error ? err.message : 'Fehler beim Trennen')
-    } finally {
-      setDisconnecting(false)
-    }
-  }
-
-  // ── Block ──────────────────────────────────────────────────────────────────
-
-  async function handleBlock() {
-    if (!profile || blocking) return
-    setBlocking(true)
-    setBlockError(null)
-    try {
-      await fetchApi<unknown>(`/profile/me/block/${profile.user_id}`, { method: 'POST' })
-      setBlockConfirmOpen(false)
-      router.back()
-    } catch (err) {
-      setBlockError(err instanceof Error ? err.message : 'Fehler beim Blockieren')
-    } finally {
-      setBlocking(false)
-    }
-  }
 
   // ── Loading / not found / error ────────────────────────────────────────────
 
@@ -342,41 +289,98 @@ export default function PublicProfilePage() {
           {!isOwnProfile && (
             <div className="w-full space-y-3">
 
-              {/* Disconnect / Contact request */}
-              {profile.connection_status === 'CONNECTED' ? (
-                <>
-                  {disconnectError && (
-                    <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                      {disconnectError}
-                    </div>
-                  )}
+              {conn.error && (
+                <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                  {conn.error}
+                </div>
+              )}
+
+              {/* Connection state */}
+              {conn.connectionStatus === 'NONE' && (
+                <button
+                  onClick={() => conn.sendRequest()}
+                  disabled={conn.isLoading}
+                  className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {conn.isLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Verbinden
+                </button>
+              )}
+
+              {conn.connectionStatus === 'SENT' && (
+                <div
+                  className="w-full py-4 rounded-full bg-surface-container-high text-primary-fixed-dim font-semibold text-center"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Ausstehend ✓
+                </div>
+              )}
+
+              {conn.connectionStatus === 'RECEIVED' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => conn.acceptRequest()}
+                    disabled={conn.isLoading}
+                    className="flex-1 py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {conn.isLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                    Annehmen
+                  </button>
+                  <button
+                    onClick={() => conn.declineRequest()}
+                    disabled={conn.isLoading}
+                    className="flex-1 py-4 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Ablehnen
+                  </button>
+                </div>
+              )}
+
+              {conn.connectionStatus === 'CONNECTED' && (
+                <div className="space-y-2">
+                  <div
+                    className="w-full py-4 rounded-full bg-surface-container-high text-primary-fixed-dim font-semibold text-center"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    Verbunden ✓
+                  </div>
+                  <button
+                    onClick={() => conn.conversationId && router.push(`/chat/${conn.conversationId}`)}
+                    disabled={!conn.conversationId}
+                    className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label={`Mit ${profile.nickname} chatten`}
+                  >
+                    Chatten →
+                  </button>
                   <button
                     onClick={() => setDisconnectConfirmOpen(true)}
-                    className="w-full py-4 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container active:scale-95 transition-all"
                   >
-                    Verbindung trennen
+                    Trennen
                   </button>
-                </>
-              ) : (
-                <>
-                  {requestError && (
-                    <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                      {requestError}
-                    </div>
-                  )}
+                </div>
+              )}
+
+              {conn.connectionStatus === 'BLOCKED' && (
+                <div className="space-y-2">
+                  <div
+                    className="w-full py-4 rounded-full bg-surface-container-high text-on-surface-variant font-semibold text-center"
+                    role="status"
+                  >
+                    Blockiert
+                  </div>
                   <button
-                    onClick={handleContactRequest}
-                    disabled={requestStatus === 'loading' || requestStatus === 'sent'}
-                    className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    onClick={() => conn.unblock()}
+                    disabled={conn.isLoading}
+                    className="w-full py-4 rounded-full border border-outline-variant text-on-surface-variant font-semibold hover:bg-surface-container active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {requestStatus === 'loading' && (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    )}
-                    {requestStatus === 'sent' ? 'Anfrage gesendet ✓' : 'Kontakt anfragen'}
+                    {conn.isLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                    Entblocken
                   </button>
-                </>
+                </div>
               )}
 
               {/* Report button */}
@@ -388,14 +392,16 @@ export default function PublicProfilePage() {
                 User melden
               </button>
 
-              {/* Block button */}
-              <button
-                onClick={() => setBlockConfirmOpen(true)}
-                className="w-full py-3 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium hover:bg-surface-container active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <Ban className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                Nutzer blockieren
-              </button>
+              {/* Block button — hidden when already blocked */}
+              {conn.connectionStatus !== 'BLOCKED' && (
+                <button
+                  onClick={() => setBlockConfirmOpen(true)}
+                  className="w-full py-3 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium hover:bg-surface-container active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Ban className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                  Nutzer blockieren
+                </button>
+              )}
             </div>
           )}
 
@@ -404,7 +410,7 @@ export default function PublicProfilePage() {
             <>
               <div
                 className="fixed inset-0 z-20 bg-black/50"
-                onClick={() => !disconnecting && setDisconnectConfirmOpen(false)}
+                onClick={() => !conn.isLoading && setDisconnectConfirmOpen(false)}
                 aria-hidden="true"
               />
               <div
@@ -421,16 +427,16 @@ export default function PublicProfilePage() {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row-reverse">
                   <button
-                    onClick={handleDisconnect}
-                    disabled={disconnecting}
+                    onClick={async () => { if (await conn.disconnect()) setDisconnectConfirmOpen(false) }}
+                    disabled={conn.isLoading}
                     className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                   >
-                    {disconnecting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    {conn.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
                     Trennen
                   </button>
                   <button
                     onClick={() => setDisconnectConfirmOpen(false)}
-                    disabled={disconnecting}
+                    disabled={conn.isLoading}
                     className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
                   >
                     Abbrechen
@@ -445,7 +451,7 @@ export default function PublicProfilePage() {
             <>
               <div
                 className="fixed inset-0 z-20 bg-black/50"
-                onClick={() => !blocking && setBlockConfirmOpen(false)}
+                onClick={() => !conn.isLoading && setBlockConfirmOpen(false)}
                 aria-hidden="true"
               />
               <div
@@ -460,24 +466,18 @@ export default function PublicProfilePage() {
                     Der Nutzer wird aus deiner Suche entfernt. Du kannst ihm keine Nachrichten mehr senden. Diese Aktion kann rückgängig gemacht werden.
                   </p>
                 </div>
-                {blockError && (
-                  <div className="flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-3 text-sm" role="alert">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                    {blockError}
-                  </div>
-                )}
                 <div className="flex flex-col gap-2 sm:flex-row-reverse">
                   <button
-                    onClick={handleBlock}
-                    disabled={blocking}
+                    onClick={async () => { if (await conn.block()) setBlockConfirmOpen(false) }}
+                    disabled={conn.isLoading}
                     className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                   >
-                    {blocking && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    {conn.isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
                     Blockieren
                   </button>
                   <button
                     onClick={() => setBlockConfirmOpen(false)}
-                    disabled={blocking}
+                    disabled={conn.isLoading}
                     className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
                   >
                     Abbrechen

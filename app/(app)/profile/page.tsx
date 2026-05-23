@@ -609,7 +609,7 @@ export default function ProfilePage() {
               Vorstellung
             </p>
 
-            {audioStatus === 'none' && (
+            {audioStatus === 'none' && editMode && (
               <div className="flex gap-2 justify-center flex-wrap">
                 <button
                   type="button"
@@ -683,13 +683,15 @@ export default function ProfilePage() {
                   <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                   Warte auf Freigabe
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setAudioStatus('none')}
-                  className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
-                >
-                  Ersetzen
-                </button>
+                {editMode && (
+                  <button
+                    type="button"
+                    onClick={() => setAudioStatus('none')}
+                    className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
+                  >
+                    Ersetzen
+                  </button>
+                )}
               </div>
             )}
 
@@ -721,13 +723,15 @@ export default function ProfilePage() {
                   <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
                   Abgelehnt
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setAudioStatus('none')}
-                  className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
-                >
-                  Neue Aufnahme
-                </button>
+                {editMode && (
+                  <button
+                    type="button"
+                    onClick={() => setAudioStatus('none')}
+                    className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
+                  >
+                    Neue Aufnahme
+                  </button>
+                )}
               </div>
             )}
 

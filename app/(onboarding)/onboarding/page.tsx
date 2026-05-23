@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Check, ChevronDown, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
+import { AlertCircle, Camera, Check, ChevronDown, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store/authStore'
+import { useTranslation } from '@/hooks/useTranslation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,7 +16,9 @@ interface Interest {
   category?: string
 }
 
-interface FormData {
+// Renamed from FormData to avoid shadowing the global FormData constructor
+// used for multipart photo uploads in StepDone.
+interface ProfileFormData {
   nickname: string
   birthdate: string
   city: string
@@ -44,14 +48,14 @@ function isAtLeast18(dateStr: string): boolean {
   return birth <= cutoff
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+// ─── Progress ─────────────────────────────────────────────────────────────────
 
 const TOTAL_STEPS = 5
 
 function ProgressBar({ step }: { step: number }) {
   return (
     <div
-      className="flex gap-1.5 mb-8"
+      className="flex gap-1.5 mb-6"
       role="progressbar"
       aria-valuenow={step}
       aria-valuemin={1}
@@ -73,6 +77,7 @@ function ProgressBar({ step }: { step: number }) {
 // ─── Step 1: Welcome ──────────────────────────────────────────────────────────
 
 function StepWelcome({ onNext }: { onNext: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="text-center space-y-8">
       <div className="flex justify-center">
@@ -81,73 +86,93 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         </div>
       </div>
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold text-on-surface">Willkommen bei XXX!</h1>
-        <p className="text-on-surface-variant leading-relaxed">
-          Hier findest du Menschen in deiner Nähe, die ähnliche Interessen teilen.
-          Richte in wenigen Schritten dein Profil ein – dann bist du dabei!
-        </p>
+        <h1 className="text-3xl font-bold text-on-surface">{t.onboarding.welcomeTitle}</h1>
+        <p className="text-on-surface-variant leading-relaxed">{t.onboarding.welcomeBody}</p>
       </div>
       <button
         onClick={onNext}
         className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-base min-h-[52px] hover:opacity-90 active:scale-[0.98] transition-all"
       >
-        Loslegen
+        {t.onboarding.start}
       </button>
     </div>
   )
 }
 
-// ─── Step 2: Nickname ─────────────────────────────────────────────────────────
+// ─── Step 2: Profile info (Nickname + Birthdate + City + optional fields) ─────
 
-function StepNickname({
-  value,
+function StepProfileInfo({
+  formData,
   onChange,
   onNext,
 }: {
-  value: string
-  onChange: (v: string) => void
+  formData: ProfileFormData
+  onChange: <K extends keyof ProfileFormData>(key: K, value: ProfileFormData[K]) => void
   onNext: () => void
 }) {
-  const [touched, setTouched] = useState(false)
-  const error = touched ? validateNickname(value) : null
+  const [touched, setTouched] = useState({ nickname: false, birthdate: false, city: false })
+
+  const maxDate = useMemo(() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 18)
+    return d.toISOString().split('T')[0]
+  }, [])
+
+  const nicknameError = touched.nickname ? validateNickname(formData.nickname) : null
+  const birthdateError = touched.birthdate
+    ? !formData.birthdate
+      ? 'Geburtsdatum ist erforderlich'
+      : !isAtLeast18(formData.birthdate)
+      ? 'Du musst mindestens 18 Jahre alt sein'
+      : null
+    : null
+  const cityError = touched.city && !formData.city.trim() ? 'Stadt ist erforderlich' : null
 
   function handleNext() {
-    setTouched(true)
-    if (!validateNickname(value)) onNext()
+    setTouched({ nickname: true, birthdate: true, city: true })
+    if (
+      !validateNickname(formData.nickname) &&
+      formData.birthdate && isAtLeast18(formData.birthdate) &&
+      formData.city.trim()
+    ) {
+      onNext()
+    }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-on-surface">Wie soll man dich nennen?</h2>
+        <h2 className="text-2xl font-bold text-on-surface">Erstelle dein Profil</h2>
         <p className="text-on-surface-variant text-sm">
-          Dein Nickname ist dein öffentlicher Name auf XXX.
+          Diese Angaben helfen anderen, dich zu finden.
         </p>
       </div>
 
+      {/* Nickname */}
       <div className="space-y-1.5">
         <label htmlFor="nickname" className="text-sm font-medium text-on-surface">
-          Nickname
+          Nickname <span className="text-error" aria-hidden="true">*</span>
         </label>
         <input
           id="nickname"
           type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={() => setTouched(true)}
+          value={formData.nickname}
+          onChange={(e) => onChange('nickname', e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, nickname: true }))}
           placeholder="z.B. coolcat99"
           maxLength={30}
           autoComplete="username"
           className={`w-full rounded-2xl bg-surface-container border px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors ${
-            error ? 'border-error' : 'border-outline-variant'
+            nicknameError ? 'border-error' : 'border-outline-variant'
           }`}
-          aria-describedby={error ? 'nickname-error' : 'nickname-hint'}
-          aria-invalid={error ? 'true' : 'false'}
+          aria-describedby={nicknameError ? 'nickname-error' : 'nickname-hint'}
+          aria-invalid={nicknameError ? 'true' : 'false'}
+          aria-required="true"
         />
-        {error ? (
+        {nicknameError ? (
           <p id="nickname-error" className="text-xs text-error flex items-center gap-1.5" role="alert">
             <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            {error}
+            {nicknameError}
           </p>
         ) : (
           <p id="nickname-hint" className="text-xs text-on-surface-variant">
@@ -156,87 +181,17 @@ function StepNickname({
         )}
       </div>
 
-      <button
-        onClick={handleNext}
-        className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-base min-h-[52px] hover:opacity-90 active:scale-[0.98] transition-all"
-      >
-        Weiter
-      </button>
-    </div>
-  )
-}
-
-// ─── Step 3: Basic info ───────────────────────────────────────────────────────
-
-function StepBasicInfo({
-  birthdate,
-  city,
-  bio,
-  gender,
-  lookingFor,
-  onChangeBirthdate,
-  onChangeCity,
-  onChangeBio,
-  onChangeGender,
-  onChangeLookingFor,
-  onNext,
-}: {
-  birthdate: string
-  city: string
-  bio: string
-  gender: string
-  lookingFor: string
-  onChangeBirthdate: (v: string) => void
-  onChangeCity: (v: string) => void
-  onChangeBio: (v: string) => void
-  onChangeGender: (v: string) => void
-  onChangeLookingFor: (v: string) => void
-  onNext: () => void
-}) {
-  const [touched, setTouched] = useState({ birthdate: false, city: false })
-
-  const maxDate = useMemo(() => {
-    const d = new Date()
-    d.setFullYear(d.getFullYear() - 18)
-    return d.toISOString().split('T')[0]
-  }, [])
-
-  const birthdateError = touched.birthdate
-    ? !birthdate
-      ? 'Geburtsdatum ist erforderlich'
-      : !isAtLeast18(birthdate)
-      ? 'Du musst mindestens 18 Jahre alt sein'
-      : null
-    : null
-
-  const cityError = touched.city && !city.trim() ? 'Stadt ist erforderlich' : null
-
-  function handleNext() {
-    setTouched({ birthdate: true, city: true })
-    if (birthdate && isAtLeast18(birthdate) && city.trim()) onNext()
-  }
-
-  return (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-on-surface">Ein paar Infos über dich</h2>
-        <p className="text-on-surface-variant text-sm">
-          Diese Angaben helfen anderen, dich zu finden.
-        </p>
-      </div>
-
       {/* Birthdate */}
       <div className="space-y-1.5">
         <label htmlFor="birthdate" className="text-sm font-medium text-on-surface">
-          Geburtsdatum{' '}
-          <span className="text-error" aria-hidden="true">*</span>
+          Geburtsdatum <span className="text-error" aria-hidden="true">*</span>
         </label>
         <input
           id="birthdate"
           type="date"
-          value={birthdate}
+          value={formData.birthdate}
           max={maxDate}
-          onChange={(e) => onChangeBirthdate(e.target.value)}
+          onChange={(e) => onChange('birthdate', e.target.value)}
           onBlur={() => setTouched((t) => ({ ...t, birthdate: true }))}
           className={`w-full rounded-2xl bg-surface-container border px-4 py-3.5 text-on-surface focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors ${
             birthdateError ? 'border-error' : 'border-outline-variant'
@@ -256,14 +211,13 @@ function StepBasicInfo({
       {/* City */}
       <div className="space-y-1.5">
         <label htmlFor="city" className="text-sm font-medium text-on-surface">
-          Stadt{' '}
-          <span className="text-error" aria-hidden="true">*</span>
+          Stadt <span className="text-error" aria-hidden="true">*</span>
         </label>
         <input
           id="city"
           type="text"
-          value={city}
-          onChange={(e) => onChangeCity(e.target.value)}
+          value={formData.city}
+          onChange={(e) => onChange('city', e.target.value)}
           onBlur={() => setTouched((t) => ({ ...t, city: true }))}
           placeholder="z.B. Berlin"
           maxLength={100}
@@ -291,8 +245,8 @@ function StepBasicInfo({
         </label>
         <textarea
           id="bio"
-          value={bio}
-          onChange={(e) => onChangeBio(e.target.value)}
+          value={formData.bio}
+          onChange={(e) => onChange('bio', e.target.value)}
           placeholder="Erzähl ein bisschen über dich…"
           maxLength={1000}
           rows={3}
@@ -300,7 +254,7 @@ function StepBasicInfo({
           aria-describedby="bio-count"
         />
         <p id="bio-count" className="text-xs text-on-surface-variant text-right">
-          {bio.length}/1000
+          {formData.bio.length}/1000
         </p>
       </div>
 
@@ -313,8 +267,8 @@ function StepBasicInfo({
         <div className="relative">
           <select
             id="gender"
-            value={gender}
-            onChange={(e) => onChangeGender(e.target.value)}
+            value={formData.gender}
+            onChange={(e) => onChange('gender', e.target.value)}
             className="w-full appearance-none rounded-2xl bg-surface-container border border-outline-variant px-4 pr-10 py-3.5 text-on-surface focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors cursor-pointer"
           >
             <option value="">Keine Angabe</option>
@@ -339,8 +293,8 @@ function StepBasicInfo({
         <div className="relative">
           <select
             id="looking-for"
-            value={lookingFor}
-            onChange={(e) => onChangeLookingFor(e.target.value)}
+            value={formData.looking_for}
+            onChange={(e) => onChange('looking_for', e.target.value)}
             className="w-full appearance-none rounded-2xl bg-surface-container border border-outline-variant px-4 pr-10 py-3.5 text-on-surface focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors cursor-pointer"
           >
             <option value="">Keine Angabe</option>
@@ -366,6 +320,102 @@ function StepBasicInfo({
   )
 }
 
+// ─── Step 3: Photo ────────────────────────────────────────────────────────────
+
+function StepPhoto({
+  onNext,
+  onSkip,
+}: {
+  onNext: (file: File | null) => void
+  onSkip: () => void
+}) {
+  const { t } = useTranslation()
+  const fileInputRef              = useRef<HTMLInputElement>(null)
+  const [file, setFile]           = useState<File | null>(null)
+  const [preview, setPreview]     = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+
+  function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
+      setError('Nur JPEG, PNG und WebP erlaubt')
+      return
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      setError('Datei zu groß. Maximal 5 MB erlaubt.')
+      return
+    }
+    setError(null)
+    if (preview) URL.revokeObjectURL(preview)
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  useEffect(() => {
+    return () => { if (preview) URL.revokeObjectURL(preview) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-1 text-center">
+        <h2 className="text-2xl font-bold text-on-surface">{t.onboarding.stepPhoto}</h2>
+        <p className="text-on-surface-variant text-sm">{t.onboarding.photoSubtitle}</p>
+      </div>
+
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="relative w-36 h-36 rounded-full overflow-hidden bg-surface-container border-2 border-dashed border-outline-variant hover:border-primary-fixed-dim transition-colors flex items-center justify-center"
+          aria-label="Foto auswählen"
+        >
+          {preview ? (
+            <img src={preview} alt="" className="w-full h-full object-cover" aria-hidden="true" />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-on-surface-variant">
+              <Camera className="h-8 w-8" aria-hidden="true" />
+              <span className="text-xs font-medium">Foto wählen</span>
+            </div>
+          )}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleSelect}
+          aria-hidden="true"
+        />
+      </div>
+
+      {error && (
+        <p className="text-xs text-error text-center flex items-center justify-center gap-1.5" role="alert">
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          onClick={onSkip}
+          className="flex-1 py-4 rounded-full border border-outline-variant text-on-surface font-semibold text-base min-h-[52px] hover:bg-surface-container transition-colors"
+        >
+          {t.onboarding.skip}
+        </button>
+        <button
+          onClick={() => onNext(file)}
+          className="flex-1 py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-base min-h-[52px] hover:opacity-90 active:scale-[0.98] transition-all"
+        >
+          {t.onboarding.next}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Step 4: Interests ────────────────────────────────────────────────────────
 
 function StepInterests({
@@ -381,6 +431,7 @@ function StepInterests({
   loading: boolean
   onNext: () => void
 }) {
+  const { t } = useTranslation()
   const [attempted, setAttempted] = useState(false)
   const hasError = attempted && selectedIds.length === 0
 
@@ -391,11 +442,9 @@ function StepInterests({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-on-surface">Was interessiert dich?</h2>
-        <p className="text-on-surface-variant text-sm">
-          Wähle mindestens ein Interesse aus – so findest du Gleichgesinnte.
-        </p>
+      <div className="space-y-2 text-center">
+        <h2 className="text-2xl font-bold text-on-surface">{t.onboarding.stepInterests}</h2>
+        <p className="text-on-surface-variant text-sm">{t.onboarding.interestsSubtitle}</p>
       </div>
 
       {loading ? (
@@ -439,7 +488,7 @@ function StepInterests({
         disabled={loading}
         className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-base min-h-[52px] hover:opacity-90 active:scale-[0.98] disabled:opacity-40 transition-all"
       >
-        Weiter
+        {t.onboarding.next}
       </button>
     </div>
   )
@@ -447,9 +496,16 @@ function StepInterests({
 
 // ─── Step 5: Done (save + redirect) ──────────────────────────────────────────
 
-function StepDone({ formData }: { formData: FormData }) {
+function StepDone({
+  formData,
+  photoFile,
+}: {
+  formData: ProfileFormData
+  photoFile: File | null
+}) {
+  const { t } = useTranslation()
   const router = useRouter()
-  const [status, setStatus] = useState<'saving' | 'success' | 'error'>('saving')
+  const [status, setStatus]       = useState<'saving' | 'success' | 'error'>('saving')
   const [saveError, setSaveError] = useState<string | null>(null)
   const savedOnce = useRef(false)
 
@@ -457,11 +513,33 @@ function StepDone({ formData }: { formData: FormData }) {
     setStatus('saving')
     setSaveError(null)
     try {
+      // Photo upload (optional)
+      if (photoFile) {
+        const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
+        useAuthStore.getState().setAccessToken(freshToken)
+        const fd = new FormData()
+        fd.append('file', photoFile)
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/media/upload/profile-photo`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: { Authorization: `Bearer ${freshToken}` },
+            body: fd,
+          }
+        )
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as { message?: string }
+          throw new Error(body.message ?? 'Foto-Upload fehlgeschlagen')
+        }
+      }
+
       // Interests must be added before PUT so that checkAndCompleteOnboarding
       // (triggered by PUT) finds them and sets onboarding_completed = true.
       for (const id of formData.interestIds) {
         await fetchApi<unknown>(`/profile/me/interests/${id}`, { method: 'POST' })
       }
+
       await fetchApi<unknown>('/profile/me', {
         method: 'PUT',
         body: JSON.stringify({
@@ -473,14 +551,15 @@ function StepDone({ formData }: { formData: FormData }) {
           ...(formData.looking_for ? { looking_for: formData.looking_for } : {}),
         }),
       })
+
       await fetchApi<unknown>('/profile/me/publish', { method: 'PATCH' })
+
       setStatus('success')
-      setTimeout(() => router.push('/dashboard'), 1500)
     } catch (err) {
       setStatus('error')
       setSaveError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten')
     }
-  }, [formData, router])
+  }, [formData, photoFile])
 
   useEffect(() => {
     if (savedOnce.current) return
@@ -526,16 +605,22 @@ function StepDone({ formData }: { formData: FormData }) {
   }
 
   return (
-    <div className="text-center space-y-6 py-8">
+    <div className="text-center space-y-8 py-4">
       <div className="flex justify-center">
         <div className="h-16 w-16 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center">
           <Check className="h-8 w-8 text-primary-fixed-dim" aria-hidden="true" />
         </div>
       </div>
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-on-surface">Willkommen an Bord!</h2>
-        <p className="text-on-surface-variant">Dein Profil ist bereit. Du wirst weitergeleitet…</p>
+      <div className="space-y-3">
+        <h2 className="text-2xl font-bold text-on-surface">{t.onboarding.doneTitle}</h2>
+        <p className="text-on-surface-variant leading-relaxed text-sm">{t.onboarding.doneBody}</p>
       </div>
+      <button
+        onClick={() => router.push('/discover')}
+        className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-base min-h-[52px] hover:opacity-90 active:scale-[0.98] transition-all"
+      >
+        {t.onboarding.discover}
+      </button>
     </div>
   )
 }
@@ -544,26 +629,27 @@ function StepDone({ formData }: { formData: FormData }) {
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1)
-  const [formData, setFormData] = useState<FormData>({
-    nickname:   '',
-    birthdate:  '',
-    city:       '',
-    bio:        '',
-    gender:     '',
+  const [formData, setFormData] = useState<ProfileFormData>({
+    nickname:    '',
+    birthdate:   '',
+    city:        '',
+    bio:         '',
+    gender:      '',
     looking_for: '',
     interestIds: [],
   })
-  const [interests, setInterests] = useState<Interest[]>([])
+  const [photoFile, setPhotoFile]               = useState<File | null>(null)
+  const [interests, setInterests]               = useState<Interest[]>([])
   const [loadingInterests, setLoadingInterests] = useState(true)
 
   useEffect(() => {
     fetchApi<Interest[]>('/profile/interests')
       .then(setInterests)
-      .catch(() => {/* silently handled — user will see empty list */})
+      .catch(() => {})
       .finally(() => setLoadingInterests(false))
   }, [])
 
-  function update<K extends keyof FormData>(key: K, value: FormData[K]) {
+  function update<K extends keyof ProfileFormData>(key: K, value: ProfileFormData[K]) {
     setFormData((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -576,17 +662,24 @@ export default function OnboardingPage() {
     }))
   }
 
-  function next() {
-    setStep((s) => Math.min(s + 1, TOTAL_STEPS))
-  }
+  function next() { setStep((s) => Math.min(s + 1, TOTAL_STEPS)) }
+  function back() { setStep((s) => Math.max(s - 1, 1)) }
 
-  function back() {
-    setStep((s) => Math.max(s - 1, 1))
+  function handlePhotoNext(file: File | null) {
+    setPhotoFile(file)
+    next()
   }
 
   return (
     <div>
-      <ProgressBar step={step} />
+      {step < TOTAL_STEPS && (
+        <>
+          <p className="text-xs text-on-surface-variant text-center mb-3 font-medium">
+            Schritt {step} von {TOTAL_STEPS}
+          </p>
+          <ProgressBar step={step} />
+        </>
+      )}
 
       {step > 1 && step < TOTAL_STEPS && (
         <button
@@ -602,26 +695,17 @@ export default function OnboardingPage() {
       {step === 1 && <StepWelcome onNext={next} />}
 
       {step === 2 && (
-        <StepNickname
-          value={formData.nickname}
-          onChange={(v) => update('nickname', v)}
+        <StepProfileInfo
+          formData={formData}
+          onChange={update}
           onNext={next}
         />
       )}
 
       {step === 3 && (
-        <StepBasicInfo
-          birthdate={formData.birthdate}
-          city={formData.city}
-          bio={formData.bio}
-          gender={formData.gender}
-          lookingFor={formData.looking_for}
-          onChangeBirthdate={(v) => update('birthdate', v)}
-          onChangeCity={(v) => update('city', v)}
-          onChangeBio={(v) => update('bio', v)}
-          onChangeGender={(v) => update('gender', v)}
-          onChangeLookingFor={(v) => update('looking_for', v)}
-          onNext={next}
+        <StepPhoto
+          onNext={handlePhotoNext}
+          onSkip={() => { setPhotoFile(null); next() }}
         />
       )}
 
@@ -635,7 +719,12 @@ export default function OnboardingPage() {
         />
       )}
 
-      {step === TOTAL_STEPS && <StepDone formData={formData} />}
+      {step === TOTAL_STEPS && (
+        <StepDone
+          formData={formData}
+          photoFile={photoFile}
+        />
+      )}
     </div>
   )
 }

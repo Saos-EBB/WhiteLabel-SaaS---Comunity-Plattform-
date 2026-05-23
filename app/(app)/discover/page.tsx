@@ -6,8 +6,7 @@ import Link from 'next/link'
 import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
-
-type ConnectionStatus = 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED'
+import { useConnectionAction, type ConnectionStatus } from '@/hooks/useConnectionAction'
 
 interface ProfileInterest {
   id: string
@@ -91,66 +90,44 @@ function ProfileCard({
   onUpdate: (userId: string, changes: Partial<Profile>) => void
 }) {
   const router = useRouter()
-  const [busy, setBusy] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
-  const [disconnecting, setDisconnecting] = useState(false)
+  const conn = useConnectionAction(
+    profile.user_id,
+    profile.connection_status ?? 'NONE',
+    profile.request_id,
+    profile.conversation_id,
+  )
 
   async function handleConnect() {
-    setBusy(true)
-    setErrorMsg('')
-    try {
-      await fetchApi<unknown>('/chat/requests', {
-        method: 'POST',
-        body: JSON.stringify({ receiver_id: profile.user_id }),
-      })
+    if (await conn.sendRequest()) {
       onUpdate(profile.user_id, { connection_status: 'SENT' })
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Anfrage fehlgeschlagen')
-    } finally {
-      setBusy(false)
     }
   }
 
   async function handleAccept() {
-    if (!profile.request_id) return
-    setBusy(true)
-    setErrorMsg('')
-    try {
-      const conv = await fetchApi<{ id: string }>(`/chat/requests/${profile.request_id}/accept`, {
-        method: 'PATCH',
-      })
-      onUpdate(profile.user_id, { connection_status: 'CONNECTED', conversation_id: conv.id, request_id: null })
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Annehmen')
-    } finally {
-      setBusy(false)
+    const convId = await conn.acceptRequest()
+    if (convId !== null) {
+      onUpdate(profile.user_id, { connection_status: 'CONNECTED', conversation_id: convId, request_id: null })
     }
   }
 
   async function handleDisconnect() {
-    setDisconnecting(true)
-    try {
-      await fetchApi<unknown>(`/chat/connections/${profile.user_id}`, { method: 'DELETE' })
+    if (await conn.disconnect()) {
       onUpdate(profile.user_id, { connection_status: 'NONE', conversation_id: null })
       setDisconnectConfirmOpen(false)
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Trennen')
-    } finally {
-      setDisconnecting(false)
     }
   }
 
   const age = calcAge(profile.birthdate)
-  const cs = profile.connection_status ?? 'NONE'
 
   function renderAction() {
+    const cs = conn.connectionStatus
     if (cs === 'CONNECTED') {
       return (
         <div className="space-y-2">
           <button
-            onClick={() => profile.conversation_id && router.push(`/chat/${profile.conversation_id}`)}
-            disabled={!profile.conversation_id}
+            onClick={() => conn.conversationId && router.push(`/chat/${conn.conversationId}`)}
+            disabled={!conn.conversationId}
             className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             aria-label={`Mit ${profile.nickname} chatten`}
           >
@@ -181,22 +158,22 @@ function ProfileCard({
       return (
         <button
           onClick={handleAccept}
-          disabled={busy}
+          disabled={conn.isLoading}
           className="w-full py-2.5 rounded-full bg-tertiary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           aria-label={`Anfrage von ${profile.nickname} annehmen`}
         >
-          {busy ? <Spinner /> : 'Anfrage annehmen'}
+          {conn.isLoading ? <Spinner /> : 'Anfrage annehmen'}
         </button>
       )
     }
     return (
       <button
         onClick={handleConnect}
-        disabled={busy}
+        disabled={conn.isLoading}
         className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         aria-label={`Mit ${profile.nickname} verbinden`}
       >
-        {busy ? <Spinner /> : 'Verbinden'}
+        {conn.isLoading ? <Spinner /> : 'Verbinden'}
       </button>
     )
   }
@@ -275,9 +252,9 @@ function ProfileCard({
 
         <div className="mt-auto space-y-2">
           {renderAction()}
-          {errorMsg && (
+          {conn.error && (
             <p className="text-xs text-error text-center leading-tight" role="alert">
-              {errorMsg}
+              {conn.error}
             </p>
           )}
         </div>
@@ -288,7 +265,7 @@ function ProfileCard({
         <>
           <div
             className="fixed inset-0 z-20 bg-black/50"
-            onClick={() => !disconnecting && setDisconnectConfirmOpen(false)}
+            onClick={() => !conn.isLoading && setDisconnectConfirmOpen(false)}
             aria-hidden="true"
           />
           <div
@@ -306,17 +283,17 @@ function ProfileCard({
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <button
                 onClick={handleDisconnect}
-                disabled={disconnecting}
+                disabled={conn.isLoading}
                 className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
-                {disconnecting && (
+                {conn.isLoading && (
                   <span className="h-3.5 w-3.5 rounded-full border-2 border-error/30 border-t-error animate-spin" aria-hidden="true" />
                 )}
                 Trennen
               </button>
               <button
                 onClick={() => setDisconnectConfirmOpen(false)}
-                disabled={disconnecting}
+                disabled={conn.isLoading}
                 className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
               >
                 Abbrechen

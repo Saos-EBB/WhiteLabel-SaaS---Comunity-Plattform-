@@ -58,8 +58,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           high_contrast: user.high_contrast,
           lang_simple: user.lang_simple,
         })
-        if (!user.is_banned && !user.onboarding_completed && !window.location.pathname.startsWith('/onboarding')) {
-          router.push('/onboarding')
+        if (!user.is_banned && !user.onboarding_completed) {
+          if (!window.location.pathname.startsWith('/onboarding')) {
+            router.push('/onboarding')
+          }
         }
 
         const sock = connect()
@@ -126,5 +128,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return () => { disconnect() }
   }, [router])
 
-  return <>{isBanned && <BanScreen />}{children}</>
+  return (
+    <>
+      {isBanned && <BanScreen />}
+      {children}
+    </>
+  )
 }

@@ -579,7 +579,7 @@ export default function ConversationPage() {
             <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             {blockedBy === 'them'
               ? 'Dieser Nutzer hat dich blockiert.'
-              : 'Du kannst diesem Nutzer keine Nachrichten senden.'}
+              : 'Du hast diesen Nutzer blockiert.'}
           </div>
         )}
         <div className="flex items-center gap-2 max-w-3xl mx-auto">
@@ -590,7 +590,11 @@ export default function ConversationPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Nachricht schreiben…"
-            className="flex-1 rounded-full bg-surface-container border border-outline-variant px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
+            className={`flex-1 rounded-full border px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none min-h-[44px] transition-colors ${
+              isBlocked
+                ? 'bg-surface-container-high border-outline-variant opacity-50 cursor-not-allowed'
+                : 'bg-surface-container border-outline-variant focus:border-primary-fixed-dim'
+            }`}
             aria-label="Nachricht eingeben"
             disabled={loading || !!error || isBlocked}
           />

@@ -466,6 +466,31 @@ Text falls back to `process.env.NEXT_PUBLIC_BAN_SCREEN_TEXT` or the default stri
 
 ---
 
+### `useConnectionAction` — `hooks/useConnectionAction.ts`
+
+Custom hook that manages all connection state mutations for a target user.
+
+```ts
+const conn = useConnectionAction(targetUserId, initialStatus, initialRequestId, initialConversationId)
+```
+
+| Return value | Type | Description |
+|---|---|---|
+| `connectionStatus` | `ConnectionStatus` | Live status: `NONE \| SENT \| RECEIVED \| CONNECTED \| BLOCKED` |
+| `conversationId` | `string \| null` | Conversation ID once connected |
+| `isLoading` | `boolean` | True while any async action is in flight |
+| `error` | `string \| null` | Last error message; cleared on next action |
+| `sendRequest()` | `() => Promise<boolean>` | POST `/chat/requests` |
+| `acceptRequest()` | `() => Promise<string \| null>` | PATCH `/chat/requests/:id/accept` — returns new `conversationId` |
+| `declineRequest()` | `() => Promise<boolean>` | PATCH `/chat/requests/:id/decline` |
+| `disconnect()` | `() => Promise<boolean>` | DELETE `/chat/connections/:userId` |
+| `block()` | `() => Promise<boolean>` | POST `/profile/me/block/:userId` |
+| `unblock()` | `() => Promise<boolean>` | DELETE `/profile/me/block/:userId` |
+
+Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a real UUID. Used by Discover and the public profile page.
+
+---
+
 ## Key notes
 
 - `sender_id` on messages is the account UUID. Always use `user.user_id` (not `user.id`) for `isOwn` comparisons.
@@ -489,7 +514,21 @@ Text falls back to `process.env.NEXT_PUBLIC_BAN_SCREEN_TEXT` or the default stri
 ## Changelog
 
 ### 2026-05-23 (latest)
-- Admin (`/admin`): new **Einstellungen** tab — reads `GET /admin/settings`, renders key/value table, saves per-key via `PUT /admin/settings/:key`
+- Admin (`/admin`): new **Swipe View** for media moderation — full-screen overlay with one card at a time; approve with → key / right arrow button / right swipe, reject with ← key / left arrow button / left swipe; audio cards show filename + Play/Pause (Spacebar); type filter (Alle / Fotos / Audio); counter ("3 von 12"); tilt animation on action; replaces the grid-of-cards approach for faster review
+- Admin (`/admin`): `AdminStrike` type gains `ban_lifted_at` field (was missing from the interface)
+- Onboarding: merged three-step profile info flow (separate Nickname, Birthdate+City, and Bio steps) into a single **StepProfileInfo** step — all required fields (nickname, birthdate, city) validated together before advancing; optional fields (bio, gender, looking_for) remain on later steps
+- Onboarding: added `useTranslation` hook integration — step 1 welcome text and CTA now use `t.onboarding.*` keys from `config/translations.ts`
+- New hook: `hooks/useConnectionAction.ts` — `useConnectionAction(targetUserId, initialStatus, initialRequestId, initialConversationId)` centralises all connection state mutations (send request, accept, decline, disconnect, block, unblock) with shared `isLoading` / `error` state; syncs from props when `targetUserId` transitions from `''` to a real value; used by Discover and public profile
+- Discover (`/discover`) + Public profile (`/profile/[nickname]`): refactored to use `useConnectionAction` — removed per-page duplicated fetch logic and state (`busy`, `disconnecting`, `blocking`, `requestStatus`, `requestError`, etc.)
+- Public profile: `PublicProfile` type gains `request_id` and `conversation_id` fields (needed by `useConnectionAction`)
+- Chat (`/chat/[id]`): block banner text corrected — "Du kannst diesem Nutzer keine Nachrichten senden." → "Du hast diesen Nutzer blockiert."; blocked input field now shows `bg-surface-container-high opacity-50 cursor-not-allowed` styling instead of plain disabled
+- Own profile (`/profile`): "Ersetzen" and "Neue Aufnahme" audio action buttons now only shown in edit mode (were always visible when audio had status pending or rejected)
+- TopNav: status dot in the status button now shows green whenever the user is logged in (`!!accessToken`) instead of checking `statusVisible` — prevents the dot going grey when the user sets themselves to invisible (which is the backend's job, not the dot's)
+- `AuthProvider`: minor formatting refactor — `return` now uses explicit JSX wrapping instead of a fragment expression
+- New: `config/translations.ts` — `translations` object with German source-of-truth (`de`) and empty `en` / `leicht` stubs typed via `DeepPartial<TranslationKeys>`; `TranslationKeys` inferred from German so TypeScript surfaces every missing key when a stub is promoted
+- New: `hooks/useTranslation.ts` — `useTranslation()` hook reads `lang_simple` from auth store to select the active locale
+
+### 2026-05-23
 
 ### 2026-05-22 (latest)
 - Auth: ban state now derived from backend on every app startup — `AuthProvider` checks `user.is_banned` in the `/profile/me` response and calls `setBanned(true)` if true. Stale ban state no longer survives across sessions.

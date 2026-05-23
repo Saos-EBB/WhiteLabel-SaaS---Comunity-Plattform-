@@ -297,7 +297,7 @@ export default function TopNav() {
             >
               <span className="pointer-events-none [&>span>span:last-child]:hidden">
                 <OnlineIndicator
-                  is_online={statusVisible}
+                  is_online={!!accessToken}
                   status_message={statusMessage}
                   size="sm"
                 />
