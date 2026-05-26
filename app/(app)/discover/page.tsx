@@ -260,20 +260,15 @@ function ProfileCard({
         </div>
       </div>
 
-      {/* Disconnect confirmation bottom sheet */}
+      {/* Disconnect confirmation modal */}
       {disconnectConfirmOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-20 bg-black/50"
-            onClick={() => !conn.isLoading && setDisconnectConfirmOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Verbindung trennen"
-          >
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Verbindung trennen"
+        >
+          <div className="bg-surface-container-high rounded-2xl p-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <p className="font-semibold text-on-surface">Verbindung trennen?</p>
               <p className="text-sm text-on-surface-variant">
@@ -300,7 +295,7 @@ function ProfileCard({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </article>
   )

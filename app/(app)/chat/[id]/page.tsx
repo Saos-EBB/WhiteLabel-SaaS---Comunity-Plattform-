@@ -11,6 +11,7 @@ import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import ReportModal from '@/components/ui/ReportModal'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,25 +39,6 @@ function normalise(res: MsgEnvelope): Message[] {
   return Array.isArray(res) ? res : (res?.data ?? [])
 }
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const sameDay =
-    d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear()
-
-  if (sameDay) {
-    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-  }
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) +
-    ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-}
-
-function shortId(id: string): string {
-  return `Nutzer ${id.slice(0, 6).toUpperCase()}`
-}
-
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
 function MessageBubble({
@@ -72,8 +54,25 @@ function MessageBubble({
   onLongPress: (id: string) => void
   onContextMenu: (e: React.MouseEvent, id: string) => void
 }) {
+  const { t, locale } = useTranslation()
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const didLongPress = useRef(false)
+
+  function formatTime(dateStr: string): string {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const sameDay =
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear()
+
+    const loc = locale === 'en' ? 'en-GB' : 'de-DE'
+    if (sameDay) {
+      return d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+    }
+    return d.toLocaleDateString(loc, { day: '2-digit', month: '2-digit' }) +
+      ' ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+  }
 
   function startPress() {
     didLongPress.current = false
@@ -94,7 +93,7 @@ function MessageBubble({
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
         <p className="text-xs italic text-on-surface-variant px-3 py-2">
-          Nachricht gelöscht
+          {t.chat.messageDeleted}
         </p>
       </div>
     )
@@ -134,10 +133,10 @@ function MessageBubble({
             {formatTime(msg.sent_at)}
           </time>
           {msg._status === 'pending' && (
-            <Loader2 className="h-3 w-3 text-on-surface-variant animate-spin" aria-label="Wird gesendet" />
+            <Loader2 className="h-3 w-3 text-on-surface-variant animate-spin" aria-label={t.chat.sendingAriaLabel} />
           )}
           {msg._status === 'error' && (
-            <AlertCircle className="h-3 w-3 text-error" aria-label="Fehler beim Senden" />
+            <AlertCircle className="h-3 w-3 text-error" aria-label={t.chat.sendErrorAriaLabel} />
           )}
         </div>
       </div>
@@ -151,6 +150,7 @@ export default function ConversationPage() {
   const params = useParams<{ id: string }>()
   const conversationId = params.id
   const router = useRouter()
+  const { t } = useTranslation()
 
   const currentUserId   = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
   const accessToken     = useAuthStore((s) => s.accessToken)
@@ -192,6 +192,10 @@ export default function ConversationPage() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingEmit = useRef(0)
 
+  function shortId(id: string): string {
+    return t.chat.shortUserId.replace('{id}', id.slice(0, 6).toUpperCase())
+  }
+
   // ── Active conversation tracking (suppresses bell notifications) ───────────
 
   useEffect(() => {
@@ -230,7 +234,7 @@ export default function ConversationPage() {
           .catch(() => { /* header falls back to shortId */ })
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden')
+        setError(err instanceof Error ? err.message : t.chat.loadError)
       } finally {
         setLoading(false)
       }
@@ -426,7 +430,7 @@ export default function ConversationPage() {
         <Link
           href="/chat"
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-surface-container transition-colors flex-shrink-0"
-          aria-label="Zurück zur Nachrichtenliste"
+          aria-label={t.chat.backToList}
         >
           <ChevronLeft className="h-5 w-5 text-on-surface" aria-hidden="true" />
         </Link>
@@ -440,7 +444,7 @@ export default function ConversationPage() {
 
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-on-surface text-sm truncate">
-            {isBlocked ? 'XXXX' : partnerNickname ?? (partnerId ? shortId(partnerId) : 'Gespräch')}
+            {isBlocked ? 'XXXX' : partnerNickname ?? (partnerId ? shortId(partnerId) : t.chat.conversation)}
           </p>
           <OnlineIndicator
             is_online={partnerIsOnline}
@@ -454,7 +458,7 @@ export default function ConversationPage() {
           <button
             onClick={() => setMenuOpen((v) => !v)}
             className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-surface-container transition-colors"
-            aria-label="Mehr Optionen"
+            aria-label={t.chat.moreOptions}
             aria-expanded={menuOpen}
             aria-haspopup="true"
           >
@@ -477,7 +481,7 @@ export default function ConversationPage() {
                   role="menuitem"
                 >
                   <Trash2 className="h-4 w-4 text-error flex-shrink-0" aria-hidden="true" />
-                  Chat löschen
+                  {t.chat.deleteChat}
                 </button>
                 <button
                   onClick={() => { setMenuOpen(false); setReportOpen(true) }}
@@ -485,7 +489,7 @@ export default function ConversationPage() {
                   role="menuitem"
                 >
                   <Flag className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
-                  User melden
+                  {t.chat.reportUser}
                 </button>
                 <button
                   onClick={() => { setMenuOpen(false); setBlockOpen(true) }}
@@ -493,7 +497,7 @@ export default function ConversationPage() {
                   role="menuitem"
                 >
                   <Ban className="h-4 w-4 text-error flex-shrink-0" aria-hidden="true" />
-                  Nutzer blockieren
+                  {t.chat.blockUser}
                 </button>
               </div>
             </>
@@ -506,27 +510,27 @@ export default function ConversationPage() {
         className="px-4 py-4 space-y-3 pb-32 md:pb-24"
         role="log"
         aria-live="polite"
-        aria-label="Nachrichten"
+        aria-label={t.chat.title}
       >
         {(loading || currentUserId === undefined) ? (
           <div className="flex justify-center py-12" aria-busy="true">
-            <Loader2 className="h-6 w-6 text-on-surface-variant animate-spin" aria-label="Lädt Nachrichten" />
+            <Loader2 className="h-6 w-6 text-on-surface-variant animate-spin" aria-label={t.chat.loadingMessages} />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-3" role="alert">
             <AlertCircle className="h-10 w-10 text-error" aria-hidden="true" />
-            <p className="text-on-surface font-semibold">Fehler beim Laden</p>
+            <p className="text-on-surface font-semibold">{t.chat.loadError}</p>
             <p className="text-on-surface-variant text-sm">{error}</p>
             <button
               onClick={() => window.location.reload()}
               className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
             >
-              Erneut versuchen
+              {t.common.retry}
             </button>
           </div>
         ) : messages.length === 0 ? (
           <p className="text-center text-on-surface-variant text-sm py-12">
-            Noch keine Nachrichten. Starte das Gespräch!
+            {t.chat.startConversation}
           </p>
         ) : (
           messages.map((msg) => (
@@ -541,7 +545,7 @@ export default function ConversationPage() {
           ))
         )}
         {partnerTyping && (
-          <div className="flex items-end gap-2 justify-start" aria-label="Tipp-Indikator">
+          <div className="flex items-end gap-2 justify-start" aria-label={t.chat.typingAriaLabel}>
             <div
               className="flex-shrink-0 h-7 w-7 rounded-full bg-surface-container-high flex items-center justify-center mb-0.5"
               aria-hidden="true"
@@ -566,7 +570,7 @@ export default function ConversationPage() {
         <button
           onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
           className="fixed bottom-36 md:bottom-20 right-4 z-10 h-10 w-10 rounded-full bg-surface-container-high border border-outline-variant shadow-md flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors"
-          aria-label="Nach unten scrollen"
+          aria-label={t.chat.scrollDownAriaLabel}
         >
           <ChevronDown className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -577,9 +581,7 @@ export default function ConversationPage() {
         {isBlocked && (
           <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2 rounded-xl bg-error-container text-error px-4 py-2.5 text-sm" role="alert">
             <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            {blockedBy === 'them'
-              ? 'Dieser Nutzer hat dich blockiert.'
-              : 'Du hast diesen Nutzer blockiert.'}
+            {blockedBy === 'them' ? t.chat.blockedBy : t.chat.blocked}
           </div>
         )}
         <div className="flex items-center gap-2 max-w-3xl mx-auto">
@@ -589,20 +591,20 @@ export default function ConversationPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Nachricht schreiben…"
+            placeholder={t.chat.inputPlaceholder}
             className={`flex-1 rounded-full border px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none min-h-[44px] transition-colors ${
               isBlocked
                 ? 'bg-surface-container-high border-outline-variant opacity-50 cursor-not-allowed'
                 : 'bg-surface-container border-outline-variant focus:border-primary-fixed-dim'
             }`}
-            aria-label="Nachricht eingeben"
+            aria-label={t.chat.inputAriaLabel}
             disabled={loading || !!error || isBlocked}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending || loading || !!error || isBlocked}
             className="flex-shrink-0 h-11 w-11 rounded-full bg-primary-fixed-dim text-on-primary-container flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            aria-label="Nachricht senden"
+            aria-label={t.chat.sendAriaLabel}
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -613,27 +615,22 @@ export default function ConversationPage() {
         </div>
       </div>
 
-      {/* Delete chat confirmation bottom sheet */}
+      {/* Delete chat confirmation modal */}
       {deleteChatOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-20 bg-black/50"
-            onClick={() => !deletingChat && setDeleteChatOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Chat löschen"
-          >
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.chat.deleteChatTitle}
+        >
+          <div className="bg-surface-container-high rounded-2xl p-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-container">
                 <Trash2 className="h-5 w-5 text-error" aria-hidden="true" />
               </div>
-              <p className="font-semibold text-on-surface">Chat löschen?</p>
+              <p className="font-semibold text-on-surface">{t.chat.deleteChatTitle}</p>
               <p className="text-sm text-on-surface-variant">
-                Der Chat wird nur bei dir gelöscht. Die andere Person sieht ihn weiterhin.
+                {t.chat.deleteChatDesc}
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
@@ -645,10 +642,10 @@ export default function ConversationPage() {
                 {deletingChat ? (
                   <span className="inline-flex items-center justify-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                    Löschen…
+                    {t.common.deleting}
                   </span>
                 ) : (
-                  'Löschen'
+                  t.chat.deleteChatConfirm
                 )}
               </button>
               <button
@@ -656,11 +653,11 @@ export default function ConversationPage() {
                 disabled={deletingChat}
                 className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
               >
-                Abbrechen
+                {t.common.cancel}
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Report modal */}
@@ -671,27 +668,22 @@ export default function ConversationPage() {
         />
       )}
 
-      {/* Block user confirmation bottom sheet */}
+      {/* Block user confirmation modal */}
       {blockOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-20 bg-black/50"
-            onClick={() => !blocking && setBlockOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Nutzer blockieren"
-          >
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.chat.blockTitle}
+        >
+          <div className="bg-surface-container-high rounded-2xl p-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-container">
                 <Ban className="h-5 w-5 text-error" aria-hidden="true" />
               </div>
-              <p className="font-semibold text-on-surface">Nutzer blockieren?</p>
+              <p className="font-semibold text-on-surface">{t.chat.blockTitle}</p>
               <p className="text-sm text-on-surface-variant">
-                Der Nutzer wird aus deiner Suche entfernt. Du kannst ihm keine Nachrichten mehr senden. Diese Aktion kann rückgängig gemacht werden.
+                {t.chat.blockDesc}
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
@@ -701,41 +693,36 @@ export default function ConversationPage() {
                 className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
                 {blocking && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-                Blockieren
+                {t.chat.blockConfirm}
               </button>
               <button
                 onClick={() => setBlockOpen(false)}
                 disabled={blocking}
                 className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
               >
-                Abbrechen
+                {t.common.cancel}
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Delete message confirmation bottom sheet */}
+      {/* Delete message confirmation modal */}
       {deleteTargetId && (
-        <>
-          <div
-            className="fixed inset-0 z-20 bg-black/50"
-            onClick={() => !deleting && setDeleteTargetId(null)}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Nachricht löschen"
-          >
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.chat.deleteMessageTitle}
+        >
+          <div className="bg-surface-container-high rounded-2xl p-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-container">
                 <Trash2 className="h-5 w-5 text-error" aria-hidden="true" />
               </div>
-              <p className="font-semibold text-on-surface">Nachricht löschen?</p>
+              <p className="font-semibold text-on-surface">{t.chat.deleteMessageTitle}</p>
               <p className="text-sm text-on-surface-variant">
-                Diese Aktion kann nicht rückgängig gemacht werden.
+                {t.chat.deleteMessageDesc}
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
@@ -747,10 +734,10 @@ export default function ConversationPage() {
                 {deleting ? (
                   <span className="inline-flex items-center justify-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                    Löschen…
+                    {t.common.deleting}
                   </span>
                 ) : (
-                  'Löschen'
+                  t.chat.deleteMessageConfirm
                 )}
               </button>
               <button
@@ -758,11 +745,11 @@ export default function ConversationPage() {
                 disabled={deleting}
                 className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
               >
-                Abbrechen
+                {t.common.cancel}
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
     </div>

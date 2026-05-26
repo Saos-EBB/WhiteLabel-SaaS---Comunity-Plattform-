@@ -11,6 +11,7 @@ import {
   type Notification as AppNotification,
   type NotificationType,
 } from '@/lib/store/notificationStore'
+import { useTranslation } from '@/lib/i18n'
 
 type Tab = 'neu' | 'verlauf'
 
@@ -22,26 +23,8 @@ const TYPE_ICONS: Record<NotificationType, typeof MessageCircle> = {
   request: UserPlus,
 }
 
-const TYPE_LABELS: Record<NotificationType, string> = {
-  message: 'Nachricht',
-  match:   'Match',
-  system:  'System',
-  ban:     'Gesperrt',
-  request: 'Anfrage',
-}
-
-function relativeTime(dateString: string): string {
-  const diff = Date.now() - new Date(dateString).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'gerade eben'
-  if (mins < 60) return `vor ${mins} Min.`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `vor ${hours} Std.`
-  const days = Math.floor(hours / 24)
-  return `vor ${days} Tag${days !== 1 ? 'en' : ''}`
-}
-
 export default function NotificationsPage() {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('neu')
   const [loading, setLoading]     = useState(true)
   const [deleting, setDeleting]   = useState(false)
@@ -50,6 +33,25 @@ export default function NotificationsPage() {
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount   = useNotificationStore((s) => s.unreadCount)
 
+  const TYPE_LABELS: Record<NotificationType, string> = {
+    message: t.notifications.typeMessage,
+    match:   t.notifications.typeMatch,
+    system:  t.notifications.typeSystem,
+    ban:     t.notifications.typeBan,
+    request: t.notifications.typeRequest,
+  }
+
+  function relativeTime(dateString: string): string {
+    const diff = Date.now() - new Date(dateString).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return t.relativeTime.justNow
+    if (mins < 60) return t.relativeTime.minutesAgo.replace('{mins}', String(mins))
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return t.relativeTime.hoursAgo.replace('{hours}', String(hours))
+    const days = Math.floor(hours / 24)
+    return (days === 1 ? t.relativeTime.daysAgo : t.relativeTime.daysAgoPlural).replace('{days}', String(days))
+  }
+
   useEffect(() => {
     async function load() {
       try {
@@ -57,7 +59,7 @@ export default function NotificationsPage() {
         useNotificationStore.getState().setNotifications(data)
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden')
+        setError(err instanceof Error ? err.message : t.notifications.loadError)
       } finally {
         setLoading(false)
       }
@@ -122,7 +124,7 @@ export default function NotificationsPage() {
       <main className="min-h-screen bg-background flex items-center justify-center">
         <Loader2
           className="h-6 w-6 text-on-surface-variant animate-spin"
-          aria-label="Lädt Benachrichtigungen"
+          aria-label={t.notifications.loadingLabel}
         />
       </main>
     )
@@ -138,14 +140,14 @@ export default function NotificationsPage() {
       >
         <AlertCircle className="h-10 w-10 text-error" aria-hidden="true" />
         <p className="text-on-surface font-semibold">
-          Benachrichtigungen konnten nicht geladen werden
+          {t.notifications.loadError}
         </p>
         <p className="text-on-surface-variant text-sm">{error}</p>
         <button
           onClick={() => window.location.reload()}
           className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
         >
-          Erneut versuchen
+          {t.common.retry}
         </button>
       </main>
     )
@@ -159,15 +161,15 @@ export default function NotificationsPage() {
 
         {/* Header */}
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-on-surface">Benachrichtigungen</h1>
+          <h1 className="text-2xl font-bold text-on-surface">{t.notifications.title}</h1>
           {activeTab === 'neu' && unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
               className="flex items-center gap-2 px-4 py-2 rounded-full border border-outline-variant text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors min-h-[44px] flex-shrink-0"
             >
               <CheckCheck className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-              <span className="hidden sm:inline">Alle als gelesen markieren</span>
-              <span className="sm:hidden">Alle lesen</span>
+              <span className="hidden sm:inline">{t.notifications.markAllRead}</span>
+              <span className="sm:hidden">{t.notifications.markAllReadShort}</span>
             </button>
           )}
           {activeTab === 'verlauf' && tabNotifications.length > 0 && (
@@ -180,7 +182,7 @@ export default function NotificationsPage() {
                 ? <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin" aria-hidden="true" />
                 : <Trash2 className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
               }
-              <span>Alle löschen</span>
+              <span>{t.notifications.deleteAll}</span>
             </button>
           )}
         </div>
@@ -188,12 +190,12 @@ export default function NotificationsPage() {
         {/* Tabs */}
         <div
           role="group"
-          aria-label="Benachrichtigungen filtern"
+          aria-label={t.notifications.filterLabel}
           className="flex rounded-xl overflow-hidden border border-outline-variant"
         >
           {([
-            { key: 'neu' as Tab,     label: unreadCount > 0 ? `Neu (${unreadCount})` : 'Neu' },
-            { key: 'verlauf' as Tab, label: 'Verlauf' },
+            { key: 'neu' as Tab,     label: unreadCount > 0 ? `${t.notifications.tabNew} (${unreadCount})` : t.notifications.tabNew },
+            { key: 'verlauf' as Tab, label: t.notifications.tabHistory },
           ]).map(({ key, label }, i, arr) => (
             <button
               key={key}
@@ -216,12 +218,10 @@ export default function NotificationsPage() {
         {tabNotifications.length === 0 ? (
           <div className="rounded-2xl bg-surface-container border border-outline-variant p-10 flex flex-col items-center gap-2 text-center">
             <p className="text-on-surface font-medium">
-              {activeTab === 'neu' ? 'Keine neuen Benachrichtigungen' : 'Kein Verlauf'}
+              {activeTab === 'neu' ? t.notifications.emptyNew : t.notifications.emptyHistory}
             </p>
             <p className="text-sm text-on-surface-variant">
-              {activeTab === 'neu'
-                ? 'Du hast keine ungelesenen Benachrichtigungen.'
-                : 'Gelesene Benachrichtigungen erscheinen hier.'}
+              {activeTab === 'neu' ? t.notifications.emptyNewDesc : t.notifications.emptyHistoryDesc}
             </p>
           </div>
         ) : (
@@ -277,7 +277,7 @@ export default function NotificationsPage() {
                   <button
                     onClick={() => handleDelete(n)}
                     className="flex-shrink-0 px-4 text-on-surface-variant/40 hover:text-error transition-colors"
-                    aria-label="Benachrichtigung löschen"
+                    aria-label={t.notifications.deleteNotification}
                   >
                     <Trash2 size={16} aria-hidden />
                   </button>

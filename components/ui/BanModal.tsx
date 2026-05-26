@@ -63,7 +63,8 @@ export default function BanModal({ userId, nickname, reportId, onSuccess, onClos
         onClick={() => !loading && onClose()}
         aria-hidden="true"
       />
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
+      {/* pb-16 = nav bar height (h-16) on mobile so the sheet clears the fixed bottom nav */}
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none pb-16 sm:pb-0">
         <div
           role="dialog"
           aria-modal="true"

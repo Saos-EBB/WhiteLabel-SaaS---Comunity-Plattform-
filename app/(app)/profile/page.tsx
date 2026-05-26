@@ -6,6 +6,7 @@ import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,8 @@ interface Profile {
   is_published: boolean
   status_visible: boolean
   status_message: string | null
+  nickname_changed_at: string | null
+  gender_changed_at: string | null
 }
 
 type AudioStatus = 'none' | 'recording' | 'preview' | 'uploading' | 'pending' | 'approved' | 'rejected'
@@ -61,9 +64,15 @@ function calcAge(birthdate: string): number {
   return Math.floor((Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
 }
 
+function formatGermanDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
+  const { t } = useTranslation()
+
   const [profile, setProfile]             = useState<Profile | null>(null)
   const [userInterests, setUserInterests] = useState<UserInterest[]>([])
   const [allInterests, setAllInterests]   = useState<Interest[]>([])
@@ -74,8 +83,10 @@ export default function ProfilePage() {
   const [draft, setDraft]         = useState({
     nickname: '', bio: '', city: '', gender: '', looking_for: '', is_published: false,
   })
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving]               = useState(false)
+  const [saveError, setSaveError]         = useState<string | null>(null)
+  const [showNicknameConfirm, setShowNicknameConfirm] = useState(false)
+  const [showGenderConfirm, setShowGenderConfirm]     = useState(false)
 
   const [interestLoading, setInterestLoading] = useState<string | null>(null)
 
@@ -128,12 +139,13 @@ export default function ProfilePage() {
         setAllInterests(normalise(ai))
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden')
+        setError(err instanceof Error ? err.message : t.common.error)
       } finally {
         setLoading(false)
       }
     }
     load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Edit ──────────────────────────────────────────────────────────────────
@@ -175,6 +187,21 @@ export default function ProfilePage() {
 
   async function handleSave() {
     if (!profile || !draft.nickname.trim()) return
+    if (draft.nickname !== originalNickname.current) {
+      setShowNicknameConfirm(true)
+      return
+    }
+    if (draft.gender !== originalGender.current) {
+      setShowGenderConfirm(true)
+      return
+    }
+    await performSave()
+  }
+
+  async function performSave() {
+    if (!profile || !draft.nickname.trim()) return
+    setShowNicknameConfirm(false)
+    setShowGenderConfirm(false)
     setSaving(true)
     setSaveError(null)
     try {
@@ -194,7 +221,7 @@ export default function ProfilePage() {
           })
           if (!res.ok) {
             const body = await res.json().catch(() => ({})) as { message?: string }
-            throw new Error(body.message ?? 'Foto-Upload fehlgeschlagen')
+            throw new Error(body.message ?? t.onboarding.photoUploadFailed)
           }
           const data = await res.json() as { file_url: string; id: string }
           URL.revokeObjectURL(pendingPhotoPreview!)
@@ -227,7 +254,7 @@ export default function ProfilePage() {
       }
       setEditMode(false)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Fehler beim Speichern'
+      const msg = err instanceof Error ? err.message : t.common.error
       setSaveError(
         msg.toLowerCase().includes('einmal pro jahr')
           ? 'Änderung nicht möglich — du hast dieses Feld bereits dieses Jahr geändert.'
@@ -268,11 +295,11 @@ export default function ProfilePage() {
     e.target.value = ''
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setPhotoPickError('Nur JPEG, PNG und WebP erlaubt')
+      setPhotoPickError(t.onboarding.photoTypeError)
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      setPhotoPickError('Datei zu groß. Maximal 5 MB erlaubt.')
+      setPhotoPickError(t.onboarding.photoSizeError)
       return
     }
     setPhotoPickError(null)
@@ -286,7 +313,7 @@ export default function ProfilePage() {
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current !== null) clearInterval(timerIntervalRef.current)
-      streamRef.current?.getTracks().forEach((t) => t.stop())
+      streamRef.current?.getTracks().forEach((tr) => tr.stop())
     }
   }, [])
 
@@ -314,7 +341,7 @@ export default function ProfilePage() {
         setAudioBlob(blob)
         setAudioUrl(URL.createObjectURL(blob))
         setAudioStatus('preview')
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((tr) => tr.stop())
         streamRef.current = null
       }
 
@@ -331,7 +358,7 @@ export default function ProfilePage() {
         }
       }, 1000)
     } catch {
-      setAudioError('Mikrofon nicht verfügbar')
+      setAudioError(t.profile.micUnavailable)
     }
   }
 
@@ -373,14 +400,14 @@ export default function ProfilePage() {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string }
-        throw new Error(body.message ?? 'Audio-Upload fehlgeschlagen')
+        throw new Error(body.message ?? t.common.error)
       }
       if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl)
       setAudioBlob(null)
       setAudioUrl(null)
       setAudioStatus('pending')
     } catch (err) {
-      setAudioError(err instanceof Error ? err.message : 'Fehler beim Hochladen')
+      setAudioError(err instanceof Error ? err.message : t.common.error)
       setAudioStatus('preview')
     }
   }
@@ -393,7 +420,7 @@ export default function ProfilePage() {
       setAudioBlob(null)
       setAudioStatus('none')
     } catch (err) {
-      setAudioError(err instanceof Error ? err.message : 'Fehler beim Löschen')
+      setAudioError(err instanceof Error ? err.message : t.common.error)
     }
   }
 
@@ -402,7 +429,7 @@ export default function ProfilePage() {
     e.target.value = ''
     if (!file) return
     if (file.size > 5 * 1024 * 1024) {
-      setAudioError('Datei zu groß. Maximal 5 MB erlaubt.')
+      setAudioError(t.onboarding.photoSizeError)
       return
     }
     setAudioError(null)
@@ -416,12 +443,24 @@ export default function ProfilePage() {
 
   const selectedIds = new Set(userInterests.map((ui) => ui.interest_id))
 
+  const nicknameChangedAt = profile?.nickname_changed_at ?? null
+  const nicknameChangedWithinYear = nicknameChangedAt
+    ? Date.now() - new Date(nicknameChangedAt).getTime() < 365 * 24 * 60 * 60 * 1000
+    : false
+  const nicknameChangesRemaining = nicknameChangedWithinYear ? 0 : 1
+
+  const genderChangedAt = profile?.gender_changed_at ?? null
+  const genderChangedWithinYear = genderChangedAt
+    ? Date.now() - new Date(genderChangedAt).getTime() < 365 * 24 * 60 * 60 * 1000
+    : false
+  const genderChangesRemaining = genderChangedWithinYear ? 0 : 1
+
   // ── Loading / error ───────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-6 w-6 text-on-surface-variant animate-spin" aria-label="Lädt Profil" />
+        <Loader2 className="h-6 w-6 text-on-surface-variant animate-spin" aria-label={t.common.loading} />
       </main>
     )
   }
@@ -430,13 +469,13 @@ export default function ProfilePage() {
     return (
       <main className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 p-6 text-center" role="alert">
         <AlertCircle className="h-10 w-10 text-error" aria-hidden="true" />
-        <p className="text-on-surface font-semibold">Profil konnte nicht geladen werden</p>
+        <p className="text-on-surface font-semibold">{t.profile.loadError}</p>
         <p className="text-on-surface-variant text-sm">{error}</p>
         <button
           onClick={() => window.location.reload()}
           className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
         >
-          Erneut versuchen
+          {t.common.retry}
         </button>
       </main>
     )
@@ -456,7 +495,7 @@ export default function ProfilePage() {
             {displayPhoto ? (
               <img
                 src={displayPhoto}
-                alt="Profilbild"
+                alt={t.profile.profilePhoto}
                 className={`w-full h-full object-cover rounded-3xl${profile.photo_needs_review && !pendingPhotoPreview ? ' ring-2 ring-error' : ''}`}
               />
             ) : (
@@ -469,7 +508,7 @@ export default function ProfilePage() {
 
             {profile.photo_needs_review && !pendingPhotoPreview && photoUrl && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-error/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
-                Wird überprüft
+                {t.profile.underReview}
               </div>
             )}
 
@@ -479,7 +518,7 @@ export default function ProfilePage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={saving}
                 className="absolute inset-0 rounded-3xl bg-black/40 flex items-center justify-center focus:outline-none disabled:cursor-not-allowed"
-                aria-label="Profilbild ändern"
+                aria-label={t.profile.profilePhoto}
               >
                 {photoUploading ? (
                   <Loader2 className="h-10 w-10 text-white animate-spin" aria-hidden="true" />
@@ -505,7 +544,7 @@ export default function ProfilePage() {
                 <h1 className="text-2xl font-bold text-white leading-tight">{profile.nickname}</h1>
               )}
               {profile.birthdate && (
-                <p className="text-sm text-white/70 mt-0.5">{calcAge(profile.birthdate)} Jahre</p>
+                <p className="text-sm text-white/70 mt-0.5">{calcAge(profile.birthdate)} {t.common.years}</p>
               )}
             </div>
 
@@ -520,8 +559,8 @@ export default function ProfilePage() {
                     onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
                     maxLength={100}
                     className="bg-transparent text-white text-sm w-20 focus:outline-none placeholder-white/50 border-b border-white/30"
-                    placeholder="Stadt"
-                    aria-label="Stadt"
+                    placeholder={t.onboarding.city}
+                    aria-label={t.onboarding.city}
                   />
                 ) : (
                   <span>{profile.city ?? '—'}</span>
@@ -569,13 +608,13 @@ export default function ProfilePage() {
                     value={draft.gender}
                     onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
                     className="w-full appearance-none pl-4 pr-8 py-3 rounded-2xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer"
-                    aria-label="Geschlecht"
+                    aria-label={t.onboarding.gender}
                   >
-                    <option value="">Geschlecht — Keine Angabe</option>
-                    <option value="male">Mann</option>
-                    <option value="female">Frau</option>
-                    <option value="non_binary">Non-Binary</option>
-                    <option value="diverse">Divers</option>
+                    <option value="">{t.onboarding.gender} — {t.onboarding.noChoice}</option>
+                    <option value="male">{t.onboarding.genderMale}</option>
+                    <option value="female">{t.onboarding.genderFemale}</option>
+                    <option value="non_binary">{t.onboarding.genderNonBinary}</option>
+                    <option value="diverse">{t.onboarding.genderDiverse}</option>
                   </select>
                   <ChevronDown
                     className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
@@ -593,13 +632,13 @@ export default function ProfilePage() {
                   value={draft.looking_for}
                   onChange={(e) => setDraft((d) => ({ ...d, looking_for: e.target.value }))}
                   className="w-full appearance-none pl-4 pr-8 py-3 rounded-2xl bg-surface-container border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer"
-                  aria-label="Suche nach"
+                  aria-label={t.onboarding.lookingFor}
                 >
-                  <option value="">Suche nach — Keine Angabe</option>
-                  <option value="friendship">Freundschaft</option>
-                  <option value="relationship">Beziehung</option>
-                  <option value="exchange">Austausch</option>
-                  <option value="all">Alles offen</option>
+                  <option value="">{t.onboarding.lookingFor} — {t.onboarding.noChoice}</option>
+                  <option value="friendship">{t.onboarding.lookingForFriendship}</option>
+                  <option value="relationship">{t.onboarding.lookingForRelationship}</option>
+                  <option value="exchange">{t.onboarding.lookingForExchange}</option>
+                  <option value="all">{t.onboarding.lookingForAll}</option>
                 </select>
                 <ChevronDown
                   className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
@@ -612,7 +651,7 @@ export default function ProfilePage() {
           {/* ── Audio ────────────────────────────────────────────────────── */}
           <div className="w-full mb-5">
             <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide text-center mb-3">
-              Vorstellung
+              {t.profile.audioSection}
             </p>
 
             {audioStatus === 'none' && editMode && (
@@ -623,7 +662,7 @@ export default function ProfilePage() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container-high transition-colors min-h-[44px]"
                 >
                   <Mic className="h-4 w-4" aria-hidden="true" />
-                  Aufnehmen
+                  {t.profile.record}
                 </button>
                 <button
                   type="button"
@@ -631,7 +670,7 @@ export default function ProfilePage() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container-high transition-colors min-h-[44px]"
                 >
                   <Upload className="h-4 w-4" aria-hidden="true" />
-                  Datei wählen
+                  {t.profile.chooseFile}
                 </button>
               </div>
             )}
@@ -649,7 +688,7 @@ export default function ProfilePage() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-error-container text-error text-sm font-medium hover:opacity-90 transition-opacity min-h-[44px]"
                 >
                   <Square className="h-4 w-4" aria-hidden="true" />
-                  Stop
+                  {t.profile.stop}
                 </button>
               </div>
             )}
@@ -663,14 +702,14 @@ export default function ProfilePage() {
                     onClick={discardAudio}
                     className="px-4 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-medium hover:bg-surface-container-high transition-colors min-h-[44px]"
                   >
-                    Nochmal
+                    {t.profile.recordAgain}
                   </button>
                   <button
                     type="button"
                     onClick={uploadAudio}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-medium hover:opacity-90 transition-opacity min-h-[44px]"
                   >
-                    Hochladen
+                    {t.profile.upload}
                   </button>
                 </div>
               </div>
@@ -679,7 +718,7 @@ export default function ProfilePage() {
             {audioStatus === 'uploading' && (
               <div className="flex items-center justify-center gap-2 text-on-surface-variant text-sm py-3">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                Wird hochgeladen…
+                {t.profile.uploading}
               </div>
             )}
 
@@ -687,7 +726,7 @@ export default function ProfilePage() {
               <div className="flex flex-col items-center gap-3">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium">
                   <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                  Warte auf Freigabe
+                  {t.profile.waitingApproval}
                 </span>
                 {editMode && (
                   <button
@@ -695,7 +734,7 @@ export default function ProfilePage() {
                     onClick={() => setAudioStatus('none')}
                     className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
                   >
-                    Ersetzen
+                    {t.profile.replace}
                   </button>
                 )}
               </div>
@@ -706,7 +745,7 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between px-1">
                   <span className="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
                     <CheckCircle2 className="h-3.5 w-3.5 text-primary-fixed-dim" aria-hidden="true" />
-                    Freigegeben
+                    {t.profile.approved}
                   </span>
                   {editMode && (
                     <button
@@ -715,7 +754,7 @@ export default function ProfilePage() {
                       className="flex items-center gap-1 text-xs text-error hover:underline transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      Löschen
+                      {t.profile.deleteAudio}
                     </button>
                   )}
                 </div>
@@ -727,7 +766,7 @@ export default function ProfilePage() {
               <div className="flex flex-col items-center gap-3">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-error-container text-error text-xs font-medium">
                   <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  Abgelehnt
+                  {t.profile.rejected}
                 </span>
                 {editMode && (
                   <button
@@ -735,7 +774,7 @@ export default function ProfilePage() {
                     onClick={() => setAudioStatus('none')}
                     className="text-xs text-on-surface-variant underline hover:text-on-surface transition-colors"
                   >
-                    Neue Aufnahme
+                    {t.profile.newRecording}
                   </button>
                 )}
               </div>
@@ -765,7 +804,7 @@ export default function ProfilePage() {
                   rows={4}
                   maxLength={1000}
                   className="w-full bg-transparent text-on-surface text-sm leading-relaxed text-center focus:outline-none resize-none placeholder:text-on-surface-variant"
-                  placeholder="Erzähl etwas über dich…"
+                  placeholder={t.profile.bioPlaceholder}
                   aria-label="Bio"
                 />
                 <p className="text-xs text-on-surface-variant text-right mt-1" aria-live="polite">
@@ -774,7 +813,7 @@ export default function ProfilePage() {
               </>
             ) : (
               <p className={`leading-relaxed text-center ${profile.bio ? 'text-on-surface' : 'text-on-surface-variant italic text-sm'}`}>
-                {profile.bio ?? 'Noch keine Bio hinzugefügt.'}
+                {profile.bio ?? t.profile.noBio}
               </p>
             )}
           </div>
@@ -782,7 +821,7 @@ export default function ProfilePage() {
           {/* ── Interests ─────────────────────────────────────────────────── */}
           <div className="w-full mb-6">
             <h3 className="text-xs font-medium text-on-surface-variant mb-3 text-center uppercase tracking-wide">
-              Interessen
+              {t.profile.interests}
             </h3>
             <div className="flex flex-wrap gap-2 justify-center">
               {editMode ? (
@@ -810,7 +849,7 @@ export default function ProfilePage() {
                     )
                   })
                 ) : (
-                  <p className="text-sm text-on-surface-variant italic">Keine Interessen verfügbar.</p>
+                  <p className="text-sm text-on-surface-variant italic">{t.profile.noInterestsAvailable}</p>
                 )
               ) : (
                 userInterests.length > 0 ? (
@@ -823,7 +862,7 @@ export default function ProfilePage() {
                     </span>
                   ))
                 ) : (
-                  <p className="text-sm text-on-surface-variant italic">Noch keine Interessen hinzugefügt.</p>
+                  <p className="text-sm text-on-surface-variant italic">{t.profile.noInterestsAdded}</p>
                 )
               )}
             </div>
@@ -836,8 +875,8 @@ export default function ProfilePage() {
                 <p className="text-sm font-medium text-on-surface">Profil sichtbar</p>
                 <p className="text-xs text-on-surface-variant mt-0.5">
                   {draft.is_published
-                    ? 'Öffentlich — andere können dich finden'
-                    : 'Privat — nur du siehst dein Profil'}
+                    ? `${t.profile.visibilityPublic} — andere können dich finden`
+                    : `${t.profile.visibilityPrivate} — nur du siehst dein Profil`}
                 </p>
               </div>
               <button
@@ -874,7 +913,7 @@ export default function ProfilePage() {
                 disabled={saving}
                 className="flex-1 py-4 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container transition-colors disabled:opacity-50"
               >
-                Abbrechen
+                {t.profile.cancel}
               </button>
               <button
                 onClick={handleSave}
@@ -882,7 +921,7 @@ export default function ProfilePage() {
                 className="flex-1 py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                Speichern
+                {t.profile.save}
               </button>
             </div>
           ) : (
@@ -890,7 +929,7 @@ export default function ProfilePage() {
               onClick={startEdit}
               className="w-full py-4 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold hover:opacity-90 active:scale-95 transition-all"
             >
-              Bearbeiten
+              {t.profile.edit}
             </button>
           )}
 
@@ -902,10 +941,104 @@ export default function ProfilePage() {
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors min-h-[52px] mt-12"
         >
           <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-          Abmelden
+          {t.profile.logout}
         </button>
 
       </div>
+
+      {/* ── Nickname change confirmation modal ────────────────────────── */}
+      {showNicknameConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="nickname-confirm-title"
+        >
+          <div className="w-full max-w-sm bg-surface-container rounded-3xl p-6 shadow-xl">
+            <h2 id="nickname-confirm-title" className="text-lg font-bold text-on-surface mb-4">
+              {t.profile.nicknameChangeTitle}
+            </h2>
+
+            <p className="text-sm text-on-surface mb-2">
+              Du hast noch {nicknameChangesRemaining} von 1 Änderung übrig.
+            </p>
+
+            {nicknameChangedAt && (
+              <p className="text-sm text-on-surface-variant mb-2">
+                Zuletzt geändert: {formatGermanDate(nicknameChangedAt)}
+              </p>
+            )}
+
+            <p className="text-sm text-on-surface-variant mb-6">
+              {t.profile.nicknameChangeBody}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowNicknameConfirm(false)}
+                className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-high transition-colors min-h-[44px]"
+              >
+                {t.profile.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={performSave}
+                className="flex-1 py-3 rounded-full bg-error text-white font-semibold hover:opacity-90 transition-opacity min-h-[44px]"
+              >
+                {t.profile.nicknameChangeConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Gender change confirmation modal ──────────────────────────── */}
+      {showGenderConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gender-confirm-title"
+        >
+          <div className="w-full max-w-sm bg-surface-container rounded-3xl p-6 shadow-xl">
+            <h2 id="gender-confirm-title" className="text-lg font-bold text-on-surface mb-4">
+              {t.profile.genderChangeTitle}
+            </h2>
+
+            <p className="text-sm text-on-surface mb-2">
+              Auf den meisten Plattformen ist diese Angabe nicht änderbar. Du hast noch {genderChangesRemaining} von 1 Änderung übrig.
+            </p>
+
+            {genderChangedAt && (
+              <p className="text-sm text-on-surface-variant mb-2">
+                Zuletzt geändert: {formatGermanDate(genderChangedAt)}
+              </p>
+            )}
+
+            <p className="text-sm text-on-surface-variant mb-6">
+              {t.profile.genderChangeBody}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowGenderConfirm(false)}
+                className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-high transition-colors min-h-[44px]"
+              >
+                {t.profile.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={performSave}
+                className="flex-1 py-3 rounded-full bg-error text-white font-semibold hover:opacity-90 transition-opacity min-h-[44px]"
+              >
+                {t.profile.genderChangeConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

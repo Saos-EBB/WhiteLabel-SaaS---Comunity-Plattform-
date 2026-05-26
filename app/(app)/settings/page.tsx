@@ -3,12 +3,14 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  Type, Globe, Bell, Eye, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download, CreditCard, Flag, Shield, User,
+  Type, Globe, Bell, Eye, EyeOff, Mail, Check, AlertCircle, Loader2, ChevronDown, Lock, LogOut, Download, CreditCard, Flag, Shield, User,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAccessibilityStore } from '@/lib/store/accessibilityStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useThemeStore } from '@/lib/store/themeStore'
+import { useLanguageStore, type UiLang } from '@/lib/store/languageStore'
+import { useTranslation } from '@/lib/i18n'
 import StripeCheckoutModal from '@/components/ui/StripeCheckoutModal'
 import ReportModal from '@/components/ui/ReportModal'
 
@@ -17,7 +19,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FontSize = 'normal' | 'large' | 'xl'
-type AccordionSection = 'design' | 'notifications' | 'visibility' | 'account' | 'security' | 'payment' | 'support'
+type AccordionSection = 'design' | 'notifications' | 'visibility' | 'account' | 'security' | 'payment' | 'support' | 'password' | 'email'
 
 interface BlockedUser {
   block_id: string
@@ -188,19 +190,12 @@ function AccordionItem({
   )
 }
 
-// ─── ComingSoonBadge ─────────────────────────────────────────────────────────
-
-function ComingSoonBadge() {
-  return (
-    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-medium">
-      Bald verfügbar
-    </span>
-  )
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
+  const { uiLang, setUiLang } = useLanguageStore()
+
   const [profile, setProfile] = useState<Profile | null>(null)
   const [notif, setNotif]     = useState<NotifSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -208,9 +203,11 @@ export default function SettingsPage() {
 
   const [openSection, setOpenSection] = useState<AccordionSection | null>(null)
 
-  const [uiLang, setUiLang] = useState('de')
-
   const { theme, toggleTheme } = useThemeStore()
+
+  const userRole = useAuthStore((s) => s.user?.role ?? 'user')
+
+  const [prices, setPrices] = useState<{ monthly: string; yearly: string; lifetime: string } | null>(null)
 
   const [accessSaving, setAccessSaving]   = useState(false)
   const [notifSaving, setNotifSaving]     = useState<Set<keyof NotifSettings>>(new Set())
@@ -245,6 +242,27 @@ export default function SettingsPage() {
   const [confirmingUnblockId, setConfirmingUnblockId] = useState<string | null>(null)
   const [unblocking, setUnblocking]       = useState(false)
 
+  // Change password
+  const [pwCurrent, setPwCurrent]         = useState('')
+  const [pwNew, setPwNew]                 = useState('')
+  const [pwConfirm, setPwConfirm]         = useState('')
+  const [pwShowCurrent, setPwShowCurrent] = useState(false)
+  const [pwShowNew, setPwShowNew]         = useState(false)
+  const [pwSaving, setPwSaving]           = useState(false)
+  const [pwError, setPwError]             = useState<string | null>(null)
+  const [pwSuccess, setPwSuccess]         = useState(false)
+
+  // Change email
+  const [emPassword, setEmPassword]   = useState('')
+  const [emNew, setEmNew]             = useState('')
+  const [emSaving, setEmSaving]       = useState(false)
+  const [emError, setEmError]         = useState<string | null>(null)
+  const [emSuccess, setEmSuccess]     = useState(false)
+
+  // Sub-accordion open state (nested inside Konto)
+  const [pwOpen, setPwOpen] = useState(false)
+  const [emOpen, setEmOpen] = useState(false)
+
   useEffect(() => {
     return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
   }, [])
@@ -262,12 +280,21 @@ export default function SettingsPage() {
         setNotif(ns)
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden')
+        setError(err instanceof Error ? err.message : t.common.error)
       } finally {
         setLoading(false)
       }
     }
     load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Prices (public, no auth) ───────────────────────────────────────────────
+
+  useEffect(() => {
+    fetchApi<{ monthly: string; yearly: string; lifetime: string }>('/system-settings/prices')
+      .then(setPrices)
+      .catch(() => {})
   }, [])
 
   // ── Lazy-load subscription detail ─────────────────────────────────────────
@@ -315,7 +342,7 @@ export default function SettingsPage() {
       useAuthStore.getState().logout()
       router.replace('/login')
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Fehler beim Löschen des Kontos')
+      setDeleteError(err instanceof Error ? err.message : t.common.error)
     } finally {
       setDeleteLoading(false)
     }
@@ -335,7 +362,7 @@ export default function SettingsPage() {
       setCancelConfirm(false)
       showToast('Abonnement gekündigt')
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Fehler beim Kündigen', false)
+      showToast(err instanceof Error ? err.message : t.common.error, false)
     } finally {
       setCancelLoading(false)
     }
@@ -389,7 +416,7 @@ export default function SettingsPage() {
       showToast('Gespeichert')
     } catch {
       setProfile(prev)
-      showToast('Fehler beim Speichern', false)
+      showToast(t.common.error, false)
     } finally {
       setAccessSaving(false)
     }
@@ -411,7 +438,7 @@ export default function SettingsPage() {
       showToast('Gespeichert')
     } catch {
       setNotif(prev)
-      showToast('Fehler beim Speichern', false)
+      showToast(t.common.error, false)
     } finally {
       setNotifSaving((s) => { const n = new Set(s); n.delete(key); return n })
     }
@@ -432,7 +459,7 @@ export default function SettingsPage() {
       showToast(value ? 'Profil veröffentlicht' : 'Profil zurückgezogen')
     } catch {
       setProfile(prev)
-      showToast('Fehler beim Speichern', false)
+      showToast(t.common.error, false)
     } finally {
       setPublishSaving(false)
     }
@@ -454,9 +481,50 @@ export default function SettingsPage() {
       showToast('Gespeichert')
     } catch {
       setProfile(prev)
-      showToast('Fehler beim Speichern', false)
+      showToast(t.common.error, false)
     } finally {
       setVisSaving((s) => { const n = new Set(s); n.delete(field); return n })
+    }
+  }
+
+  // ── Change password ────────────────────────────────────────────────────────
+
+  async function handleChangePassword() {
+    setPwError(null)
+    if (pwNew.length < 8) { setPwError(t.setup.passwordPlaceholder); return }
+    if (pwNew !== pwConfirm) { setPwError(t.setup.errorMismatch); return }
+    setPwSaving(true)
+    try {
+      await fetchApi('/auth/change-password', {
+        method: 'PATCH',
+        body: JSON.stringify({ current_password: pwCurrent, new_password: pwNew }),
+      })
+      setPwSuccess(true)
+      setPwCurrent(''); setPwNew(''); setPwConfirm('')
+      setPwShowCurrent(false); setPwShowNew(false)
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : t.common.error)
+    } finally {
+      setPwSaving(false)
+    }
+  }
+
+  // ── Change email ───────────────────────────────────────────────────────────
+
+  async function handleChangeEmail() {
+    setEmError(null)
+    setEmSaving(true)
+    try {
+      await fetchApi('/auth/change-email', {
+        method: 'PATCH',
+        body: JSON.stringify({ current_password: emPassword, new_email: emNew }),
+      })
+      setEmSuccess(true)
+      setEmPassword(''); setEmNew('')
+    } catch (err) {
+      setEmError(err instanceof Error ? err.message : t.common.error)
+    } finally {
+      setEmSaving(false)
     }
   }
 
@@ -517,7 +585,7 @@ export default function SettingsPage() {
       setConfirmingUnblockId(null)
       showToast('Blockierung aufgehoben')
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Fehler beim Entsperren', false)
+      showToast(err instanceof Error ? err.message : t.common.error, false)
     } finally {
       setUnblocking(false)
     }
@@ -528,7 +596,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-6 w-6 text-on-surface-variant animate-spin" aria-label="Lädt Einstellungen" />
+        <Loader2 className="h-6 w-6 text-on-surface-variant animate-spin" aria-label={t.common.loading} />
       </main>
     )
   }
@@ -537,13 +605,13 @@ export default function SettingsPage() {
     return (
       <main className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 p-6 text-center" role="alert">
         <AlertCircle className="h-10 w-10 text-error" aria-hidden="true" />
-        <p className="text-on-surface font-semibold">Einstellungen konnten nicht geladen werden</p>
+        <p className="text-on-surface font-semibold">{t.settings.loadError}</p>
         <p className="text-on-surface-variant text-sm">{error}</p>
         <button
           onClick={() => window.location.reload()}
           className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
         >
-          Erneut versuchen
+          {t.common.retry}
         </button>
       </main>
     )
@@ -581,26 +649,26 @@ export default function SettingsPage() {
       )}
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-3">
-        <h1 className="text-2xl font-bold text-on-surface mb-5">Einstellungen</h1>
+        <h1 className="text-2xl font-bold text-on-surface mb-5">{t.settings.title}</h1>
 
         {/* ── A) Design & Barrierefreiheit ──────────────────────────────────── */}
         <AccordionItem
-          title="Design & Barrierefreiheit"
+          title={t.settings.sectionDesign}
           icon={<Type className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'design'}
           onToggle={() => toggleSection('design')}
         >
           <ToggleRow
             id="theme-mode"
-            label="Heller Modus"
-            description="Wechsle zwischen dunklem und hellem Design"
+            label={t.settings.lightMode}
+            description={t.settings.lightModeDesc}
             checked={theme === 'light'}
             onChange={() => toggleTheme()}
           />
 
           <ToggleRow
             id="profanity-filter"
-            label="Schimpfwortfilter"
+            label={t.settings.profanityFilter}
             description="Unangemessene Wörter werden unkenntlich gemacht"
             checked={profile.profanity_filter}
             onChange={(v) => saveAccessibility({ profanity_filter: v })}
@@ -609,7 +677,7 @@ export default function SettingsPage() {
 
           <div className="space-y-2">
             <p className="text-sm font-medium text-on-surface" id="font-size-label">
-              Schriftgröße
+              {t.settings.fontSize}
             </p>
             <div
               role="group"
@@ -617,9 +685,9 @@ export default function SettingsPage() {
               className="flex rounded-xl overflow-hidden border border-outline-variant"
             >
               {([
-                { value: 'normal', label: 'Normal' },
-                { value: 'large',  label: 'Groß' },
-                { value: 'xl',     label: 'Sehr groß' },
+                { value: 'normal', label: t.settings.fontSizeNormal },
+                { value: 'large',  label: t.settings.fontSizeLarge },
+                { value: 'xl',     label: t.settings.fontSizeXL },
               ] as const).map(({ value, label }, i, arr) => (
                 <button
                   key={value}
@@ -642,7 +710,7 @@ export default function SettingsPage() {
 
           <ToggleRow
             id="high-contrast"
-            label="Hoher Kontrast"
+            label={t.settings.highContrast}
             description="Erhöht den Farbkontrast für bessere Lesbarkeit"
             checked={profile.high_contrast}
             onChange={(v) => saveAccessibility({ high_contrast: v })}
@@ -651,7 +719,7 @@ export default function SettingsPage() {
 
           <ToggleRow
             id="lang-simple"
-            label="Einfache Sprache"
+            label={t.settings.easyLanguage}
             description="Inhalte werden in leicht verständlicher Sprache angezeigt"
             checked={profile.lang_simple}
             onChange={(v) => saveAccessibility({ lang_simple: v })}
@@ -661,17 +729,23 @@ export default function SettingsPage() {
           <div className="space-y-1.5">
             <label htmlFor="ui-lang" className="text-sm font-medium text-on-surface">
               <Globe className="inline h-3.5 w-3.5 mr-1.5 -mt-0.5" aria-hidden="true" />
-              Sprache der Benutzeroberfläche
+              {t.settings.uiLanguage}
             </label>
             <div className="relative">
               <select
                 id="ui-lang"
                 value={uiLang}
-                onChange={(e) => setUiLang(e.target.value)}
+                onChange={(e) => setUiLang(e.target.value as UiLang)}
                 className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors cursor-pointer min-h-[44px]"
               >
                 <option value="de">Deutsch</option>
                 <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="es">Español</option>
+                <option value="it">Italiano</option>
+                <option value="ru">Русский</option>
+                <option value="ja">日本語</option>
+                <option value="de_easy">Leichte Sprache</option>
               </select>
               <ChevronDown
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
@@ -681,19 +755,19 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <SectionLabel>Vorschau</SectionLabel>
+            <SectionLabel>{t.settings.preview}</SectionLabel>
             <div
               className={`rounded-xl border border-outline-variant p-4 transition-all ${
                 profile.high_contrast ? 'bg-background' : 'bg-surface-container-high'
               }`}
-              aria-label="Vorschau der aktuellen Einstellungen"
+              aria-label={t.settings.preview}
             >
               <p
                 className={`leading-relaxed transition-all ${fontSizeClass[profile.font_size]} ${
                   profile.high_contrast ? 'text-on-surface font-medium' : 'text-on-surface-variant'
                 }`}
               >
-                Das ist ein Beispieltext. So sieht dein Text mit den aktuellen Einstellungen aus.
+                {t.settings.previewText}
               </p>
             </div>
           </div>
@@ -701,17 +775,17 @@ export default function SettingsPage() {
 
         {/* ── B) Benachrichtigungen ─────────────────────────────────────────── */}
         <AccordionItem
-          title="Benachrichtigungen"
+          title={t.settings.sectionNotifications}
           icon={<Bell className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'notifications'}
           onToggle={() => toggleSection('notifications')}
         >
           <div className="space-y-3">
-            <SectionLabel>E-Mail</SectionLabel>
+            <SectionLabel>{t.settings.notifEmail}</SectionLabel>
             {([
-              { key: 'email_messages', label: 'Neue Nachrichten', desc: 'Bei neuen Chat-Nachrichten' },
-              { key: 'email_matches',  label: 'Neue Matches',     desc: 'Bei neuen Verbindungen' },
-              { key: 'email_system',   label: 'Systemmeldungen',  desc: 'Bei wichtigen Updates' },
+              { key: 'email_messages', label: t.settings.notifNewMessages, desc: 'Bei neuen Chat-Nachrichten' },
+              { key: 'email_matches',  label: t.settings.notifNewMatches,  desc: 'Bei neuen Verbindungen' },
+              { key: 'email_system',   label: t.settings.notifSystem,      desc: 'Bei wichtigen Updates' },
             ] as const).map(({ key, label, desc }) => (
               <ToggleRow
                 key={key}
@@ -728,11 +802,11 @@ export default function SettingsPage() {
           <Divider />
 
           <div className="space-y-3">
-            <SectionLabel>Push</SectionLabel>
+            <SectionLabel>{t.settings.notifPush}</SectionLabel>
             {([
-              { key: 'push_messages', label: 'Neue Nachrichten', desc: 'Bei neuen Chat-Nachrichten' },
-              { key: 'push_matches',  label: 'Neue Matches',     desc: 'Bei neuen Verbindungen' },
-              { key: 'push_system',   label: 'Systemmeldungen',  desc: 'Bei wichtigen Updates' },
+              { key: 'push_messages', label: t.settings.notifNewMessages, desc: 'Bei neuen Chat-Nachrichten' },
+              { key: 'push_matches',  label: t.settings.notifNewMatches,  desc: 'Bei neuen Verbindungen' },
+              { key: 'push_system',   label: t.settings.notifSystem,      desc: 'Bei wichtigen Updates' },
             ] as const).map(({ key, label, desc }) => (
               <ToggleRow
                 key={key}
@@ -749,7 +823,7 @@ export default function SettingsPage() {
 
         {/* ── C) Sichtbarkeit ───────────────────────────────────────────────── */}
         <AccordionItem
-          title="Sichtbarkeit"
+          title={t.settings.sectionVisibility}
           icon={<Eye className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'visibility'}
           onToggle={() => toggleSection('visibility')}
@@ -757,10 +831,10 @@ export default function SettingsPage() {
           {/* Master toggle */}
           <ToggleRow
             id="is-published"
-            label="Profil öffentlich"
+            label={t.settings.visibilityProfilePublic}
             description={profile.is_published
-              ? 'Andere Nutzer können dich finden'
-              : 'Nur du siehst dein Profil'}
+              ? t.settings.visibilityPublicDesc
+              : t.settings.visibilityPrivateDesc}
             checked={profile.is_published}
             onChange={togglePublished}
             saving={publishSaving}
@@ -782,13 +856,13 @@ export default function SettingsPage() {
           {/* Field visibility toggles */}
           <div className={`space-y-3 transition-opacity duration-200 ${visFieldsDisabled ? 'opacity-50' : ''}`}>
             {([
-              { field: 'status_visible',  label: 'Online-Status' },
-              { field: 'show_bio',        label: 'Bio' },
-              { field: 'show_city',       label: 'Stadt' },
-              { field: 'show_age',        label: 'Alter' },
-              { field: 'show_gender',     label: 'Geschlecht & Suche' },
-              { field: 'show_interests',  label: 'Interessen' },
-              { field: 'show_audio',      label: 'Vorstellung / Audio' },
+              { field: 'status_visible',  label: t.settings.visibilityOnlineStatus },
+              { field: 'show_bio',        label: t.settings.visibilityBio },
+              { field: 'show_city',       label: t.settings.visibilityCity },
+              { field: 'show_age',        label: t.settings.visibilityAge },
+              { field: 'show_gender',     label: t.settings.visibilityGender },
+              { field: 'show_interests',  label: t.settings.visibilityInterests },
+              { field: 'show_audio',      label: t.settings.visibilityAudio },
             ] as const).map(({ field, label }) => (
               <ToggleRow
                 key={field}
@@ -805,7 +879,7 @@ export default function SettingsPage() {
 
         {/* ── D) Konto ──────────────────────────────────────────────────────── */}
         <AccordionItem
-          title="Konto"
+          title={t.settings.sectionAccount}
           icon={<Lock className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'account'}
           onToggle={() => toggleSection('account')}
@@ -816,14 +890,14 @@ export default function SettingsPage() {
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors min-h-[52px]"
           >
             <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            Abmelden
+            {t.settings.logout}
           </button>
 
           <Divider />
 
           {/* Subscription */}
           <div>
-            <SectionLabel>Abonnement</SectionLabel>
+            <SectionLabel>{t.settings.subscription}</SectionLabel>
             <div className="mt-3">
               {profile.subscription ? (
                 <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]">
@@ -838,13 +912,13 @@ export default function SettingsPage() {
                     </div>
                     {profile.subscription.current_period_end && (
                       <p className="text-xs text-on-surface-variant mt-0.5">
-                        Läuft bis {new Date(profile.subscription.current_period_end).toLocaleDateString('de-DE')}
+                        {t.settings.validUntil} {new Date(profile.subscription.current_period_end).toLocaleDateString('de-DE')}
                       </p>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-on-surface-variant px-1">Kein aktives Abonnement</p>
+                <p className="text-sm text-on-surface-variant px-1">{t.settings.noSubscription}</p>
               )}
             </div>
           </div>
@@ -853,21 +927,11 @@ export default function SettingsPage() {
 
           {/* Account actions */}
           <div className="space-y-2">
-            {(['Passwort ändern', 'E-Mail ändern'] as const).map((label) => (
-              <div
-                key={label}
-                className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px]"
-              >
-                <span className="text-sm font-medium text-on-surface-variant">{label}</span>
-                <ComingSoonBadge />
-              </div>
-            ))}
-
             <button
               onClick={() => setDeleteDialogOpen(true)}
               className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px] hover:bg-error-container/40 transition-colors text-left"
             >
-              <span className="text-sm font-medium text-error">Konto löschen</span>
+              <span className="text-sm font-medium text-error">{t.settings.deleteAccount}</span>
             </button>
 
             <div>
@@ -876,7 +940,7 @@ export default function SettingsPage() {
                 disabled={gdprLoading}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px] hover:bg-surface-container transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <span className="text-sm font-medium text-on-surface">Daten exportieren (PDF)</span>
+                <span className="text-sm font-medium text-on-surface">{t.settings.exportData}</span>
                 {gdprLoading
                   ? <Loader2 className="h-4 w-4 text-on-surface-variant animate-spin flex-shrink-0" aria-hidden="true" />
                   : <Download className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
@@ -894,21 +958,170 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <Divider />
+
+          {/* ── Passwort ändern (sub-section) ─────────────────────────────── */}
+          <AccordionItem
+            title={t.settings.changePassword}
+            icon={<Lock className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
+            isOpen={pwOpen}
+            onToggle={() => { setPwOpen(prev => !prev); setPwError(null); setPwSuccess(false) }}
+          >
+            {pwSuccess ? (
+              <div className="flex items-center gap-2 text-sm text-on-surface py-1">
+                <Check className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+                {t.settings.passwordChanged}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="pw-current" className="text-sm font-medium text-on-surface">{t.settings.currentPassword}</label>
+                  <div className="relative">
+                    <input
+                      id="pw-current"
+                      type={pwShowCurrent ? 'text' : 'password'}
+                      value={pwCurrent}
+                      onChange={(e) => setPwCurrent(e.target.value)}
+                      autoComplete="current-password"
+                      className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPwShowCurrent((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                      aria-label={pwShowCurrent ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      tabIndex={-1}
+                    >
+                      {pwShowCurrent
+                        ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="pw-new" className="text-sm font-medium text-on-surface">{t.settings.newPassword}</label>
+                  <div className="relative">
+                    <input
+                      id="pw-new"
+                      type={pwShowNew ? 'text' : 'password'}
+                      value={pwNew}
+                      onChange={(e) => setPwNew(e.target.value)}
+                      autoComplete="new-password"
+                      className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPwShowNew((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                      aria-label={pwShowNew ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      tabIndex={-1}
+                    >
+                      {pwShowNew
+                        ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-on-surface-variant">{t.settings.newPasswordPlaceholder}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="pw-confirm" className="text-sm font-medium text-on-surface">{t.settings.confirmPassword}</label>
+                  <input
+                    id="pw-confirm"
+                    type="password"
+                    value={pwConfirm}
+                    onChange={(e) => setPwConfirm(e.target.value)}
+                    autoComplete="new-password"
+                    className="w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]"
+                  />
+                </div>
+                {pwError && (
+                  <div className="flex items-center gap-2 text-error text-sm">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    {pwError}
+                  </div>
+                )}
+                <button
+                  onClick={() => void handleChangePassword()}
+                  disabled={pwSaving || !pwCurrent || !pwNew || !pwConfirm}
+                  className="w-full px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pwSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {t.settings.changePassword}
+                </button>
+              </div>
+            )}
+          </AccordionItem>
+
+          {/* ── E-Mail ändern (sub-section) ───────────────────────────────── */}
+          <AccordionItem
+            title={t.settings.changeEmail}
+            icon={<Mail className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
+            isOpen={emOpen}
+            onToggle={() => { setEmOpen(prev => !prev); setEmError(null); setEmSuccess(false) }}
+          >
+            {emSuccess ? (
+              <div className="flex items-center gap-2 text-sm text-on-surface py-1">
+                <Check className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+                {t.settings.emailUpdated}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="em-password" className="text-sm font-medium text-on-surface">{t.settings.currentPassword}</label>
+                  <input
+                    id="em-password"
+                    type="password"
+                    value={emPassword}
+                    onChange={(e) => setEmPassword(e.target.value)}
+                    autoComplete="current-password"
+                    className="w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="em-new" className="text-sm font-medium text-on-surface">{t.settings.newEmailAddress}</label>
+                  <input
+                    id="em-new"
+                    type="email"
+                    value={emNew}
+                    onChange={(e) => setEmNew(e.target.value)}
+                    autoComplete="email"
+                    placeholder="neue@email.de"
+                    className="w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]"
+                  />
+                </div>
+                {emError && (
+                  <div className="flex items-center gap-2 text-error text-sm">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                    {emError}
+                  </div>
+                )}
+                <button
+                  onClick={() => void handleChangeEmail()}
+                  disabled={emSaving || !emPassword || !emNew}
+                  className="w-full px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {emSaving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {t.settings.changeEmail}
+                </button>
+              </div>
+            )}
+          </AccordionItem>
+
         </AccordionItem>
 
         {/* ── E) Sicherheit & Blockierungen ────────────────────────────────── */}
         <AccordionItem
-          title="Sicherheit & Blockierungen"
+          title={t.settings.sectionSecurity}
           icon={<Shield className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'security'}
           onToggle={() => toggleSection('security')}
         >
           {blocksLoading ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin" aria-label="Lädt blockierte Nutzer" />
+              <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin" aria-label={t.common.loading} />
             </div>
           ) : blockedUsers.length === 0 ? (
-            <p className="text-sm text-on-surface-variant text-center py-2">Keine blockierten Nutzer</p>
+            <p className="text-sm text-on-surface-variant text-center py-2">{t.settings.noBlockedUsers}</p>
           ) : (
             <div className="space-y-2">
               {blockedUsers.map((b) => (
@@ -932,7 +1145,7 @@ export default function SettingsPage() {
                           disabled={unblocking}
                           className="px-3 py-1.5 rounded-full border border-outline-variant text-on-surface text-xs font-medium hover:bg-surface-container transition-colors disabled:opacity-50 min-h-[36px]"
                         >
-                          Abbrechen
+                          {t.common.cancel}
                         </button>
                         <button
                           onClick={() => handleUnblock(b.user_id)}
@@ -940,7 +1153,7 @@ export default function SettingsPage() {
                           className="px-3 py-1.5 rounded-full bg-error-container text-error text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 min-h-[36px] flex items-center gap-1.5"
                         >
                           {unblocking && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
-                          Bestätigen
+                          {t.settings.unblockConfirmTitle}
                         </button>
                       </div>
                     ) : (
@@ -948,14 +1161,14 @@ export default function SettingsPage() {
                         onClick={() => setConfirmingUnblockId(b.user_id)}
                         className="flex-shrink-0 px-3 py-1.5 rounded-full border border-outline-variant text-on-surface text-xs font-medium hover:bg-surface-container transition-colors min-h-[36px]"
                       >
-                        Entsperren
+                        {t.settings.unblock}
                       </button>
                     )}
                   </div>
 
                   {confirmingUnblockId === b.user_id && (
                     <div className="px-4 pb-3 text-xs text-on-surface-variant">
-                      Möchtest du die Blockierung aufheben?
+                      {t.settings.unblockConfirmDesc}
                     </div>
                   )}
                 </div>
@@ -965,30 +1178,35 @@ export default function SettingsPage() {
         </AccordionItem>
 
         {/* ── F) Abonnement & Zahlung ───────────────────────────────────────── */}
+        {userRole !== 'admin' && userRole !== 'owner' && (
         <AccordionItem
-          title="Abonnement & Zahlung"
+          title={t.settings.sectionSubscription}
           icon={<CreditCard className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'payment'}
           onToggle={() => toggleSection('payment')}
         >
           {subLoading ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin" aria-label="Lädt Abonnement" />
+              <Loader2 className="h-5 w-5 text-on-surface-variant animate-spin" aria-label={t.common.loading} />
             </div>
           ) : profile.subscription?.status === 'active' ? (
             <div className="space-y-4">
               <div className="px-4 py-3 rounded-xl bg-surface-container-high">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-on-surface">
-                    {({ monthly: 'Monatlich', yearly: 'Jährlich', lifetime: 'Lebenslang' } as Record<string, string>)[profile.subscription.plan] ?? profile.subscription.plan}
+                    {({
+                      monthly: t.settings.subscriptionMonthly,
+                      yearly: t.settings.subscriptionYearly,
+                      lifetime: t.settings.subscriptionLifetime,
+                    } as Record<string, string>)[profile.subscription.plan] ?? profile.subscription.plan}
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary-fixed-dim/20 text-primary-fixed-dim font-medium">
-                    Aktiv
+                    {t.settings.subscriptionActive}
                   </span>
                 </div>
                 {profile.subscription.plan !== 'lifetime' && profile.subscription.current_period_end && (
                   <p className="text-xs text-on-surface-variant mt-0.5">
-                    Läuft bis {new Date(profile.subscription.current_period_end).toLocaleDateString('de-DE')}
+                    {t.settings.validUntil} {new Date(profile.subscription.current_period_end).toLocaleDateString('de-DE')}
                   </p>
                 )}
               </div>
@@ -998,12 +1216,12 @@ export default function SettingsPage() {
                   onClick={() => setCancelConfirm(true)}
                   className="w-full py-3 rounded-full bg-error/10 text-error text-sm font-semibold hover:bg-error/20 transition-colors min-h-[44px]"
                 >
-                  Abonnement kündigen
+                  {t.settings.cancelSubscription}
                 </button>
               ) : (
                 <div className="rounded-xl border border-error/30 bg-error-container/20 p-4 space-y-3">
                   <p className="text-sm text-on-surface">
-                    Bist du sicher? Diese Aktion kann nicht rückgängig gemacht werden.
+                    {t.settings.cancelSubscriptionConfirm}
                   </p>
                   <div className="flex gap-3">
                     <button
@@ -1011,7 +1229,7 @@ export default function SettingsPage() {
                       disabled={cancelLoading}
                       className="flex-1 py-2.5 rounded-full border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors min-h-[44px] disabled:opacity-50"
                     >
-                      Abbrechen
+                      {t.common.cancel}
                     </button>
                     <button
                       onClick={handleCancelSubscription}
@@ -1019,7 +1237,7 @@ export default function SettingsPage() {
                       className="flex-1 py-2.5 rounded-full bg-error text-on-error text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
                     >
                       {cancelLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                      Bestätigen
+                      {t.common.confirm}
                     </button>
                   </div>
                 </div>
@@ -1027,42 +1245,43 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-on-surface-variant px-1">Kein aktives Abonnement</p>
+              <p className="text-sm text-on-surface-variant px-1">{t.settings.noSubscription}</p>
               <div className="space-y-2">
                 {([
-                  { plan: 'monthly',  label: 'Monatlich' },
-                  { plan: 'yearly',   label: 'Jährlich' },
-                  { plan: 'lifetime', label: 'Lebenslang' },
-                ] as const).map(({ plan, label }) => (
+                  { plan: 'monthly',  label: t.settings.subscriptionMonthly,  price: prices?.monthly },
+                  { plan: 'yearly',   label: t.settings.subscriptionYearly,   price: prices?.yearly },
+                  { plan: 'lifetime', label: t.settings.subscriptionLifetime, price: prices?.lifetime },
+                ] as const).map(({ plan, label, price }) => (
                   <button
                     key={plan}
                     onClick={() => setCheckoutPlan(plan)}
                     className="w-full py-3 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold hover:opacity-90 transition-opacity min-h-[44px]"
                   >
-                    {label}
+                    {label}{price != null ? ` — €${price}` : ''}
                   </button>
                 ))}
               </div>
             </div>
           )}
         </AccordionItem>
+        )}
 
         {/* ── G) Support ───────────────────────────────────────────────────── */}
         <AccordionItem
-          title="Support"
+          title={t.settings.sectionSupport}
           icon={<Flag className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
           isOpen={openSection === 'support'}
           onToggle={() => toggleSection('support')}
         >
           <p className="text-sm text-on-surface-variant">
-            Hast du ein Problem mit einem Nutzer oder unangemessene Inhalte gesehen?
+            {t.settings.supportText}
           </p>
           <button
             onClick={() => setReportOpen(true)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-container-high min-h-[52px] hover:bg-surface-container transition-colors text-left"
           >
             <Flag className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
-            <span className="text-sm font-medium text-on-surface">Problem melden</span>
+            <span className="text-sm font-medium text-on-surface">{t.settings.reportProblem}</span>
           </button>
         </AccordionItem>
 
@@ -1101,18 +1320,17 @@ export default function SettingsPage() {
                 id="delete-dialog-title"
                 className="text-lg font-bold text-on-surface mb-4"
               >
-                Konto löschen?
+                {t.settings.deleteAccountTitle}
               </h2>
 
               <ul className="text-sm text-on-surface-variant space-y-2 mb-5 list-disc list-inside leading-relaxed">
-                <li>Dein Profil wird sofort unsichtbar für andere User</li>
+                <li>{t.settings.deleteAccountWarning1}</li>
                 <li>
                   Du hast 30 Tage Zeit — wenn du dich in dieser Zeit einloggst,
                   wird dein Konto automatisch reaktiviert
                 </li>
                 <li>
-                  Nach 30 Tagen werden deine Daten unwiderruflich
-                  pseudonymisiert (DSGVO Art. 17)
+                  {t.settings.deleteAccountWarning3}
                 </li>
               </ul>
 
@@ -1128,7 +1346,7 @@ export default function SettingsPage() {
                   onClick={closeDeleteDialog}
                   className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface text-sm font-semibold hover:bg-surface-container-high transition-colors min-h-[44px]"
                 >
-                  Abbrechen
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleDeleteAccount}
@@ -1138,7 +1356,7 @@ export default function SettingsPage() {
                   {deleteLoading && (
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   )}
-                  Konto endgültig löschen
+                  {t.settings.deleteAccountConfirm}
                 </button>
               </div>
             </div>

@@ -4,6 +4,20 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { fetchApi } from '@/lib/api'
+import { useAuthStore } from '@/lib/store/authStore'
+import { useTranslation } from '@/lib/i18n'
+
+function getJwtRole(token: string | null): string | null {
+  if (!token) return null
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    const decoded = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string }
+    return decoded.role ?? null
+  } catch {
+    return null
+  }
+}
 
 interface AgbVersion {
   id: string
@@ -14,6 +28,9 @@ interface AgbVersion {
 
 export default function ConsentPage() {
   const router = useRouter()
+  const { accessToken } = useAuthStore()
+  const { t } = useTranslation()
+
   const [versions, setVersions] = useState<AgbVersion[]>([])
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -28,8 +45,9 @@ export default function ConsentPage() {
         data.forEach((v) => { initial[v.id] = false })
         setChecked(initial)
       })
-      .catch(() => setError('Inhalte konnten nicht geladen werden.'))
+      .catch(() => setError(t.consent.errorLoad))
       .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const allChecked = versions.length > 0 && versions.every((v) => checked[v.id])
@@ -46,18 +64,19 @@ export default function ConsentPage() {
           consents: versions.map((v) => ({ agb_version_id: v.id, accepted: true })),
         }),
       })
-      router.push('/onboarding')
+      const role = getJwtRole(accessToken)
+      router.push(role === 'admin' || role === 'owner' ? '/dashboard' : '/onboarding')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Speichern der Zustimmung')
+      setError(err instanceof Error ? err.message : t.consent.errorSave)
     } finally {
       setSubmitting(false)
     }
   }
 
   const labelText: Record<string, string> = {
-    agb: 'AGB',
-    privacy: 'Datenschutzerklärung',
-    sensitive_data: 'Verarbeitung sensibler Daten',
+    agb: t.consent.agb,
+    privacy: t.consent.privacy,
+    sensitive_data: t.consent.sensitiveData,
   }
 
   const linkPath: Record<string, string> = {
@@ -72,7 +91,7 @@ export default function ConsentPage() {
   if (loading) {
     return (
       <div className="text-center text-on-surface-variant text-sm py-8">
-        Wird geladen…
+        {t.consent.loading}
       </div>
     )
   }
@@ -80,10 +99,10 @@ export default function ConsentPage() {
   return (
     <>
       <h1 className="text-2xl font-bold text-on-surface mb-2 text-center">
-        Zustimmung erforderlich
+        {t.consent.title}
       </h1>
       <p className="text-sm text-on-surface-variant text-center mb-8">
-        Bitte stimme den folgenden Bedingungen zu, um fortzufahren.
+        {t.consent.subtitle}
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -101,15 +120,22 @@ export default function ConsentPage() {
               }
             />
             <span className="text-sm text-on-surface leading-snug">
-              Ich stimme den{' '}
+              {t.consent.checkboxLabel.replace(
+                '{label}',
+                // render as text only — link is below
+                labelText[v.type] ?? v.type
+              ).split(labelText[v.type] ?? v.type)[0]}
               <Link
                 href={linkPath[v.type] ?? '/agb'}
                 target="_blank"
                 className="text-primary-fixed-dim font-medium hover:underline"
               >
                 {labelText[v.type] ?? v.type}
-              </Link>{' '}
-              zu.
+              </Link>
+              {t.consent.checkboxLabel.replace(
+                '{label}',
+                labelText[v.type] ?? v.type
+              ).split(labelText[v.type] ?? v.type)[1]}
             </span>
           </label>
         ))}
@@ -125,7 +151,7 @@ export default function ConsentPage() {
           disabled={!allChecked || submitting}
           className="w-full min-h-[52px] mt-2 rounded-xl bg-primary-fixed-dim font-semibold text-on-primary-container transition-opacity disabled:opacity-60"
         >
-          {submitting ? 'Wird gespeichert…' : 'Zustimmen & weiter'}
+          {submitting ? t.consent.submitting : t.consent.submit}
         </button>
       </form>
     </>

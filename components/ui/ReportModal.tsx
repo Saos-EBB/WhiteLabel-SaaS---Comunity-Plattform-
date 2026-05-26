@@ -3,14 +3,7 @@
 import { useState } from 'react'
 import { Loader2, AlertCircle, X, Check, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
-
-const REASON_OPTIONS = [
-  { value: 'harassment', label: 'Belästigung' },
-  { value: 'spam',       label: 'Spam' },
-  { value: 'fake',       label: 'Fake-Profil' },
-  { value: 'sexual',     label: 'Unangemessene Inhalte' },
-  { value: 'abuse',      label: 'Missbrauch' },
-]
+import { useTranslation } from '@/lib/i18n'
 
 interface Props {
   reportedUserId?: string
@@ -19,6 +12,16 @@ interface Props {
 }
 
 export default function ReportModal({ reportedUserId, messageId, onClose }: Props) {
+  const { t } = useTranslation()
+
+  const REASON_OPTIONS = [
+    { value: 'harassment', label: t.report.reasonHarassment },
+    { value: 'spam',       label: t.report.reasonSpam },
+    { value: 'fake',       label: t.report.reasonFakeProfile },
+    { value: 'sexual',     label: t.report.reasonInappropriate },
+    { value: 'abuse',      label: t.report.reasonAbuse },
+  ]
+
   const [nickname, setNickname]       = useState('')
   const [reason, setReason]           = useState('')
   const [description, setDescription] = useState('')
@@ -33,7 +36,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
       let userId = reportedUserId
       if (!userId) {
         if (!nickname.trim()) {
-          setErrorMsg('Bitte gib einen Nutzernamen ein')
+          setErrorMsg(t.report.errorNoUsername)
           setStatus('idle')
           return
         }
@@ -52,7 +55,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
       setStatus('success')
       setTimeout(onClose, 2000)
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Fehler beim Senden')
+      setErrorMsg(err instanceof Error ? err.message : t.report.errorFailed)
       setStatus('error')
     }
   }
@@ -64,7 +67,8 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
         onClick={() => status !== 'loading' && onClose()}
         aria-hidden="true"
       />
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none">
+      {/* pb-16 = nav bar height (h-16) on mobile so the sheet clears the fixed bottom nav */}
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none pb-16 sm:pb-0">
         <div
           role="dialog"
           aria-modal="true"
@@ -73,12 +77,12 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
         >
           <div className="flex items-center justify-between">
             <h2 id="report-modal-title" className="text-lg font-bold text-on-surface">
-              User melden
+              {t.report.title}
             </h2>
             <button
               onClick={onClose}
               disabled={status === 'loading'}
-              aria-label="Schließen"
+              aria-label={t.common.close}
               className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-colors disabled:opacity-50"
             >
               <X className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />
@@ -90,22 +94,22 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
               <div className="h-12 w-12 rounded-full bg-primary-fixed-dim/20 flex items-center justify-center">
                 <Check className="h-6 w-6 text-primary-fixed-dim" aria-hidden="true" />
               </div>
-              <p className="font-semibold text-on-surface">Meldung wurde übermittelt</p>
-              <p className="text-sm text-on-surface-variant">Das Fenster schließt sich automatisch.</p>
+              <p className="font-semibold text-on-surface">{t.report.successTitle}</p>
+              <p className="text-sm text-on-surface-variant">{t.report.successDesc}</p>
             </div>
           ) : (
             <>
               {!reportedUserId && (
                 <div className="space-y-1.5">
                   <label htmlFor="report-nickname" className="text-sm font-medium text-on-surface">
-                    Nutzername
+                    {t.report.username}
                   </label>
                   <input
                     id="report-nickname"
                     type="text"
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
-                    placeholder="Nickname eingeben"
+                    placeholder={t.report.usernamePlaceholder}
                     disabled={status === 'loading'}
                     className="w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
                   />
@@ -114,7 +118,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
 
               <div className="space-y-1.5">
                 <label htmlFor="report-reason" className="text-sm font-medium text-on-surface">
-                  Grund <span className="text-error" aria-hidden="true">*</span>
+                  {t.report.reason} <span className="text-error" aria-hidden="true">*</span>
                 </label>
                 <div className="relative">
                   <select
@@ -124,7 +128,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
                     disabled={status === 'loading'}
                     className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    <option value="">Bitte wählen…</option>
+                    <option value="">{t.report.reasonPlaceholder}</option>
                     {REASON_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
@@ -138,7 +142,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
 
               <div className="space-y-1.5">
                 <label htmlFor="report-description" className="text-sm font-medium text-on-surface">
-                  Beschreibung{' '}
+                  {t.report.description}{' '}
                   <span className="text-on-surface-variant text-xs font-normal">(optional)</span>
                 </label>
                 <textarea
@@ -146,7 +150,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, 500))}
                   rows={3}
-                  placeholder="Beschreibe das Problem…"
+                  placeholder={t.report.descriptionPlaceholder}
                   disabled={status === 'loading'}
                   className="w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim resize-none transition-colors disabled:opacity-50"
                 />
@@ -168,7 +172,7 @@ export default function ReportModal({ reportedUserId, messageId, onClose }: Prop
                 {status === 'loading' && (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 )}
-                Melden
+                {t.report.submit}
               </button>
             </>
           )}

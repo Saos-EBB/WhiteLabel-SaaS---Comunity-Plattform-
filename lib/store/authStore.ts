@@ -5,6 +5,7 @@ export interface User {
   id: string
   user_id?: string
   email: string
+  role: 'user' | 'admin' | 'owner'
   is_banned?: boolean
   [key: string]: unknown
 }
@@ -20,14 +21,25 @@ interface AuthState {
   clearAuth: () => void
 }
 
+function decodeJwtRole(token: string): 'user' | 'admin' | 'owner' {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    if (payload.role === 'admin' || payload.role === 'owner') return payload.role
+  } catch { /* ignore */ }
+  return 'user'
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       accessToken: null,
       user: null,
       isBanned: false,
       setAccessToken: (token) => set({ accessToken: token }),
-      setUser: (user) => set({ user }),
+      setUser: (user) => {
+        const role = get().accessToken ? decodeJwtRole(get().accessToken!) : 'user'
+        set({ user: { ...user, role } })
+      },
       setBanned: (val) => set({ isBanned: val }),
       logout: () => {
         set({ accessToken: null, user: null, isBanned: false })

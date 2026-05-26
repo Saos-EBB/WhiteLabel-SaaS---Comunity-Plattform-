@@ -46,6 +46,8 @@ Copy `.env.example` to `.env.local` and fill in the values.
 | `NEXT_PUBLIC_COMPANY_NAME` | Company name used in Impressum and Datenschutz pages |
 | `NEXT_PUBLIC_COMPANY_*` | Address/contact fields for legal pages |
 | `NEXT_PUBLIC_CONTACT_*` | WhatsApp, Instagram, email, phone for the B2B contact section |
+| `NEXT_PUBLIC_COPYRIGHT_YEAR` | Year shown in the auth layout footer copyright line |
+| `NEXT_PUBLIC_BRAND_NAME` | Brand name shown in the auth layout footer |
 
 ---
 
@@ -133,6 +135,8 @@ Accordion layout — one section open at a time with CSS `grid-rows` height tran
 ## Screens
 
 ### Auth — `(auth)`
+
+The auth layout (`app/(auth)/layout.tsx`) wraps all auth routes with a sticky footer showing the copyright year (`NEXT_PUBLIC_COPYRIGHT_YEAR`), brand name (`NEXT_PUBLIC_BRAND_NAME`), and Impressum / Datenschutz links.
 
 | Route | Description |
 |---|---|
@@ -225,7 +229,8 @@ Accordion layout — single section open at a time, CSS `grid-rows` height trans
 **D) Konto:**
 - Subscription info sourced from `GET /profile/me` (`subscription` field) — shows plan badge, status label, and expiry date; displays "Kein aktives Abonnement" when `null`.
 - **Daten exportieren (PDF)** — calls `GET /gdpr/export`; downloads the response as a PDF blob (`paarship-daten-export.pdf`). Rate-limit (403) shows cooldown message in amber; other errors show red message. DSGVO hint ("max. 1× pro 30 Tage") shown below the button. Spinner while loading.
-- Placeholder rows with "Bald verfügbar" badge (not functional): Passwort ändern, E-Mail ändern.
+- **Passwort ändern** (nested sub-accordion within Konto) — current password + new password + confirmation; show/hide toggles; calls `PATCH /auth/change-password`; success state clears fields.
+- **E-Mail ändern** (nested sub-accordion within Konto) — current password + new email address; calls `PATCH /auth/change-email`; success state clears fields.
 - **Konto löschen** — focus-trapped confirmation dialog; calls `DELETE /auth/account`, clears auth store and redirects to `/login` on success; shows inline error on failure with spinner during the request.
 - Logout button — `POST /auth/logout` + clears Zustand store; succeeds even if the backend is unreachable.
 
@@ -236,7 +241,8 @@ Accordion layout — single section open at a time, CSS `grid-rows` height trans
 **F) Abonnement & Zahlung:**
 - Subscription detail fetched lazily from `GET /payment/subscriptions` when the accordion is first opened — not on page mount.
 - **Active subscription:** plan label (Monatlich / Jährlich / Lebenslang), "Aktiv" badge, expiry date in de-DE format (hidden for lifetime plan). Cancel button ("Abonnement kündigen") reveals an inline confirmation step ("Bist du sicher? Diese Aktion kann nicht rückgängig gemacht werden." + Bestätigen / Abbrechen) before calling `DELETE /payment/subscriptions/:id`; on success profile is re-fetched.
-- **No active subscription:** "Kein aktives Abonnement" message and three plan buttons (Monatlich / Jährlich / Lebenslang). Clicking any plan opens `StripeCheckoutModal` with the selected plan.
+- **No active subscription:** "Kein aktives Abonnement" message and three plan buttons (Monatlich / Jährlich / Lebenslang) with prices fetched from `GET /system-settings/prices` shown inline (e.g. "Monatlich — €9.99"). Clicking any plan opens `StripeCheckoutModal` with the selected plan.
+- **Hidden for admin/owner users:** the entire Abonnement & Zahlung section is not rendered when the user's role is `admin` or `owner`.
 
 **G) Support:**
 - "Problem melden" button opens `ReportModal` without a pre-filled user (nickname lookup mode).
@@ -260,7 +266,7 @@ Eight tabs (`owner` sees all; `admin` does not see **Verwaltung**):
 | Strikes | Paginated strike list. "Neuer Strike" modal — type (`warning`, `temp`, `permanent`), **nickname search** (debounced lookup, select from results), reason, optional expiry. |
 | Schimpfwörter | Custom profanity word list. Add / delete words; persisted to `profanity_words` table via backend. |
 | Einstellungen | System settings key/value editor. **Owner only.** |
-| Verwaltung | **Owner only.** Two sub-sections: (A) admin account list (paginated, `GET /admin/admins`) — shows nickname, role badge, verified status, last login; (B) "Admin erstellen" form (`POST /admin/users/create`) — email, password, nickname. |
+| Verwaltung | **Owner only.** Three accordion sub-sections: (A) admin account list (paginated, `GET /admin/admins`) — shows nickname, role badge, verified status, last login; (B) "Admin erstellen" form (`POST /admin/users/create`) — email, password, nickname; (C) "Abonnement-Preise" — edit monthly/yearly/lifetime prices via `PATCH /system-settings/prices`, confirmation modal before saving; note to keep prices in sync with Stripe. |
 
 ### Public — `(public)`
 
@@ -532,6 +538,16 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ---
 
 ## Changelog
+
+### 2026-05-26 (latest)
+- Settings (`/settings`): "Abonnement & Zahlung" section hidden entirely for `admin` and `owner` users
+- Settings (`/settings`): plan selection buttons now show prices fetched from `GET /system-settings/prices` (e.g. "Monatlich — €9.99"); prices are loaded on page mount
+- Settings (`/settings`): "Passwort ändern" and "E-Mail ändern" implemented as nested sub-accordions inside the **Konto** section (replacing "Bald verfügbar" placeholders); each has show/hide password toggles and inline success/error states
+- Settings (`/settings`): `uiLang` state migrated from local `useState` to `languageStore` (Zustand) — language preference now survives component remounts
+- Auth layout (`(auth)/layout.tsx`): sticky footer added with copyright year (`NEXT_PUBLIC_COPYRIGHT_YEAR`), brand name (`NEXT_PUBLIC_BRAND_NAME`), and Impressum / Datenschutz links
+- Admin (`/admin`): new **Abonnement-Preise** accordion in the **Verwaltung** tab — owner can edit monthly/yearly/lifetime prices via `PATCH /system-settings/prices`; prices are pre-loaded from `GET /system-settings/prices`; confirmation modal before saving with a Stripe sync reminder
+- Chat (`/chat/[id]`): "Chat löschen", "Nutzer blockieren", and "Nachricht löschen" confirmation dialogs changed from bottom sheets to centered modals
+- i18n: `useTranslation()` hook and `t.*` keys applied throughout chat, settings, admin, and auth pages — all UI strings now go through the translation layer
 
 ### 2026-05-24 (latest)
 - Auth (`/login`): login now accepts email **or** nickname via `identifier` field; "Support kontaktieren" link opens `ContactSupportModal`; `?setup=done` query param shows a green success banner

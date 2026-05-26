@@ -2,24 +2,31 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
+import ContactSupportModal from '@/components/ui/ContactSupportModal'
+import { useTranslation } from '@/lib/i18n'
 
 interface LoginResponse {
   accessToken: string
   needsConsent: boolean
-  user?: { id: string; email: string; [key: string]: unknown }
+  user?: { id: string; email: string; role: 'user' | 'admin' | 'owner'; [key: string]: unknown }
 }
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { setAccessToken, setUser } = useAuthStore()
+  const { t } = useTranslation()
 
-  const [email, setEmail] = useState('')
+  const setupDone = searchParams.get('setup') === 'done'
+
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showSupportModal, setShowSupportModal] = useState(false)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -29,14 +36,14 @@ export default function LoginPage() {
     try {
       const data = await fetchApi<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       })
 
       setAccessToken(data.accessToken)
       if (data.user) setUser(data.user)
       router.push(data.needsConsent ? '/consent' : '/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen')
+      setError(err instanceof Error ? err.message : t.login.failed)
     } finally {
       setLoading(false)
     }
@@ -47,23 +54,32 @@ export default function LoginPage() {
 
   return (
     <>
+      {setupDone && (
+        <div
+          role="status"
+          className="mb-6 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 text-center"
+        >
+          {t.login.setupDone}
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-on-surface mb-8 text-center">
-        Willkommen zurück
+        {t.login.title}
       </h1>
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="email" className="text-sm font-medium text-on-surface-variant">
-            E-Mail
+          <label htmlFor="identifier" className="text-sm font-medium text-on-surface-variant">
+            {t.login.emailOrNickname}
           </label>
           <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="identifier"
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
-            autoComplete="email"
-            placeholder="name@beispiel.de"
+            autoComplete="username"
+            placeholder={t.login.emailOrNicknamePlaceholder}
             className={inputClass}
           />
         </div>
@@ -71,13 +87,13 @@ export default function LoginPage() {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="password" className="text-sm font-medium text-on-surface-variant">
-              Passwort
+              {t.login.password}
             </label>
             <Link
               href="/forgot-password"
               className="text-xs text-primary-fixed-dim hover:underline"
             >
-              Passwort vergessen?
+              {t.login.forgotPassword}
             </Link>
           </div>
           <input
@@ -103,16 +119,30 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full min-h-[52px] mt-2 rounded-xl bg-primary-fixed-dim font-semibold text-on-primary-container transition-opacity disabled:opacity-60"
         >
-          {loading ? 'Wird angemeldet…' : 'Anmelden'}
+          {loading ? t.login.submitting : t.login.submit}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-on-surface-variant">
-        Noch kein Konto?{' '}
+        {t.login.noAccount}{' '}
         <Link href="/register" className="text-primary-fixed-dim font-medium hover:underline">
-          Registrieren
+          {t.login.register}
         </Link>
       </p>
+
+      <p className="mt-3 text-center text-xs text-on-surface-variant">
+        <button
+          type="button"
+          onClick={() => setShowSupportModal(true)}
+          className="hover:text-on-surface transition-colors"
+        >
+          {t.login.helpAndSupport}
+        </button>
+      </p>
+
+      {showSupportModal && (
+        <ContactSupportModal onClose={() => setShowSupportModal(false)} />
+      )}
     </>
   )
 }

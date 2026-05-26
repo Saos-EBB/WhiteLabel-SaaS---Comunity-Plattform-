@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
+import { Bell, Inbox, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -12,12 +12,8 @@ import {
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
-
-const navLinks = [
-  { href: '/discover', label: 'Discover' },
-  { href: '/requests', label: 'Requests' },
-  { href: '/chat', label: 'Chat' },
-]
+import { connect } from '@/lib/socket'
+import { useTranslation } from '@/lib/i18n'
 
 function getJwtRole(token: string | null): string | null {
   if (!token) return null
@@ -51,25 +47,20 @@ const TYPE_ROUTES: Record<NotificationType, string> = {
 
 type StatusMessage = 'available' | 'looking_for_chat' | 'looking_for_date' | 'busy' | 'do_not_disturb' | null
 
-const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] = [
-  { value: 'available',        label: 'Verfügbar',      color: '#4ade80' },
-  { value: 'looking_for_chat', label: 'Suche Gespräch', color: '#60a5fa' },
-  { value: 'looking_for_date', label: 'Suche Date',     color: '#c084fc' },
-  { value: 'busy',             label: 'Beschäftigt',    color: '#f59e0b' },
-  { value: 'do_not_disturb',   label: 'Nicht stören',   color: '#f87171' },
-]
-
 // ─── relativeTime ─────────────────────────────────────────────────────────────
 
-function relativeTime(dateString: string): string {
+function relativeTime(
+  dateString: string,
+  rt: { justNow: string; minutesAgo: string; hoursAgo: string; daysAgo: string; daysAgoPlural: string }
+): string {
   const diff = Date.now() - new Date(dateString).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'gerade eben'
-  if (mins < 60) return `vor ${mins} Min.`
+  if (mins < 1) return rt.justNow
+  if (mins < 60) return rt.minutesAgo.replace('{mins}', String(mins))
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `vor ${hours} Std.`
+  if (hours < 24) return rt.hoursAgo.replace('{hours}', String(hours))
   const days = Math.floor(hours / 24)
-  return `vor ${days} Tag${days !== 1 ? 'en' : ''}`
+  return (days === 1 ? rt.daysAgo : rt.daysAgoPlural).replace('{days}', String(days))
 }
 
 interface IncomingRequest {
@@ -89,11 +80,28 @@ function normaliseRequests(res: IncomingEnvelope): IncomingRequest[] {
 export default function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const { t } = useTranslation()
 
   const accessToken = useAuthStore((s) => s.accessToken)
-  const isAdmin = getJwtRole(accessToken) === 'admin'
+  const _role = getJwtRole(accessToken)
+  const isAdmin = _role === 'admin' || _role === 'owner'
+
+  const navLinks = [
+    { href: '/discover', label: t.nav.discover },
+    { href: '/requests', label: t.nav.requests },
+    { href: '/chat',     label: t.nav.chat },
+  ]
+
+  const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] = [
+    { value: 'available',        label: t.status.available,      color: '#4ade80' },
+    { value: 'looking_for_chat', label: t.status.lookingToTalk,  color: '#60a5fa' },
+    { value: 'looking_for_date', label: t.status.lookingForDate, color: '#c084fc' },
+    { value: 'busy',             label: t.status.busy,           color: '#f59e0b' },
+    { value: 'do_not_disturb',   label: t.status.doNotDisturb,   color: '#f87171' },
+  ]
+
   const activeNavLinks = isAdmin
-    ? navLinks.map((l) => l.href === '/requests' ? { href: '/admin', label: 'Admin' } : l)
+    ? navLinks.map((l) => l.href === '/requests' ? { href: '/admin', label: t.nav.admin } : l)
     : navLinks
 
   // Bell dropdown
@@ -111,11 +119,39 @@ export default function TopNav() {
   const seenRequestIdsRef    = useRef(new Set<string>())
   const isFirstRequestPollRef = useRef(true)
 
+  // ── Admin ticket badge ────────────────────────────────────────────────────
+  const [ticketCount, setTicketCount] = useState(0)
+
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount   = useNotificationStore((s) => s.unreadCount)
   const displayUnread = pathname.startsWith('/chat/')
     ? notifications.filter((n) => !n.is_read && n.type !== 'message').length
     : unreadCount
+
+  // ── Admin: load initial ticket count + live WebSocket updates ────────────
+
+  useEffect(() => {
+    if (!isAdmin) return
+
+    async function loadCount() {
+      try {
+        const [reports, support] = await Promise.all([
+          fetchApi<{ total: number }>('/admin/reports?status=open&limit=1&page=1'),
+          fetchApi<{ total: number }>('/admin/tickets?status=open&limit=1&page=1'),
+        ])
+        setTicketCount((reports.total ?? 0) + (support.total ?? 0))
+      } catch {
+        // non-critical
+      }
+    }
+
+    loadCount()
+
+    const socket = connect()
+    socket.on('ticket.new', () => setTicketCount((n) => n + 1))
+    return () => { socket.off('ticket.new') }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
   // ── Load profile status on mount ──────────────────────────────────────────
 
@@ -181,12 +217,6 @@ export default function TopNav() {
 
   function handleNotificationClick(n: AppNotification) {
     setBellOpen(false)
-    if (!n.is_read) {
-      useNotificationStore.getState().markRead(n.id)
-      if (!n._local) {
-        fetchApi(`/notifications/${n.id}/read`, { method: 'PATCH' }).catch(() => {})
-      }
-    }
     router.push(TYPE_ROUTES[n.type])
   }
 
@@ -285,12 +315,13 @@ export default function TopNav() {
           })}
         </ul>
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* On mobile, flex-1 + justify-evenly spreads icons across the remaining width */}
+        <div className="flex-1 sm:flex-none sm:ml-auto flex items-center justify-evenly sm:justify-start gap-0 sm:gap-2">
 
           {/* ── Status Dot ──────────────────────────────────────────────────── */}
           <div className="relative" ref={statusRef}>
             <button
-              aria-label="Online-Status ändern"
+              aria-label={t.status.label}
               aria-expanded={statusOpen}
               onClick={() => setStatusOpen((v) => !v)}
               className="p-2 rounded-lg hover:bg-surface-container transition-colors flex items-center justify-center"
@@ -307,7 +338,7 @@ export default function TopNav() {
             {statusOpen && (
               <div
                 role="dialog"
-                aria-label="Status wählen"
+                aria-label={t.status.choose}
                 className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
               >
                 <div className="px-4 py-3 border-b border-outline-variant">
@@ -335,7 +366,7 @@ export default function TopNav() {
                 </ul>
 
                 <div className="border-t border-outline-variant px-4 py-3 flex items-center justify-between gap-3">
-                  <span className="text-sm text-on-surface-variant">Unsichtbar</span>
+                  <span className="text-sm text-on-surface-variant">{t.status.invisible}</span>
                   <button
                     role="switch"
                     aria-checked={!statusVisible}
@@ -357,129 +388,148 @@ export default function TopNav() {
             )}
           </div>
 
-          {/* ── Bell ────────────────────────────────────────────────────────── */}
-          <div className="relative" ref={bellRef}>
-            <button
-              aria-label={`Benachrichtigungen${displayUnread > 0 ? `, ${displayUnread} ungelesen` : ''}`}
-              aria-expanded={bellOpen}
-              onClick={() => setBellOpen((v) => !v)}
-              className={`relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors ${
-                displayUnread > 0 ? 'animate-pulse ring-2 ring-offset-1 ring-[#73db9a]' : ''
-              }`}
+          {/* ── Admin: Ticket inbox icon with live badge ─────────────────── */}
+          {isAdmin ? (
+            <Link
+              href="/admin"
+              aria-label={`Tickets${ticketCount > 0 ? `, ${ticketCount} offen` : ''}`}
+              className="relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
             >
-              <Bell size={20} aria-hidden />
-              {displayUnread > 0 && (
+              <Inbox size={20} aria-hidden />
+              {ticketCount > 0 && (
                 <span
                   aria-hidden="true"
                   className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error text-[10px] font-bold leading-none"
                 >
-                  {displayUnread > 9 ? '9+' : displayUnread}
+                  {ticketCount > 9 ? '9+' : ticketCount}
                 </span>
               )}
-            </button>
-
-            {bellOpen && (
-              <div
-                role="dialog"
-                aria-label="Benachrichtigungen"
-                className="absolute right-0 top-full mt-2 w-80 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
+            </Link>
+          ) : (
+            /* ── Bell (regular users only) ──────────────────────────────── */
+            <div className="relative" ref={bellRef}>
+              <button
+                aria-label={`${t.notifications.label}${displayUnread > 0 ? `, ${displayUnread} ungelesen` : ''}`}
+                aria-expanded={bellOpen}
+                onClick={() => setBellOpen((v) => !v)}
+                className={`relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors ${
+                  displayUnread > 0 ? 'animate-pulse ring-2 ring-offset-1 ring-[#73db9a]' : ''
+                }`}
               >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
-                  <span className="text-sm font-semibold text-on-surface">Benachrichtigungen</span>
-                  {activeTab === 'neu' && unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllRead}
-                      className="text-xs text-primary-fixed-dim hover:opacity-75 transition-opacity"
-                    >
-                      Alle als gelesen
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex border-b border-outline-variant">
-                  {(['neu', 'verlauf'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
-                        activeTab === tab
-                          ? 'text-primary-fixed-dim border-b-2 border-primary-fixed-dim'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      {tab === 'neu'
-                        ? unreadCount > 0 ? `Neu (${unreadCount})` : 'Neu'
-                        : 'Verlauf'}
-                    </button>
-                  ))}
-                </div>
-
-                {tabNotifications.length === 0 ? (
-                  <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
-                    {activeTab === 'neu' ? 'Keine neuen Benachrichtigungen' : 'Kein Verlauf'}
-                  </p>
-                ) : (
-                  <ul>
-                    {tabNotifications.map((n) => {
-                      const Icon = TYPE_ICONS[n.type]
-                      return (
-                        <li
-                          key={n.id}
-                          className={`flex items-stretch ${
-                            !n.is_read ? 'border-l-2 border-primary-fixed-dim bg-surface-container-low' : ''
-                          }`}
-                        >
-                          <button
-                            onClick={() => handleNotificationClick(n)}
-                            className="flex-1 flex items-start gap-3 px-4 py-3 text-left hover:bg-surface-container-high transition-colors"
-                          >
-                            <Icon
-                              size={16}
-                              className={`mt-0.5 flex-shrink-0 ${
-                                !n.is_read ? 'text-primary-fixed-dim' : 'text-on-surface-variant'
-                              }`}
-                              aria-hidden
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm leading-snug truncate ${
-                                !n.is_read ? 'text-on-surface font-medium' : 'text-on-surface-variant'
-                              }`}>
-                                {n.content}
-                              </p>
-                              <p className="text-xs text-on-surface-variant mt-0.5">
-                                {relativeTime(n.created_at)}
-                              </p>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => handleDelete(n)}
-                            className="flex-shrink-0 px-3 text-on-surface-variant/40 hover:text-error transition-colors"
-                            aria-label="Benachrichtigung löschen"
-                          >
-                            <Trash2 size={14} aria-hidden />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-
-                <div className="border-t border-outline-variant px-4 py-2.5">
-                  <Link
-                    href="/notifications"
-                    onClick={() => setBellOpen(false)}
-                    className="block text-center text-xs font-medium text-primary-fixed-dim hover:opacity-75 transition-opacity"
+                <Bell size={20} aria-hidden />
+                {displayUnread > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error text-[10px] font-bold leading-none"
                   >
-                    Alle anzeigen
-                  </Link>
+                    {displayUnread > 9 ? '9+' : displayUnread}
+                  </span>
+                )}
+              </button>
+
+              {bellOpen && (
+                <div
+                  role="dialog"
+                  aria-label={t.notifications.label}
+                  className="absolute right-0 top-full mt-2 w-80 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
+                    <span className="text-sm font-semibold text-on-surface">{t.notifications.label}</span>
+                    {activeTab === 'neu' && unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-xs text-primary-fixed-dim hover:opacity-75 transition-opacity"
+                      >
+                        {t.notifications.markAllRead}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex border-b border-outline-variant">
+                    {(['neu', 'verlauf'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
+                          activeTab === tab
+                            ? 'text-primary-fixed-dim border-b-2 border-primary-fixed-dim'
+                            : 'text-on-surface-variant hover:text-on-surface'
+                        }`}
+                      >
+                        {tab === 'neu'
+                          ? unreadCount > 0 ? `${t.notifications.tabNew} (${unreadCount})` : t.notifications.tabNew
+                          : t.notifications.tabHistory}
+                      </button>
+                    ))}
+                  </div>
+
+                  {tabNotifications.length === 0 ? (
+                    <p className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                      {activeTab === 'neu' ? t.notifications.emptyNew : t.notifications.emptyHistory}
+                    </p>
+                  ) : (
+                    <ul>
+                      {tabNotifications.map((n) => {
+                        const Icon = TYPE_ICONS[n.type]
+                        return (
+                          <li
+                            key={n.id}
+                            className={`flex items-stretch ${
+                              !n.is_read ? 'border-l-2 border-primary-fixed-dim bg-surface-container-low' : ''
+                            }`}
+                          >
+                            <button
+                              onClick={() => handleNotificationClick(n)}
+                              className="flex-1 flex items-start gap-3 px-4 py-3 text-left hover:bg-surface-container-high transition-colors"
+                            >
+                              <Icon
+                                size={16}
+                                className={`mt-0.5 flex-shrink-0 ${
+                                  !n.is_read ? 'text-primary-fixed-dim' : 'text-on-surface-variant'
+                                }`}
+                                aria-hidden
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm leading-snug truncate ${
+                                  !n.is_read ? 'text-on-surface font-medium' : 'text-on-surface-variant'
+                                }`}>
+                                  {n.content}
+                                </p>
+                                <p className="text-xs text-on-surface-variant mt-0.5">
+                                  {relativeTime(n.created_at, t.relativeTime)}
+                                </p>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => handleDelete(n)}
+                              className="flex-shrink-0 px-3 text-on-surface-variant/40 hover:text-error transition-colors"
+                              aria-label={t.notifications.deleteNotification}
+                            >
+                              <Trash2 size={14} aria-hidden />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+
+                  <div className="border-t border-outline-variant px-4 py-2.5">
+                    <Link
+                      href="/notifications"
+                      onClick={() => setBellOpen(false)}
+                      className="block text-center text-xs font-medium text-primary-fixed-dim hover:opacity-75 transition-opacity"
+                    >
+                      {t.notifications.showAll}
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <Link
             href="/settings"
-            aria-label="Einstellungen"
+            aria-label={t.nav.settings}
             className="inline-flex p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
           >
             <Settings size={20} aria-hidden />
@@ -487,7 +537,7 @@ export default function TopNav() {
 
           <Link
             href="/profile"
-            aria-label="Profile"
+            aria-label={t.nav.profile}
             className="hidden md:inline-flex p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
           >
             <User size={20} aria-hidden />

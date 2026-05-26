@@ -15,7 +15,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <div className={`${fontSizeClass}${highContrast ? ' high-contrast' : ''}`}>
         <TopNav />
-        <main className="pb-16 md:pb-0">{children}</main>
+        <main className="pb-20 md:pb-0">{children}</main>
         <footer className="mb-16 md:mb-0 border-t border-outline-variant py-4 text-center text-xs text-on-surface-variant">
           © {process.env.NEXT_PUBLIC_COPYRIGHT_YEAR} {process.env.NEXT_PUBLIC_BRAND_NAME}{' '}
           <span aria-hidden="true">·</span>{' '}

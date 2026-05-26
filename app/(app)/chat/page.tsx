@@ -8,24 +8,12 @@ import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useConversationStore, type Conversation } from '@/lib/store/conversationStore'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
+import { useTranslation } from '@/lib/i18n'
 
 type ConvEnvelope = Conversation[] | { data: Conversation[] }
 
 function normalise<T>(res: T[] | { data: T[] }): T[] {
   return Array.isArray(res) ? res : ((res as { data: T[] })?.data ?? [])
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-}
-
-function getPreview(content: string | null | undefined): string {
-  if (!content) return 'Noch keine Nachrichten'
-  return content.length > 40 ? content.slice(0, 40) + '...' : content
-}
-
-function shortId(id: string): string {
-  return `Nutzer ${id.slice(0, 6).toUpperCase()}`
 }
 
 function SkeletonItem() {
@@ -44,12 +32,26 @@ function SkeletonItem() {
 }
 
 export default function ChatPage() {
+  const { t, locale } = useTranslation()
   const router = useRouter()
   const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
   const conversations = useConversationStore((s) => s.conversations)
   const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  function formatTime(dateStr: string): string {
+    return new Date(dateStr).toLocaleTimeString(locale === 'en' ? 'en-GB' : 'de-DE', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  function getPreview(content: string | null | undefined): string {
+    if (!content) return t.chat.noMessages
+    return content.length > 40 ? content.slice(0, 40) + '...' : content
+  }
+
+  function shortId(id: string): string {
+    return t.chat.shortUserId.replace('{id}', id.slice(0, 6).toUpperCase())
+  }
 
   useEffect(() => {
     async function load() {
@@ -73,7 +75,7 @@ export default function ChatPage() {
         setNicknames(map)
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
-        setError(err instanceof Error ? err.message : 'Fehler beim Laden')
+        setError(err instanceof Error ? err.message : t.chat.loadError)
       } finally {
         setLoading(false)
       }
@@ -97,34 +99,34 @@ export default function ChatPage() {
   return (
     <main className="min-h-screen bg-background pb-20 md:pb-8">
       <div className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
-        <h1 className="text-2xl font-bold text-on-surface">Nachrichten</h1>
+        <h1 className="text-2xl font-bold text-on-surface">{t.chat.title}</h1>
       </div>
 
       {loading ? (
-        <div className="divide-y divide-outline-variant mt-2" aria-busy="true" aria-label="Lädt Gespräche">
+        <div className="divide-y divide-outline-variant mt-2" aria-busy="true" aria-label={t.chat.loadingConversations}>
           {[0, 1, 2, 3].map((i) => <SkeletonItem key={i} />)}
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 px-6" role="alert">
-          <p className="text-on-surface font-semibold">Fehler beim Laden</p>
+          <p className="text-on-surface font-semibold">{t.chat.loadError}</p>
           <p className="text-on-surface-variant text-sm">{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
           >
-            Erneut versuchen
+            {t.common.retry}
           </button>
         </div>
       ) : conversations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-2 px-6">
           <MessageCircle className="h-10 w-10 text-on-surface-variant" aria-hidden="true" />
-          <p className="text-on-surface font-semibold">Noch keine Gespräche</p>
+          <p className="text-on-surface font-semibold">{t.chat.empty}</p>
           <p className="text-on-surface-variant text-sm">
-            Verbinde dich mit anderen Nutzern, um zu chatten
+            {t.chat.emptyDesc}
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-outline-variant mt-2" aria-label="Gespräche">
+        <ul className="divide-y divide-outline-variant mt-2" aria-label={t.chat.conversationList}>
           {conversations.map((conv) => {
             const partnerId = getPartnerId(conv)
             const unread = isUnread(conv)
@@ -136,7 +138,7 @@ export default function ChatPage() {
                 <div
                   onClick={() => router.push(`/chat/${conv.id}`)}
                   className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-surface-container-low active:bg-surface-container transition-colors min-h-[72px] cursor-pointer"
-                  aria-label={`Gespräch mit ${nickname}${conv.last_message_at ? ', ' + formatTime(conv.last_message_at) : ''}`}
+                  aria-label={`${t.chat.conversationWith.replace('{nickname}', nickname)}${conv.last_message_at ? ', ' + formatTime(conv.last_message_at) : ''}`}
                 >
                   <div className="relative flex-shrink-0">
                     <div

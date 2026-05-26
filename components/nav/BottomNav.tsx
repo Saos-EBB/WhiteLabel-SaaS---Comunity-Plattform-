@@ -4,14 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Compass, Heart, MessageCircle, User, Shield } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
-
-const navItems = [
-  { href: '/dashboard', label: 'Home',           Icon: Home },
-  { href: '/discover',  label: 'Discover',       Icon: Compass },
-  { href: '/requests',  label: 'Requests',       Icon: Heart },
-  { href: '/chat',      label: 'Chat',           Icon: MessageCircle },
-  { href: '/profile',   label: 'Profile',        Icon: User },
-]
+import { useTranslation } from '@/lib/i18n'
 
 function getJwtRole(token: string | null): string | null {
   if (!token) return null
@@ -28,9 +21,20 @@ function getJwtRole(token: string | null): string | null {
 export default function BottomNav() {
   const pathname = usePathname()
   const accessToken = useAuthStore((s) => s.accessToken)
-  const isAdmin = getJwtRole(accessToken) === 'admin'
+  const { t } = useTranslation()
+
+  const navItems = [
+    { href: '/dashboard', label: t.nav.home,     Icon: Home },
+    { href: '/discover',  label: t.nav.discover,  Icon: Compass },
+    { href: '/requests',  label: t.nav.requests,  Icon: Heart },
+    { href: '/chat',      label: t.nav.chat,       Icon: MessageCircle },
+    { href: '/profile',   label: t.nav.profile,   Icon: User },
+  ]
+
+  const _role = getJwtRole(accessToken)
+  const isAdmin = _role === 'admin' || _role === 'owner'
   const displayItems = isAdmin
-    ? navItems.map((item) => item.href === '/requests' ? { href: '/admin', label: 'Admin', Icon: Shield } : item)
+    ? navItems.map((item) => item.href === '/requests' ? { href: '/admin', label: t.nav.admin, Icon: Shield } : item)
     : navItems
 
   return (
