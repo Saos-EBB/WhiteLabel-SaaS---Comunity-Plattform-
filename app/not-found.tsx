@@ -20,7 +20,7 @@ export default function NotFound() {
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 transition-all"
           >
             Zurück zur Startseite
