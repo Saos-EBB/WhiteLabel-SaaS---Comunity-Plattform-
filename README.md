@@ -509,6 +509,30 @@ Full-screen overlay rendered by `AuthProvider` when `isBanned` is `true` in the 
 
 ---
 
+### `ErrorCard` — `components/ui/ErrorCard.tsx`
+
+Compact inline error card for when a section fails to load. Named export.
+
+```tsx
+<ErrorCard
+  title="Daten konnten nicht geladen werden"
+  message="Bitte versuche es erneut."
+  onRetry={loadData}
+  retryLabel="Erneut versuchen"
+/>
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `title` | `string` | Bold error heading |
+| `message` | `string` | Descriptive subtext |
+| `onRetry` | `() => void` | Optional — renders a retry button when provided |
+| `retryLabel` | `string` | Button label (default: `'Erneut versuchen'`) |
+
+Styled with `bg-surface-container / border-outline-variant / rounded-2xl` to blend into any surface.
+
+---
+
 ## Config
 
 ### `config/public.config.ts`
@@ -571,6 +595,12 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-26 (latest)
+- New screens: `app/not-found.tsx` (404), `app/error.tsx` (runtime error boundary), `app/global-error.tsx` (root error boundary) — all use existing CSS variables for automatic dark/light mode; `global-error.tsx` wraps in `<html><body>`, imports `globals.css`, re-runs the theme-init script, and falls back to inline `var(--color-..., hardcoded-dark)` styles in case the stylesheet fails to load
+- New component: `ErrorCard` (`components/ui/ErrorCard.tsx`) — compact named-export card for inline section errors; props: `title`, `message`, `onRetry?`, `retryLabel?`
+- Root page (`app/page.tsx`): replaced design-system scaffold with `redirect('/dashboard')`
+- Not-found page: "Zurück zur Startseite" button now points to `/dashboard` instead of `/`
+
+### 2026-05-26
 - New component: `CityAutocomplete` (`components/ui/CityAutocomplete.tsx`) — autocomplete input that queries `GET /cities/search?q=` as the user types; shows dropdown with city name, country, and region; exposes selected city's `lat`/`lng` to the parent
 - Discover (`/discover`): city filter replaced with `CityAutocomplete`; radius slider added (10–500 km, step 10, disabled until a city is selected); search sends `lat`, `lng`, `radius` when a city is chosen from autocomplete rather than a free-text city string
 - Profile edit (`/profile`): city field replaced with `CityAutocomplete`; selected city coordinates are sent alongside the city name in `PUT /profile/me`
