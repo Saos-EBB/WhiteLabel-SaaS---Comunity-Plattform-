@@ -7,6 +7,7 @@ import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 import { useConnectionAction, type ConnectionStatus } from '@/hooks/useConnectionAction'
+import { CityAutocomplete } from '@/components/ui/CityAutocomplete'
 
 interface ProfileInterest {
   id: string
@@ -42,6 +43,9 @@ interface ProfilesResponse {
 
 const DEFAULT_FILTERS = {
   city: '',
+  lat: null as number | null,
+  lng: null as number | null,
+  radius: 50,
   gender: '',
   looking_for: '',
   min_age: '',
@@ -59,7 +63,13 @@ function calcAge(birthdate: string | null | undefined): number | null {
 
 function buildQuery(f: typeof DEFAULT_FILTERS): string {
   const params = new URLSearchParams()
-  if (f.city.trim())        params.set('city', f.city.trim())
+  if (f.lat != null) {
+    params.set('lat', String(f.lat))
+    params.set('lng', String(f.lng))
+    params.set('radius', String(f.radius))
+  } else if (f.city.trim()) {
+    params.set('city', f.city.trim())
+  }
   if (f.gender)             params.set('gender', f.gender)
   if (f.looking_for)        params.set('looking_for', f.looking_for)
   if (f.min_age)            params.set('min_age', f.min_age)
@@ -366,17 +376,16 @@ export default function DiscoverPage() {
             {/* City — full width on mobile */}
             <div className="col-span-2 relative">
               <MapPin
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none z-10"
                 aria-hidden="true"
               />
-              <input
-                type="text"
+              <CityAutocomplete
                 value={filters.city}
-                onChange={(e) => setFilters(f => ({ ...f, city: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && handleApply()}
+                onSelect={(city) => setFilters(f => ({ ...f, city: city.name, lat: Number(city.lat), lng: Number(city.lng) }))}
+                onClear={() => setFilters(f => ({ ...f, city: '', lat: null, lng: null }))}
                 placeholder="Stadt"
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
-                aria-label="Nach Stadt filtern"
+                ariaLabel="Nach Stadt filtern"
+                inputClassName="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
               />
             </div>
 
@@ -413,6 +422,25 @@ export default function DiscoverPage() {
               </select>
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
             </div>
+          </div>
+
+          {/* Radius slider */}
+          <div className={`flex items-center gap-3${filters.lat == null ? ' opacity-40' : ''}`}>
+            <MapPin className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+            <input
+              type="range"
+              min={10}
+              max={500}
+              step={10}
+              value={filters.radius}
+              disabled={filters.lat == null}
+              onChange={(e) => setFilters(f => ({ ...f, radius: Number(e.target.value) }))}
+              className="flex-1 accent-primary-fixed-dim disabled:cursor-not-allowed"
+              aria-label="Umkreis in km"
+            />
+            <span className="text-sm text-on-surface-variant w-40 text-right">
+              {filters.lat != null ? `Umkreis: ${filters.radius} km` : 'Umkreis: — (Stadt wählen)'}
+            </span>
           </div>
 
           {/* Row 2: Age range · Verbindung · Online toggle · Buttons */}

@@ -11,6 +11,7 @@ import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import BanModal from '@/components/ui/BanModal'
 import { useTranslation } from '@/lib/i18n'
+import { useSearch } from '@/hooks/useSearch'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,24 @@ interface AdminTicket {
     message: string
   }
   created_at: string
+}
+
+interface DashboardStats {
+  totalUsers: number
+  activeUsers: number
+  bannedUsers: number
+  newUsersToday: number
+  newUsersThisWeek: number
+  activeSubscriptions: number
+  totalRevenue: number
+  onlineUsers: number
+  messagesToday: number
+  messagesThisWeek: number
+  contactRequestsToday: number
+  contactRequestsThisWeek: number
+  openReports: number
+  strikesThisWeek: number
+  openTickets: number
 }
 
 interface Paginated<T> {
@@ -733,9 +752,8 @@ export default function AdminPage() {
   const [strikeReason, setStrikeReason] = useState('')
   const [strikeExpires, setStrikeExpires] = useState('')
   const [strikeSaving, setStrikeSaving]           = useState(false)
-  const [strikeListSearch, setStrikeListSearch]       = useState('')
-  const [strikeListSearchActive, setStrikeListSearchActive] = useState('')
-  const strikeListSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { query: strikeListSearch, handleChange: handleStrikeListSearch, filtered: filteredStrikes } =
+    useSearch(strikes?.data ?? [], (s, q) => (s.user_nickname ?? '').toLowerCase().includes(q))
   const [strikeNicknameQuery, setStrikeNicknameQuery] = useState('')
   const [strikeSearchResults, setStrikeSearchResults] = useState<AdminUser[]>([])
   const [strikeSearchLoading, setStrikeSearchLoading] = useState(false)
@@ -871,6 +889,11 @@ export default function AdminPage() {
   const [settingEdits, setSettingEdits]         = useState<Record<string, string>>({})
   const [settingRowSaving, setSettingRowSaving] = useState<Set<string>>(new Set())
   const [settingRowStatus, setSettingRowStatus] = useState<Record<string, { ok: boolean; msg: string }>>({})
+
+  const [dashboardStats, setDashboardStats]           = useState<DashboardStats | null>(null)
+  const [dashboardStatsLoading, setDashboardStatsLoading] = useState(false)
+  const [verwaltungDashboardOpen, setVerwaltungDashboardOpen] = useState(false)
+  const dashboardStatsLoadedOnce = useRef(false)
 
   async function loadSettings() {
     setSettingsLoading(true)
@@ -1043,6 +1066,18 @@ export default function AdminPage() {
       setEmailChangeError(err instanceof Error ? err.message : t.common.error)
     } finally {
       setEmailChangeSaving(false)
+    }
+  }
+
+  async function loadDashboardStats() {
+    setDashboardStatsLoading(true)
+    try {
+      const data = await fetchApi<DashboardStats>('/admin/dashboard/stats')
+      setDashboardStats(data)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t.admin.loadError, false)
+    } finally {
+      setDashboardStatsLoading(false)
     }
   }
 
@@ -1689,12 +1724,7 @@ export default function AdminPage() {
               type="search"
               placeholder={t.admin.strikesSearchPlaceholder}
               value={strikeListSearch}
-              onChange={(e) => {
-                const q = e.target.value
-                setStrikeListSearch(q)
-                if (strikeListSearchTimer.current) clearTimeout(strikeListSearchTimer.current)
-                strikeListSearchTimer.current = setTimeout(() => setStrikeListSearchActive(q), 300)
-              }}
+              onChange={handleStrikeListSearch}
               className="w-full px-3 py-2 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[40px]"
             />
 
@@ -1718,11 +1748,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant">
-                      {strikes.data
-                        .filter((s) =>
-                          !strikeListSearchActive.trim() ||
-                          (s.user_nickname ?? '').toLowerCase().includes(strikeListSearchActive.toLowerCase())
-                        )
+                      {filteredStrikes
                         .map((s) => (
                         <tr key={s.id} className="hover:bg-surface-container-high/50">
                           <td className="px-4 py-3 text-on-surface font-medium">
@@ -1823,6 +1849,126 @@ export default function AdminPage() {
         {/* ── Tab: Verwaltung (owner only) ─────────────────────────────────── */}
         {activeTab === 'verwaltung' && (
           <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-2">
+
+            {/* ── Accordion: Dashboard ────────────────────────────────────── */}
+            <div>
+              <div
+                role="button"
+                aria-expanded={verwaltungDashboardOpen}
+                onClick={() => {
+                  const opening = !verwaltungDashboardOpen
+                  setVerwaltungDashboardOpen(opening)
+                  if (opening && !dashboardStatsLoadedOnce.current) {
+                    dashboardStatsLoadedOnce.current = true
+                    void loadDashboardStats()
+                  }
+                }}
+                className="w-full flex items-center justify-between py-2 cursor-pointer select-none"
+              >
+                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+                  Dashboard
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void loadDashboardStats() }}
+                    disabled={dashboardStatsLoading}
+                    className="text-xs text-on-surface-variant hover:text-on-surface underline disabled:opacity-50"
+                  >
+                    {dashboardStatsLoading ? <Spinner size={3} /> : 'Aktualisieren'}
+                  </button>
+                  <ChevronDown
+                    className={`h-4 w-4 text-on-surface-variant transition-transform ${verwaltungDashboardOpen ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+
+              {verwaltungDashboardOpen && (
+                <div className="pt-3 space-y-2">
+                  {dashboardStatsLoading && !dashboardStats ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {Array.from({ length: 14 }).map((_, i) => (
+                        <div key={i} className="rounded-xl bg-surface-container-high border border-outline-variant p-3 space-y-1.5 animate-pulse">
+                          <div className="h-3 w-16 rounded bg-outline-variant/60" />
+                          <div className="h-6 w-10 rounded bg-outline-variant/40" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {/* Row 1 — Users */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {([
+                          { label: 'Nutzer gesamt', value: dashboardStats?.totalUsers },
+                          { label: 'Aktiv',         value: dashboardStats?.activeUsers },
+                          { label: 'Gesperrt',      value: dashboardStats?.bannedUsers },
+                          { label: 'Neu heute',     value: dashboardStats?.newUsersToday },
+                        ] as const).map(({ label, value }) => (
+                          <div key={label} className="rounded-xl bg-surface-container-high border border-outline-variant p-3">
+                            <p className="text-xs text-on-surface-variant truncate">{label}</p>
+                            <p className="text-xl font-bold text-on-surface tabular-nums mt-0.5">
+                              {value?.toLocaleString('de-DE') ?? '—'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Row 2 — Activity */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {([
+                          { label: 'Online jetzt',       value: dashboardStats?.onlineUsers },
+                          { label: 'Nachrichten heute',  value: dashboardStats?.messagesToday },
+                          { label: 'Anfragen heute',     value: dashboardStats?.contactRequestsToday },
+                          { label: 'Neu diese Woche',    value: dashboardStats?.newUsersThisWeek },
+                        ] as const).map(({ label, value }) => (
+                          <div key={label} className="rounded-xl bg-surface-container-high border border-outline-variant p-3">
+                            <p className="text-xs text-on-surface-variant truncate">{label}</p>
+                            <p className="text-xl font-bold text-on-surface tabular-nums mt-0.5">
+                              {value?.toLocaleString('de-DE') ?? '—'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Row 3 — Business */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {([
+                          { label: 'Aktive Abos',           value: dashboardStats?.activeSubscriptions?.toLocaleString('de-DE') },
+                          { label: 'Umsatz gesamt (€)',      value: dashboardStats?.totalRevenue != null ? dashboardStats.totalRevenue.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : undefined },
+                          { label: 'Neue Abos diese Woche', value: dashboardStats?.newUsersThisWeek?.toLocaleString('de-DE') },
+                        ] as const).map(({ label, value }) => (
+                          <div key={label} className="rounded-xl bg-surface-container-high border border-outline-variant p-3">
+                            <p className="text-xs text-on-surface-variant truncate">{label}</p>
+                            <p className="text-xl font-bold text-on-surface tabular-nums mt-0.5">
+                              {value ?? '—'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Row 4 — Moderation */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {([
+                          { label: 'Offene Meldungen',    value: dashboardStats?.openReports },
+                          { label: 'Strikes diese Woche', value: dashboardStats?.strikesThisWeek },
+                          { label: 'Offene Tickets',      value: dashboardStats?.openTickets },
+                        ] as const).map(({ label, value }) => (
+                          <div key={label} className="rounded-xl bg-surface-container-high border border-outline-variant p-3">
+                            <p className="text-xs text-on-surface-variant truncate">{label}</p>
+                            <p className="text-xl font-bold text-on-surface tabular-nums mt-0.5">
+                              {value?.toLocaleString('de-DE') ?? '—'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Divider />
 
             {/* ── Accordion: Admins ───────────────────────────────────────── */}
             <div>

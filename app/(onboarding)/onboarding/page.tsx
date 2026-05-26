@@ -6,6 +6,7 @@ import { AlertCircle, Camera, Check, ChevronDown, ChevronLeft, Loader2, Sparkles
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useTranslation } from '@/hooks/useTranslation'
+import { CityAutocomplete } from '@/components/ui/CityAutocomplete'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,8 @@ interface ProfileFormData {
   nickname: string
   birthdate: string
   city: string
+  cityLat: number | null
+  cityLng: number | null
   bio: string
   gender: string
   looking_for: string
@@ -219,24 +222,22 @@ function StepProfileInfo({
 
       {/* City */}
       <div className="space-y-1.5">
-        <label htmlFor="city" className="text-sm font-medium text-on-surface">
+        <label className="text-sm font-medium text-on-surface">
           {t.onboarding.city} <span className="text-error" aria-hidden="true">*</span>
         </label>
-        <input
-          id="city"
-          type="text"
+        <CityAutocomplete
           value={formData.city}
-          onChange={(e) => onChange('city', e.target.value)}
-          onBlur={() => setTouched((prev) => ({ ...prev, city: true }))}
+          onSelect={(city) => {
+            onChange('city', city.name)
+            onChange('cityLat', city.lat)
+            onChange('cityLng', city.lng)
+            setTouched((prev) => ({ ...prev, city: true }))
+          }}
           placeholder="z.B. Berlin"
-          maxLength={100}
-          autoComplete="address-level2"
-          className={`w-full rounded-2xl bg-surface-container border px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors ${
+          ariaLabel={t.onboarding.city}
+          inputClassName={`w-full rounded-2xl bg-surface-container border px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary-fixed-dim min-h-[52px] transition-colors ${
             cityError ? 'border-error' : 'border-outline-variant'
           }`}
-          aria-describedby={cityError ? 'city-error' : undefined}
-          aria-invalid={cityError ? 'true' : 'false'}
-          aria-required="true"
         />
         {cityError && (
           <p id="city-error" className="text-xs text-error flex items-center gap-1.5" role="alert">
@@ -555,6 +556,8 @@ function StepDone({
           nickname:   formData.nickname,
           birthdate:  formData.birthdate,
           city:       formData.city,
+          ...(formData.cityLat != null ? { lat: formData.cityLat } : {}),
+          ...(formData.cityLng != null ? { lng: formData.cityLng } : {}),
           ...(formData.bio         ? { bio:         formData.bio }         : {}),
           ...(formData.gender      ? { gender:      formData.gender }      : {}),
           ...(formData.looking_for ? { looking_for: formData.looking_for } : {}),
@@ -678,6 +681,8 @@ export default function OnboardingPage() {
     nickname:    '',
     birthdate:   '',
     city:        '',
+    cityLat:     null,
+    cityLng:     null,
     bio:         '',
     gender:      '',
     looking_for: '',

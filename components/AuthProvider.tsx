@@ -18,6 +18,7 @@ interface MessagePayload {
   conversation_id: string
   content: string
   sent_at: string
+  sender_nickname?: string
 }
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -78,7 +79,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
               store.addOrUpdateNotification({
                 id: `temp-msg-${msg.id}`,
                 type: 'message',
-                content: 'Neue Nachricht',
+                content: `${msg.sender_nickname ?? 'Jemand'} hat dir eine Nachricht geschickt.`,
                 is_read: false,
                 created_at: new Date().toISOString(),
                 conversation_id: msg.conversation_id,

@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import { useTranslation } from '@/lib/i18n'
+import { CityAutocomplete } from '@/components/ui/CityAutocomplete'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export default function ProfilePage() {
   const [draft, setDraft]         = useState({
     nickname: '', bio: '', city: '', gender: '', looking_for: '', is_published: false,
   })
+  const [cityCoords, setCityCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [saving, setSaving]               = useState(false)
   const [saveError, setSaveError]         = useState<string | null>(null)
   const [showNicknameConfirm, setShowNicknameConfirm] = useState(false)
@@ -242,6 +244,7 @@ export default function ProfilePage() {
       }
       if (draft.gender)      payload.gender      = draft.gender
       if (draft.looking_for) payload.looking_for = draft.looking_for
+      if (cityCoords) { payload.lat = cityCoords.lat; payload.lng = cityCoords.lng }
 
       await fetchApi<Profile>('/profile/me', {
         method: 'PUT',
@@ -553,14 +556,15 @@ export default function ProfilePage() {
               <div className="flex items-center gap-1.5 text-white text-sm mb-1">
                 <MapPin className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
                 {editMode ? (
-                  <input
-                    type="text"
+                  <CityAutocomplete
                     value={draft.city}
-                    onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
-                    maxLength={100}
-                    className="bg-transparent text-white text-sm w-20 focus:outline-none placeholder-white/50 border-b border-white/30"
+                    onSelect={(city) => {
+                      setDraft((d) => ({ ...d, city: city.name }))
+                      setCityCoords({ lat: city.lat, lng: city.lng })
+                    }}
                     placeholder={t.onboarding.city}
-                    aria-label={t.onboarding.city}
+                    ariaLabel={t.onboarding.city}
+                    inputClassName="bg-transparent text-white text-sm w-32 focus:outline-none placeholder-white/50 border-b border-white/30"
                   />
                 ) : (
                   <span>{profile.city ?? '—'}</span>

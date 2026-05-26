@@ -61,7 +61,7 @@ Copy `.env.example` to `.env.local` and fill in the values.
 
 ### Discover
 - 2-col (mobile) / 3-col (desktop) profile grid with skeleton loading
-- Filters: city, gender, looking_for, age range, online-only
+- Filters: `CityAutocomplete` city picker (sends `lat`/`lng`/`radius` to backend), gender, looking_for, age range, online-only; radius slider (10–500 km) enabled once a city is selected
 - "Verbinden" sends contact request optimistically; connected profiles show "Chatten →" and "Verbindung trennen"
 - "Verbindung trennen" calls `DELETE /chat/connections/:userId` with a bottom-sheet confirmation
 
@@ -93,7 +93,7 @@ Accessible to `role: admin` or `role: owner` users. Auth guard waits for Zustand
 | Strikes | Paginated strikes; "Neuer Strike" modal with debounced nickname search |
 | Schimpfwörter | Custom profanity word list; add/delete words |
 | Einstellungen | System settings key/value editor — `owner` only |
-| Verwaltung | **Owner only.** Admin account list (paginated) + "Admin erstellen" form; duplicates settings editor |
+| Verwaltung | **Owner only.** Admin account list (paginated) + "Admin erstellen" form; "Abonnement-Preise" editor; **Dashboard** accordion with platform stats (lazy-loaded via `GET /admin/dashboard/stats`, refresh button) |
 
 ### Ban Screen
 - `BanScreen` component: full-screen overlay (`z-[9999]`) shown when `isBanned` is `true` in auth store
@@ -151,7 +151,12 @@ The auth layout (`app/(auth)/layout.tsx`) wraps all auth routes with a sticky fo
 All app routes are protected. Unauthenticated users are redirected to `/login`.
 
 #### `/dashboard`
-Home screen after login.
+Home screen after login. Shows role badge (Crown/Shield) in the welcome heading for owner/admin users, then three stat sections:
+- **Mein Überblick** (all users): pending contact requests, active conversation count, subscription status — via `GET /admin/dashboard/user-stats`
+- **Moderations-Überblick** (admin + owner): open reports, open tickets, pending media, strikes this week — via `GET /admin/dashboard/admin-stats`
+- **Plattform-Übersicht** (owner only): full platform metrics grid (users, activity, revenue, moderation) — via `GET /admin/dashboard/stats`
+
+Followed by quick-access cards (Discover, Chat, Requests) and recent notifications.
 
 #### `/discover`
 Browse published profiles in a 2-col (mobile) / 3-col (desktop) grid. Skeleton loading state on initial fetch.
@@ -266,7 +271,7 @@ Eight tabs (`owner` sees all; `admin` does not see **Verwaltung**):
 | Strikes | Paginated strike list. "Neuer Strike" modal — type (`warning`, `temp`, `permanent`), **nickname search** (debounced lookup, select from results), reason, optional expiry. |
 | Schimpfwörter | Custom profanity word list. Add / delete words; persisted to `profanity_words` table via backend. |
 | Einstellungen | System settings key/value editor. **Owner only.** |
-| Verwaltung | **Owner only.** Three accordion sub-sections: (A) admin account list (paginated, `GET /admin/admins`) — shows nickname, role badge, verified status, last login; (B) "Admin erstellen" form (`POST /admin/users/create`) — email, password, nickname; (C) "Abonnement-Preise" — edit monthly/yearly/lifetime prices via `PATCH /system-settings/prices`, confirmation modal before saving; note to keep prices in sync with Stripe. |
+| Verwaltung | **Owner only.** Four accordion sub-sections: (A) "Dashboard" — platform stats grid (users, activity, revenue, moderation) lazy-loaded via `GET /admin/dashboard/stats` with a refresh button and skeleton loading; (B) admin account list (paginated, `GET /admin/admins`) — shows nickname, role badge, verified status, last login; (C) "Admin erstellen" form (`POST /admin/users/create`) — email, password, nickname; (D) "Abonnement-Preise" — edit monthly/yearly/lifetime prices via `PATCH /system-settings/prices`, confirmation modal before saving; note to keep prices in sync with Stripe. |
 
 ### Public — `(public)`
 
@@ -375,6 +380,32 @@ Reusable online-status dot + optional status label.
 Status translations: `available` → Verfügbar · `looking_for_chat` → Suche Gespräch · `looking_for_date` → Suche Date · `busy` → Beschäftigt · `do_not_disturb` → Nicht stören.
 
 Renders an accessible `aria-label` describing the combined state.
+
+### `CityAutocomplete` — `components/ui/CityAutocomplete.tsx`
+
+City autocomplete input. Queries `GET /cities/search?q=` as the user types and renders a dropdown of results.
+
+```tsx
+<CityAutocomplete
+  value={city}
+  onSelect={(city) => { setCity(city.name); setCoords({ lat: city.lat, lng: city.lng }) }}
+  onClear={() => { setCity(''); setCoords(null) }}
+  placeholder="Stadt"
+  ariaLabel="Nach Stadt filtern"
+  inputClassName="..."
+/>
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `value` | `string` | Controlled display value |
+| `onSelect` | `(city: { id, name, country, region, lat, lng }) => void` | Called when the user picks a result |
+| `onClear` | `() => void` | Optional — called when the input is cleared |
+| `placeholder` | `string` | Input placeholder |
+| `ariaLabel` | `string` | `aria-label` on the underlying input |
+| `inputClassName` | `string` | CSS classes forwarded to the `<input>` |
+
+---
 
 ### `StripeCheckoutModal` — `components/ui/StripeCheckoutModal.tsx`
 
@@ -540,6 +571,16 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-26 (latest)
+- New component: `CityAutocomplete` (`components/ui/CityAutocomplete.tsx`) — autocomplete input that queries `GET /cities/search?q=` as the user types; shows dropdown with city name, country, and region; exposes selected city's `lat`/`lng` to the parent
+- Discover (`/discover`): city filter replaced with `CityAutocomplete`; radius slider added (10–500 km, step 10, disabled until a city is selected); search sends `lat`, `lng`, `radius` when a city is chosen from autocomplete rather than a free-text city string
+- Profile edit (`/profile`): city field replaced with `CityAutocomplete`; selected city coordinates are sent alongside the city name in `PUT /profile/me`
+- Onboarding: city step uses `CityAutocomplete`; `cityLat`/`cityLng` stored in form state and included in `PUT /profile/me` on wizard completion
+- Dashboard (`/dashboard`): full redesign — role badge (Crown/Shield) shown in welcome heading for owner/admin; "Mein Überblick" stat row for all users (pending requests, active chats, subscription via `GET /admin/dashboard/user-stats`); "Moderations-Überblick" (admin + owner) via `GET /admin/dashboard/admin-stats`; "Plattform-Übersicht" (owner only) via `GET /admin/dashboard/stats`; Admin quick-link button shown to admin/owner users
+- Admin (`/admin`): new "Dashboard" accordion in Verwaltung tab (owner only) — lazy-loads platform stats via `GET /admin/dashboard/stats` with a refresh button and skeleton loading
+- Admin (`/admin`): strikes list search refactored to use new `useSearch` hook (replaces manual debounced state)
+- AuthProvider: `new_message` notifications now show `"{sender_nickname} hat dir eine Nachricht geschickt."` instead of the generic "Neue Nachricht" (`sender_nickname` field added to `MessagePayload` type)
+
+### 2026-05-26
 - Settings (`/settings`): "Abonnement & Zahlung" section hidden entirely for `admin` and `owner` users
 - Settings (`/settings`): plan selection buttons now show prices fetched from `GET /system-settings/prices` (e.g. "Monatlich — €9.99"); prices are loaded on page mount
 - Settings (`/settings`): "Passwort ändern" and "E-Mail ändern" implemented as nested sub-accordions inside the **Konto** section (replacing "Bald verfügbar" placeholders); each has show/hide password toggles and inline success/error states
