@@ -1,9 +1,10 @@
 import {
-    Body, Controller, Delete, Get, Param, ParseIntPipe,
+    Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe,
     ParseUUIDPipe, Patch, Post, Query, Request, UseGuards,
 } from '@nestjs/common';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { OwnerGuard } from '../../../common/guards/owner.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { AdminService } from './admin.service';
 import { SetVulnerableFlagDto } from './dto/set-vulnerable-flag.dto';
@@ -13,6 +14,8 @@ import { UpdateReportDto } from './dto/update-report.dto';
 import { AdminCreateStrikeDto } from './dto/admin-create-strike.dto';
 import { AddProfanityWordDto } from './dto/add-profanity-word.dto';
 import { UpdateSettingDto } from './dto/update-setting.dto';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateUserEmailDto } from './dto/update-user-email.dto';
 import { RejectMediaDto } from '../moderation/dto/reject-media.dto';
 
 @Controller('admin')
@@ -44,6 +47,12 @@ export class AdminController {
 
     // ── User management ────────────────────────────────────────────────────────
 
+    @Post('users/create')
+    @UseGuards(OwnerGuard)
+    createAdminUser(@Body() dto: CreateAdminUserDto) {
+        return this.adminService.createAdminUser(dto);
+    }
+
     @Get('users')
     getUsers(
         @Query('role') role?: string,
@@ -67,7 +76,7 @@ export class AdminController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: BanUserDto,
     ) {
-        return this.adminService.banUser(req.user.sub, id, dto);
+        return this.adminService.banUser(req.user.sub, req.user.role, id, dto);
     }
 
     @Patch('users/:id/unban')
@@ -76,11 +85,13 @@ export class AdminController {
     }
 
     @Patch('users/:id/role')
+    @UseGuards(OwnerGuard)
     setUserRole(
+        @Request() req: any,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: UpdateUserRoleDto,
     ) {
-        return this.adminService.setUserRole(id, dto);
+        return this.adminService.setUserRole(req.user.sub, id, dto);
     }
 
     @Patch('users/:id/vulnerable-flag')
@@ -94,6 +105,20 @@ export class AdminController {
     @Get('users/:id/export')
     exportUserData(@Param('id', ParseUUIDPipe) id: string) {
         return this.adminService.exportUserData(id);
+    }
+
+    @Post('users/:id/send-password-reset')
+    @HttpCode(HttpStatus.OK)
+    sendPasswordReset(@Param('id', ParseUUIDPipe) id: string) {
+        return this.adminService.sendPasswordReset(id);
+    }
+
+    @Patch('users/:id/email')
+    updateUserEmail(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: UpdateUserEmailDto,
+    ) {
+        return this.adminService.updateUserEmail(id, dto);
     }
 
     // ── Reports ────────────────────────────────────────────────────────────────
@@ -155,14 +180,65 @@ export class AdminController {
         return this.adminService.removeProfanityWord(word);
     }
 
-    // ── System settings ────────────────────────────────────────────────────────
+    // ── Direct conversations ───────────────────────────────────────────────────
+
+    @Post('conversations')
+    createDirectConversation(
+        @Request() req: any,
+        @Body('target_user_id', ParseUUIDPipe) targetUserId: string,
+    ) {
+        return this.adminService.createDirectConversation(req.user.sub, targetUserId);
+    }
+
+    // ── Admin tickets ──────────────────────────────────────────────────────────
+
+    @Get('tickets')
+    getAdminTickets(
+        @Query('type')   type?: string,
+        @Query('status') status?: string,
+        @Query('page')   page  = '1',
+        @Query('limit')  limit = '20',
+    ) {
+        return this.adminService.getAdminTickets({
+            type,
+            status,
+            page:  Math.max(1,   parseInt(page,  10) || 1),
+            limit: Math.min(100, parseInt(limit, 10) || 20),
+        });
+    }
+
+    @Patch('tickets/:id/status')
+    updateAdminTicketStatus(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body('status') status: string,
+    ) {
+        return this.adminService.updateAdminTicketStatus(id, status);
+    }
+
+    // ── Admin management (owner only) ─────────────────────────────────────────
+
+    @Get('admins')
+    @UseGuards(OwnerGuard)
+    getAdmins(
+        @Query('page')  page  = '1',
+        @Query('limit') limit = '20',
+    ) {
+        return this.adminService.getAdmins({
+            page:  Math.max(1,   parseInt(page,  10) || 1),
+            limit: Math.min(100, parseInt(limit, 10) || 20),
+        });
+    }
+
+    // ── System settings (owner only) ──────────────────────────────────────────
 
     @Get('settings')
+    @UseGuards(OwnerGuard)
     getSettings() {
         return this.adminService.getSettings();
     }
 
     @Patch('settings/:key')
+    @UseGuards(OwnerGuard)
     updateSetting(
         @Request() req: any,
         @Param('key') key: string,

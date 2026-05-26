@@ -47,10 +47,17 @@ const payload = this.jwtService.verify<{ sub: string }>(token);
 
     async handleConnection(client: Socket) {
         const userId = this.extractUserId(client);
-if (!userId) {
+        if (!userId) {
             client.disconnect();
             return;
         }
+
+        // Admin clients join a shared room so ticket.new can be broadcast to all of them
+        try {
+            const token = (client.handshake.auth?.token ?? client.handshake.query?.token) as string;
+            const { role } = this.jwtService.verify<{ sub: string; role?: string }>(token);
+            if (role === 'admin') client.join('admin');
+        } catch { /* non-critical — client stays connected as regular user */ }
 
         const conversations = await this.conversationRepo.find({
             where: [
@@ -97,6 +104,11 @@ for (const conv of conversations) {
     @OnEvent('user.unbanned')
     handleUserUnbanned(payload: { userId: string }) {
         this.emitToUser(payload.userId, 'user.unbanned', {});
+    }
+
+    @OnEvent('ticket.new')
+    handleTicketNew(): void {
+        this.server.to('admin').emit('ticket.new', {});
     }
 
     @SubscribeMessage('join_conversation')

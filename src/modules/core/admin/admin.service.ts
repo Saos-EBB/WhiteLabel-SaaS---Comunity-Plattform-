@@ -1,9 +1,13 @@
 import {
     BadRequestException,
+    ConflictException,
+    ForbiddenException,
     Injectable,
     Logger,
     NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
@@ -14,10 +18,12 @@ import { Profile } from '../profile/entities/profile.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MailService } from '../../../common/mail/mail.service';
-import { decryptEmail } from '../../../common/crypto/crypto.helper';
+import { decryptEmail, encryptField, hashEmail } from '../../../common/crypto/crypto.helper';
 import { ProfanityService } from '../moderation/profanity.service';
 import { SystemSettingsService } from '../system-settings/system-settings.service';
 import { StrikeType } from '../moderation/dto/create-strike.dto';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateUserEmailDto } from './dto/update-user-email.dto';
 import { BanUserDto, BanDuration } from './dto/ban-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
@@ -286,10 +292,12 @@ export class AdminService {
         return { data: rows, total: parseInt(total, 10), page, limit };
     }
 
-    async banUser(adminId: string, userId: string, dto: BanUserDto): Promise<{ success: true; ban_expires_at: Date | null; type: 'temp' | 'permanent' }> {
+    async banUser(adminId: string, requesterRole: string, userId: string, dto: BanUserDto): Promise<{ success: true; ban_expires_at: Date | null; type: 'temp' | 'permanent' }> {
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('Benutzer nicht gefunden');
         if (userId === adminId) throw new BadRequestException('Du kannst deinen eigenen Account nicht sperren.');
+        if (user.role === 'owner') throw new ForbiddenException('Owner-Konten können nicht gesperrt werden.');
+        if (requesterRole !== 'owner' && user.role === 'admin') throw new ForbiddenException('Admins können keine anderen Admins sperren.');
         if (user.is_banned) throw new BadRequestException('Benutzer ist bereits gesperrt');
 
         const ban_expires_at = this.calcBanExpiry(dto.duration);
@@ -356,16 +364,130 @@ export class AdminService {
         this.eventEmitter.emit('user.unbanned', { userId });
     }
 
-    async setUserRole(userId: string, dto: UpdateUserRoleDto): Promise<Partial<User>> {
+    async setUserRole(requesterId: string, userId: string, dto: UpdateUserRoleDto): Promise<Partial<User>> {
+        if (requesterId === userId) throw new BadRequestException('Du kannst deine eigene Rolle nicht ändern.');
+
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('Benutzer nicht gefunden');
+
+        if (user.role === 'owner') throw new BadRequestException('Die Owner-Rolle kann nicht geändert werden.');
 
         user.role = dto.role;
         await this.userRepo.save(user);
 
+        if (dto.role === 'admin') {
+            await this.profileRepo.update({ user_id: userId }, { onboarding_completed: true });
+        }
+
         const { password_hash, google_id_hash, email_search_hash, email,
                 email_verification_token, password_reset_token, ...safe } = user;
         return safe;
+    }
+
+    async createAdminUser(dto: CreateAdminUserDto): Promise<{ id: string; nickname: string; public_id: string }> {
+        const emailHash = hashEmail(dto.email);
+
+        const emailTaken = await this.userRepo.findOne({ where: { email_search_hash: emailHash } });
+        if (emailTaken) throw new ConflictException('Email bereits vergeben');
+
+        const nicknameTaken = await this.profileRepo.findOne({ where: { nickname: dto.nickname } });
+        if (nicknameTaken) throw new ConflictException('Nickname bereits vergeben');
+
+        const passwordHash = await bcrypt.hash(dto.password, 12);
+        const public_id = await this.generatePublicId();
+
+        const user = this.userRepo.create({
+            email_search_hash: emailHash,
+            email: encryptField(dto.email),
+            password_hash: passwordHash,
+            role: 'admin',
+            is_verified: true,
+            email_verified_at: new Date(),
+            public_id,
+        });
+        await this.userRepo.save(user);
+
+        const profile = this.profileRepo.create({
+            user_id: user.id,
+            nickname: dto.nickname,
+            birthdate: '1990-01-01',
+            onboarding_completed: true,
+            updated_at: new Date(),
+        });
+        await this.profileRepo.save(profile);
+
+        return { id: user.id, nickname: dto.nickname, public_id };
+    }
+
+    async sendPasswordReset(userId: string): Promise<{ message: string }> {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('Benutzer nicht gefunden');
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+        await this.userRepo.update(userId, {
+            password_reset_token: tokenHash,
+            password_reset_expires_at: new Date(Date.now() + 60 * 60 * 1000),
+        });
+
+        const email = decryptEmail(user.email as Buffer | null);
+        if (email) {
+            try {
+                await this.mailService.sendPasswordResetEmail(email, token);
+            } catch {
+            }
+        }
+
+        return { message: 'Passwort-Reset-Link wurde gesendet' };
+    }
+
+    async updateUserEmail(userId: string, dto: UpdateUserEmailDto): Promise<{ message: string }> {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('Benutzer nicht gefunden');
+
+        const newEmailHash = hashEmail(dto.new_email);
+        const taken = await this.userRepo.findOne({ where: { email_search_hash: newEmailHash } });
+        if (taken && taken.id !== userId) throw new ConflictException('Email bereits vergeben');
+
+        // TODO: set is_verified = false once Resend domain is verified
+        user.email = encryptField(dto.new_email);
+        user.email_search_hash = newEmailHash;
+        await this.userRepo.save(user);
+
+        return { message: 'Email aktualisiert' };
+    }
+
+    private async generatePublicId(): Promise<string> {
+        const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        for (let attempt = 0; attempt < 100; attempt++) {
+            const id = Array.from({ length: 4 }, () => charset[Math.floor(Math.random() * 36)]).join('');
+            const existing = await this.userRepo.findOne({ where: { public_id: id } });
+            if (!existing) return id;
+        }
+        throw new Error('Could not generate unique public_id');
+    }
+
+    async getAdmins(opts: { page: number; limit: number }) {
+        const { page, limit } = opts;
+        const offset = (page - 1) * limit;
+
+        const rows = await this.dataSource.query(
+            `SELECT u.id, u.role, u.is_banned, u.is_verified, u.created_at, u.last_login,
+                    p.nickname, p.photo_id
+             FROM   users u
+             LEFT JOIN profiles p ON p.user_id = u.id
+             WHERE  u.role = 'admin'
+             ORDER  BY u.created_at DESC
+             LIMIT  $1 OFFSET $2`,
+            [limit, offset],
+        );
+
+        const [{ total }] = await this.dataSource.query(
+            `SELECT COUNT(*) AS total FROM users WHERE role = 'admin'`,
+        );
+
+        return { data: rows, total: parseInt(total, 10), page, limit };
     }
 
     // ── Reports ────────────────────────────────────────────────────────────────
@@ -481,6 +603,59 @@ export class AdminService {
 
     removeProfanityWord(word: string) {
         return this.profanityService.removeCustomWord(word);
+    }
+
+    // ── Direct conversations (admin → user) ────────────────────────────────────
+
+    async createDirectConversation(adminId: string, targetUserId: string): Promise<{ conversation_id: string }> {
+        if (adminId === targetUserId) throw new BadRequestException('Ungültige Anfrage');
+
+        const [existing] = await this.dataSource.query<{ id: string }[]>(
+            `SELECT id FROM conversations
+             WHERE ((user_a_id = $1 AND user_b_id = $2) OR (user_a_id = $2 AND user_b_id = $1))
+               AND deleted_at_a IS NULL AND deleted_at_b IS NULL`,
+            [adminId, targetUserId],
+        );
+        if (existing) return { conversation_id: existing.id };
+
+        const [created] = await this.dataSource.query<{ id: string }[]>(
+            `INSERT INTO conversations (user_a_id, user_b_id) VALUES ($1, $2) RETURNING id`,
+            [adminId, targetUserId],
+        );
+        return { conversation_id: created.id };
+    }
+
+    // ── Admin tickets ──────────────────────────────────────────────────────────
+
+    async getAdminTickets(opts: { type?: string; status?: string; page: number; limit: number }) {
+        const { type, status, page, limit } = opts;
+        const offset = (page - 1) * limit;
+
+        const rows = await this.dataSource.query(
+            `SELECT id, type, status, source, context, created_at, updated_at
+             FROM   admin_tickets
+             WHERE  ($1::text IS NULL OR type   = $1::ticket_type)
+               AND  ($2::text IS NULL OR status = $2::ticket_status)
+             ORDER  BY created_at DESC
+             LIMIT  $3 OFFSET $4`,
+            [type ?? null, status ?? null, limit, offset],
+        );
+
+        const [{ total }] = await this.dataSource.query(
+            `SELECT COUNT(*) AS total FROM admin_tickets
+             WHERE ($1::text IS NULL OR type   = $1::ticket_type)
+               AND ($2::text IS NULL OR status = $2::ticket_status)`,
+            [type ?? null, status ?? null],
+        );
+
+        return { data: rows, total: parseInt(total, 10), page, limit };
+    }
+
+    async updateAdminTicketStatus(id: string, status: string): Promise<void> {
+        await this.dataSource.query(
+            `UPDATE admin_tickets SET status = $1::ticket_status, updated_at = NOW() WHERE id = $2`,
+            [status, id],
+        );
     }
 
     // ── System settings ────────────────────────────────────────────────────────

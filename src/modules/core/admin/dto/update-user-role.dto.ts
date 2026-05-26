@@ -6,7 +6,13 @@ export enum UserRole {
     ORG   = 'org',
 }
 
+// Roles assignable by the owner — 'owner' is intentionally excluded
+export enum AssignableRole {
+    USER  = 'user',
+    ADMIN = 'admin',
+}
+
 export class UpdateUserRoleDto {
-    @IsEnum(UserRole)
-    role!: UserRole;
+    @IsEnum(AssignableRole)
+    role!: AssignableRole;
 }

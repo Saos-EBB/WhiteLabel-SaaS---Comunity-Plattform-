@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Notification, NotificationType } from './entities/notification.entity';
 import { NotificationSettings } from './entities/notification-settings.entity';
@@ -14,9 +14,17 @@ export class NotificationsService {
         @InjectRepository(NotificationSettings)
         private readonly settingsRepository: Repository<NotificationSettings>,
         private readonly eventEmitter: EventEmitter2,
+        @InjectDataSource()
+        private readonly dataSource: DataSource,
     ) { }
 
     async createNotification(userId: string, type: NotificationType, content: string): Promise<void> {
+        const [row] = await this.dataSource.query<{ role: string }[]>(
+            'SELECT role FROM users WHERE id = $1 LIMIT 1',
+            [userId],
+        );
+        if (row?.role === 'admin') return;
+
         const notification = this.notificationRepository.create({ user_id: userId, type, content });
         const saved = await this.notificationRepository.save(notification);
         this.eventEmitter.emit('notification.created', { userId, notification: saved });

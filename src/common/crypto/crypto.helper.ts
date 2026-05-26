@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 
 function getKey(): Buffer {
     if (!process.env.APP_ENCRYPTION_KEY) throw new Error('APP_ENCRYPTION_KEY not set');
@@ -29,4 +29,11 @@ export function decryptField(buf: Buffer | null): string | null {
 /** @deprecated use decryptField */
 export function decryptEmail(buf: Buffer | null): string | null {
     return decryptField(buf);
+}
+
+export function hashEmail(email: string): string {
+    if (!process.env.EMAIL_SALT) throw new Error('EMAIL_SALT env var is not set');
+    return createHash('sha256')
+        .update(email.toLowerCase().trim() + process.env.EMAIL_SALT)
+        .digest('hex');
 }

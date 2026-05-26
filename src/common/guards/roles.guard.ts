@@ -11,7 +11,10 @@ export class RolesGuard implements CanActivate {
 
         const request = context.switchToHttp().getRequest();
         const user = request['user'];
+
         if (roles.includes(user?.role)) return true;
+        // owner inherits all admin permissions
+        if (user?.role === 'owner' && roles.includes('admin')) return true;
 
         throw new ForbiddenException('Keine Berechtigung');
     }

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Query, HttpCode, HttpStatus, UseGuards, Request, Req, Res, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Patch, Body, Query, HttpCode, HttpStatus, UseGuards, Request, Req, Res, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -8,6 +8,8 @@ import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ConsentDto } from './dto/consent.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangeEmailDto } from './dto/change-email.dto';
 
 const REFRESH_COOKIE_OPTIONS = {
     httpOnly: true,
@@ -91,6 +93,20 @@ export class AuthController {
     async createConsents(@Req() req: any, @Body() dto: ConsentDto) {
         const ip: string = req.ip ?? '0.0.0.0';
         return this.authService.createConsents(req.user.sub, dto.consents, ip);
+    }
+
+    @Patch('change-password')
+    @UseGuards(JwtGuard)
+    @HttpCode(HttpStatus.OK)
+    async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+        return this.authService.changePassword(req.user.sub, dto.current_password, dto.new_password);
+    }
+
+    @Patch('change-email')
+    @UseGuards(JwtGuard)
+    @HttpCode(HttpStatus.OK)
+    async changeEmail(@Request() req: any, @Body() dto: ChangeEmailDto) {
+        return this.authService.changeEmail(req.user.sub, dto.current_password, dto.new_email);
     }
 
     @Delete('account')

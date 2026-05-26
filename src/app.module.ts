@@ -17,6 +17,8 @@ import { AdminModule } from './modules/core/admin/admin.module';
 import { MediaModule } from './modules/core/media/media.module';
 import { GdprModule } from './modules/core/gdpr/gdpr.module';
 import { CommonModule } from './common/common.module';
+import { SupportModule } from './modules/core/support/support.module';
+import { SetupModule } from './modules/core/setup/setup.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -58,6 +60,8 @@ import databaseConfig from './config/database.config';
     AdminModule,
     MediaModule,
     GdprModule,
+    SupportModule,
+    SetupModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

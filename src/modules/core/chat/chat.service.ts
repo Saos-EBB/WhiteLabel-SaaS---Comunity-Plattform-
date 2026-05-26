@@ -42,10 +42,14 @@ export class ChatService {
             throw new BadRequestException('Anfrage an sich selbst nicht erlaubt');
         }
 
-        const receiver = await this.userRepository.findOne({
-            where: { id: dto.receiver_id, deleted_at: IsNull() },
-        });
+        const [sender, receiver] = await Promise.all([
+            this.userRepository.findOne({ where: { id: senderId } }),
+            this.userRepository.findOne({ where: { id: dto.receiver_id, deleted_at: IsNull() } }),
+        ]);
         if (!receiver) throw new NotFoundException('Benutzer nicht gefunden');
+        if (sender?.role === 'admin' || receiver.role === 'admin') {
+            throw new ForbiddenException('Verbindungsanfragen mit Admin-Accounts sind nicht möglich');
+        }
 
         const existing = await this.contactRequestRepository.findOne({
             where: { sender_id: senderId, receiver_id: dto.receiver_id, status: ContactRequestStatus.PENDING },

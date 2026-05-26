@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import leoProfanity from 'leo-profanity';
 import { PROFANITY_WORDLIST } from './profanity.wordlist';
 
@@ -12,6 +13,7 @@ export class ProfanityService implements OnModuleInit {
     constructor(
         @InjectDataSource()
         private readonly dataSource: DataSource,
+        private readonly eventEmitter: EventEmitter2,
     ) {
         leoProfanity.add(PROFANITY_WORDLIST);
     }
@@ -67,6 +69,7 @@ export class ProfanityService implements OnModuleInit {
             `INSERT INTO admin_tickets (type, user_id, context) VALUES ('nickname', $1, $2)`,
             [userId, JSON.stringify({ nickname })],
         );
+        this.eventEmitter.emit('ticket.new', {});
     }
 
     async createImageTicket(userId: string, mediaId: string): Promise<void> {
@@ -74,6 +77,7 @@ export class ProfanityService implements OnModuleInit {
             `INSERT INTO admin_tickets (type, user_id, context) VALUES ('image', $1, $2)`,
             [userId, JSON.stringify({ media_id: mediaId, user_id: userId })],
         );
+        this.eventEmitter.emit('ticket.new', {});
     }
 
     // ── Admin word management ──────────────────────────────────────────────────

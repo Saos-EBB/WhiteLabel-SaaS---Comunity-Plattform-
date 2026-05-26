@@ -11,6 +11,7 @@ import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { OwnerGuard } from '../../../common/guards/owner.guard';
 import { PseudonymizationTask } from './tasks/pseudonymization.task';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ModerationModule } from '../moderation/moderation.module';
@@ -34,6 +35,6 @@ import { SystemSettingsModule } from '../system-settings/system-settings.module'
         SystemSettingsModule,
     ],
     controllers: [AdminController],
-    providers: [AdminService, JwtGuard, RolesGuard, PseudonymizationTask],
+    providers: [AdminService, JwtGuard, RolesGuard, OwnerGuard, PseudonymizationTask],
 })
 export class AdminModule {}

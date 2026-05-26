@@ -59,6 +59,8 @@ export class ModerationService {
 
         const saved = await this.reportRepository.save(report);
 
+        this.eventEmitter.emit('ticket.new', {});
+
         void this.checkAutoSuspend(dto.reported_user_id, saved.id).catch((err) =>
             this.logger.error(`checkAutoSuspend fehlgeschlagen für User ${dto.reported_user_id}`, err),
         );

@@ -60,6 +60,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 - **Auto-suspend**: triggered at ≥ 10 unique reports against a user — bans automatically, creates a `SYSTEM` strike, sends auto-suspend email, pushes `user.banned` socket event
 - Unban (`PATCH /admin/users/:id/unban`) pushes `user.unbanned` socket event
 - `GET /profile/me` returns `is_banned` — frontend uses this as source of truth on startup
+- **Ban protections**: `owner` accounts can never be banned; admins cannot ban other admins — only the `owner` can
 
 ### Real-time (WebSocket)
 - Socket.io gateway on the same port as HTTP
@@ -94,8 +95,11 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 
 ### System Settings
 - `system_settings` table — owner-editable key/value pairs
-- `SystemSettingsService.getNumber(key, fallback)` with 60 s in-memory cache
-- Owner-only endpoints: `GET /admin/settings`, `PATCH /admin/settings/:key`
+- `SystemSettingsService.getNumber(key, fallback)` and `getString(key, fallback)` with 60 s in-memory cache
+- Owner-only admin endpoints: `GET /admin/settings`, `PATCH /admin/settings/:key`
+- Subscription prices stored as `subscription_price_monthly`, `subscription_price_yearly`, `subscription_price_lifetime` keys; seeded via migration `020_subscription_prices.sql`
+- Public endpoint: `GET /system-settings/prices` — returns `{ monthly, yearly, lifetime }` (no auth required)
+- Owner-only price update: `PATCH /system-settings/prices` — updates one or more price keys atomically
 
 ### Owner Role
 - `role` column on `users`: `user | admin | org | owner`
@@ -190,7 +194,7 @@ All chat routes require JWT.
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/chat/requests` | Send a contact request to another user. |
+| POST | `/chat/requests` | Send a contact request to another user. Returns 403 if either the sender or receiver has `role = 'admin'` — admin accounts cannot participate in regular contact requests. |
 | GET | `/chat/requests/incoming` | List incoming pending contact requests. |
 | GET | `/chat/requests/outgoing` | List outgoing pending contact requests. |
 | PATCH | `/chat/requests/:id/accept` | Accept a contact request. Creates (or restores) conversation. |
@@ -352,6 +356,15 @@ All admin routes require JWT with `role: admin`.
 
 ---
 
+### System Settings — `/system-settings`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/system-settings/prices` | — | Returns current subscription prices: `{ monthly, yearly, lifetime }` (string values in EUR). Defaults: `9.99` / `49.99` / `149.99`. Used by the frontend to show prices on plan selection buttons. |
+| PATCH | `/system-settings/prices` | JWT + Owner | Update one or more subscription prices. Body: `{ monthly?, yearly?, lifetime? }` (all optional strings). Returns the updated price object. |
+
+---
+
 ### Setup — `/setup`
 
 Public, unauthenticated. Rate-limited per IP (max 5 attempts in-process).
@@ -389,7 +402,7 @@ Gateway runs on the same port as HTTP. Auth via `auth.token` in socket handshake
 
 | Direction | Event | Payload | Description |
 |---|---|---|---|
-| Client → Server | `join_conversation` | `conversationId: string` | Subscribe to a conversation room. |
+| Client → Server | `join_conversation` | `conversationId: string` | Subscribe to a conversation room. Admins also auto-join a shared `admin` room on connect (used for `ticket.new` broadcasts). |
 | Client → Server | `send_message` | `{ conversationId, content, type }` | Send a message. |
 | Client → Server | `typing` | `conversationId: string` | Broadcast typing indicator to other participant. |
 | Client → Server | `read_messages` | `conversationId: string` | Mark all messages in conversation as read. |
@@ -400,6 +413,7 @@ Gateway runs on the same port as HTTP. Auth via `auth.token` in socket handshake
 | Server → Client | `contact_request` | `ContactRequest` | Incoming contact request pushed to recipient. |
 | Server → Client | `user.banned` | `{}` | Pushed to the banned user's personal room when an admin bans them or the auto-suspend threshold is reached. Frontend shows the ban screen. |
 | Server → Client | `user.unbanned` | `{}` | Pushed to the user's personal room when an admin lifts a ban. Frontend hides the ban screen. |
+| Server → Client | `ticket.new` | `{}` | Pushed to all connected admin clients (shared `admin` room) whenever a new `admin_tickets` row is created — from reports, profanity nickname/image tickets, or support contact submissions. |
 
 ---
 
@@ -459,6 +473,15 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ---
 
 ## Changelog
+
+### 2026-05-26 (latest)
+- System settings: new `SystemSettingsController` with public `GET /system-settings/prices` (returns `{ monthly, yearly, lifetime }`) and owner-only `PATCH /system-settings/prices`
+- System settings: `SystemSettingsService` gains `getString(key, fallback)` method; `20_subscription_prices.sql` seeds default prices
+- Admin: `PATCH /admin/users/:id/ban` now rejects attempts to ban an `owner` account (403); admins cannot ban other admins — only the `owner` can
+- Admin: `PATCH /admin/users/:id/role` prevents changing one's own role and prevents changing the `owner` role; promoted-to-admin users get `onboarding_completed = true` automatically
+- Chat: `POST /chat/requests` now returns 403 if either party has `role = 'admin'`
+- Notifications: `createNotification()` now skips users with `role = 'admin'` (admins do not receive system notifications)
+- WebSocket: admin clients join a shared `admin` room on connect; `ticket.new` event pushed to all connected admins whenever a new ticket is created (report filed, profanity ticket, support contact)
 
 ### 2026-05-24 (latest)
 - Auth: `POST /auth/login` now accepts `identifier` (email **or** nickname) instead of email only

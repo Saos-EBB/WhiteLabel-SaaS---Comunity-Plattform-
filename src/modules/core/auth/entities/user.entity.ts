@@ -14,7 +14,7 @@ export class User {
     @Column({ type: 'varchar', nullable: true })
     google_id_hash!: string | null;
 
-    @Column({ type: 'enum', enum: ['user', 'admin', 'org'], default: 'user' })
+    @Column({ type: 'enum', enum: ['user', 'admin', 'org', 'owner'], default: 'user' })
     role!: string;
 
     @Column({ type: 'boolean', default: false })
