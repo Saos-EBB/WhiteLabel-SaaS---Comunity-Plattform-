@@ -14,6 +14,7 @@ import { Repository, IsNull, Not } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageType } from './entities/message.entity';
+import { Profile } from '../profile/entities/profile.entity';
 import { ProfanityService } from '../moderation/profanity.service';
 
 @WebSocketGateway({
@@ -32,6 +33,8 @@ export class ChatGateway implements OnGatewayConnection {
         private readonly conversationRepo: Repository<Conversation>,
         @InjectRepository(Message)
         private readonly messageRepo: Repository<Message>,
+        @InjectRepository(Profile)
+        private readonly profileRepo: Repository<Profile>,
         private readonly profanityService: ProfanityService,
     ) {}
 
@@ -161,7 +164,15 @@ for (const conv of conversations) {
             this.profanityService.flagUser(userId, '', 'chat').catch(() => {});
         }
 
-        this.server.to(data.conversationId).emit('new_message', message);
+        const senderProfile = await this.profileRepo.findOne({
+            where: { user_id: userId },
+            select: { id: true, nickname: true },
+        });
+
+        this.server.to(data.conversationId).emit('new_message', {
+            ...message,
+            sender_nickname: senderProfile?.nickname ?? 'Unbekannt',
+        });
     }
 
     @SubscribeMessage('typing')

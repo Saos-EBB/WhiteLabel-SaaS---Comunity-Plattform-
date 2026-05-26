@@ -180,6 +180,14 @@ export class ProfileService {
         }
 
         const saved = await this.profileRepo.save(profile);
+
+        if (dto.lat != null && dto.lng != null) {
+            await this.profileRepo.manager.query(
+                `UPDATE profiles SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE user_id = $3`,
+                [dto.lng, dto.lat, userId],
+            );
+        }
+
         await this.checkAndCompleteOnboarding(userId);
         return saved;
     }
@@ -354,6 +362,8 @@ export class ProfileService {
             city:       profile.show_city     ? profile.city       : null,
             birthdate:  profile.show_age      ? profile.birthdate  : (null as any),
             gender:     profile.show_gender   ? profile.gender     : null,
+            // looking_for is intentionally gated behind show_gender —
+            // hiding gender also hides looking_for to prevent reverse inference.
             looking_for: profile.show_gender  ? profile.looking_for : null,
             photo_url,
             is_online,
@@ -410,6 +420,9 @@ export class ProfileService {
         maxAge?: number,
         onlineOnly?: boolean,
         connectionStatus?: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED',
+        lat?: number,
+        lng?: number,
+        radius?: number,
     ): Promise<(Partial<Profile> & { photo_url: string | null; photo_needs_review: boolean; is_online: boolean; interests: { id: string; name_de: string; category: string | null }[]; connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED'; conversation_id: string | null; request_id: string | null })[]> {
         const qb = this.profileRepo
             .createQueryBuilder('p')
@@ -435,7 +448,13 @@ export class ProfileService {
             )
         `, { requestingUserId });
 
-        if (city) {
+        if (lat != null && lng != null) {
+            const radiusMeters = (radius ?? 50) * 1000;
+            qb.andWhere(
+                `ST_DWithin(p.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusMeters)`,
+                { lat, lng, radiusMeters },
+            );
+        } else if (city) {
             qb.andWhere('LOWER(p.city) LIKE LOWER(:city)', { city: `%${city}%` });
         }
 
@@ -522,6 +541,8 @@ export class ProfileService {
             city:        p.show_city    ? p.city         : null,
             birthdate:   p.show_age     ? p.birthdate    : (null as any),
             gender:      p.show_gender  ? p.gender       : null,
+            // looking_for is intentionally gated behind show_gender —
+            // hiding gender also hides looking_for to prevent reverse inference.
             looking_for: p.show_gender  ? p.looking_for  : null,
         }));
 

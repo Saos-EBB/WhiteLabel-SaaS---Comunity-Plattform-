@@ -18,14 +18,20 @@ export class NotificationsService {
         private readonly dataSource: DataSource,
     ) { }
 
-    async createNotification(userId: string, type: NotificationType, content: string): Promise<void> {
+    async createNotification(userId: string, type: NotificationType, content: string, title?: string, relatedId?: string): Promise<void> {
         const [row] = await this.dataSource.query<{ role: string }[]>(
             'SELECT role FROM users WHERE id = $1 LIMIT 1',
             [userId],
         );
         if (row?.role === 'admin') return;
 
-        const notification = this.notificationRepository.create({ user_id: userId, type, content });
+        const notification = this.notificationRepository.create({
+            user_id: userId,
+            type,
+            content,
+            title: title ?? null,
+            related_id: relatedId ?? null,
+        });
         const saved = await this.notificationRepository.save(notification);
         this.eventEmitter.emit('notification.created', { userId, notification: saved });
     }

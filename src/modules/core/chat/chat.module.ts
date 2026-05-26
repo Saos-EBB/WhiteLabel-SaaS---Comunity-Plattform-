@@ -7,6 +7,7 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { ModerationModule } from '../moderation/moderation.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ContactRequest } from './entities/contact-request.entity';
 import { Conversation } from './entities/conversation.entity';
 import { Message } from './entities/message.entity';
@@ -18,6 +19,7 @@ import { Block } from '../profile/entities/block.entity';
     imports: [
         TypeOrmModule.forFeature([ContactRequest, Conversation, Message, User, Profile, Block]),
         ModerationModule,
+        NotificationsModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({

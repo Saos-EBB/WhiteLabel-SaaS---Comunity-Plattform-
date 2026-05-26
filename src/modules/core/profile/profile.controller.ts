@@ -85,6 +85,9 @@ export class ProfileController {
             query.max_age,
             query.online_only,
             query.connection_status,
+            query.lat,
+            query.lng,
+            query.radius,
         );
     }
 

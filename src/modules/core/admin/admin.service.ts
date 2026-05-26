@@ -30,6 +30,9 @@ import { UpdateReportDto } from './dto/update-report.dto';
 import { AdminCreateStrikeDto } from './dto/admin-create-strike.dto';
 import { AddProfanityWordDto } from './dto/add-profanity-word.dto';
 import { SetVulnerableFlagDto } from './dto/set-vulnerable-flag.dto';
+import { AdminDashboardStatsDto } from './dto/admin-dashboard-stats.dto';
+import { UserDashboardStatsDto } from './dto/user-dashboard-stats.dto';
+import { AdminStatsDto } from './dto/admin-stats.dto';
 
 @Injectable()
 export class AdminService {
@@ -361,6 +364,14 @@ export class AdminService {
             [userId],
         );
 
+        await this.notificationsService.createNotification(
+            userId,
+            'ban',
+            'Deine Sperre wurde aufgehoben. Du kannst Paarship wieder normal nutzen.',
+            'Sperre aufgehoben',
+            userId,
+        );
+
         this.eventEmitter.emit('user.unbanned', { userId });
     }
 
@@ -666,5 +677,158 @@ export class AdminService {
 
     updateSetting(key: string, value: string, adminId: string) {
         return this.systemSettingsService.set(key, value, adminId);
+    }
+
+    // ── Dashboard stats (owner only) ───────────────────────────────────────────
+
+    async getDashboardStats(): Promise<AdminDashboardStatsDto> {
+        const [
+            [totalUsersRow],
+            [activeUsersRow],
+            [bannedUsersRow],
+            [newUsersTodayRow],
+            [newUsersThisWeekRow],
+            [activeSubscriptionsRow],
+            [totalRevenueRow],
+            [onlineUsersRow],
+            [messagesTodayRow],
+            [messagesThisWeekRow],
+            [contactRequestsTodayRow],
+            [contactRequestsThisWeekRow],
+            [openReportsRow],
+            [strikesThisWeekRow],
+            [openTicketsRow],
+            [pendingMediaRow],
+        ] = await Promise.all([
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM users WHERE deleted_at IS NULL`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM users WHERE deleted_at IS NULL AND is_banned = false AND is_verified = true`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM users WHERE is_banned = true`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM users WHERE created_at >= DATE_TRUNC('day', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM users WHERE created_at >= DATE_TRUNC('week', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM subscriptions WHERE status = 'active'`,
+            ),
+            this.dataSource.query<{ total: string }[]>(
+                `SELECT COALESCE(SUM(amount), 0) AS total FROM payment_logs WHERE status = 'success'`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM profiles WHERE last_active_at > NOW() - INTERVAL '15 minutes'`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM messages WHERE sent_at >= DATE_TRUNC('day', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM messages WHERE sent_at >= DATE_TRUNC('week', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM contact_requests WHERE created_at >= DATE_TRUNC('day', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM contact_requests WHERE created_at >= DATE_TRUNC('week', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM reports WHERE status = 'open'`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM strikes WHERE created_at >= DATE_TRUNC('week', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM admin_tickets WHERE status = 'open'`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM media_uploads WHERE moderation_status = 'pending'`,
+            ),
+        ]);
+
+        return {
+            totalUsers:              parseInt(totalUsersRow.count, 10),
+            activeUsers:             parseInt(activeUsersRow.count, 10),
+            bannedUsers:             parseInt(bannedUsersRow.count, 10),
+            newUsersToday:           parseInt(newUsersTodayRow.count, 10),
+            newUsersThisWeek:        parseInt(newUsersThisWeekRow.count, 10),
+            activeSubscriptions:     parseInt(activeSubscriptionsRow.count, 10),
+            totalRevenue:            parseFloat(totalRevenueRow.total),
+            onlineUsers:             parseInt(onlineUsersRow.count, 10),
+            messagesToday:           parseInt(messagesTodayRow.count, 10),
+            messagesThisWeek:        parseInt(messagesThisWeekRow.count, 10),
+            contactRequestsToday:    parseInt(contactRequestsTodayRow.count, 10),
+            contactRequestsThisWeek: parseInt(contactRequestsThisWeekRow.count, 10),
+            openReports:             parseInt(openReportsRow.count, 10),
+            strikesThisWeek:         parseInt(strikesThisWeekRow.count, 10),
+            openTickets:             parseInt(openTicketsRow.count, 10),
+            pendingMedia:            parseInt(pendingMediaRow.count, 10),
+        };
+    }
+
+    // ── User dashboard stats (any authenticated user) ──────────────────────────
+
+    async getUserDashboardStats(userId: string): Promise<UserDashboardStatsDto> {
+        const [
+            [pendingRequestsRow],
+            [activeConversationsRow],
+            subRows,
+        ] = await Promise.all([
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM contact_requests WHERE receiver_id = $1 AND status = 'pending'`,
+                [userId],
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM conversations WHERE (user_a_id = $1 OR user_b_id = $1) AND purged_at IS NULL`,
+                [userId],
+            ),
+            this.dataSource.query<{ plan: string; status: string; expires_at: string | null }[]>(
+                `SELECT plan, status, expires_at FROM subscriptions WHERE user_id = $1 AND status IN ('active') ORDER BY started_at DESC LIMIT 1`,
+                [userId],
+            ),
+        ]);
+
+        return {
+            pendingRequests:     parseInt(pendingRequestsRow.count, 10),
+            activeConversations: parseInt(activeConversationsRow.count, 10),
+            subscription:        subRows[0]
+                ? { plan: subRows[0].plan, status: subRows[0].status, expires_at: subRows[0].expires_at }
+                : null,
+        };
+    }
+
+    // ── Admin stats (admin + owner) ────────────────────────────────────────────
+
+    async getAdminStats(): Promise<AdminStatsDto> {
+        const [
+            [openReportsRow],
+            [openTicketsRow],
+            [strikesThisWeekRow],
+            [pendingMediaRow],
+        ] = await Promise.all([
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM reports WHERE status = 'open'`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM admin_tickets WHERE status = 'open'`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM strikes WHERE created_at >= DATE_TRUNC('week', NOW())`,
+            ),
+            this.dataSource.query<{ count: string }[]>(
+                `SELECT COUNT(*) AS count FROM media_uploads WHERE moderation_status = 'pending'`,
+            ),
+        ]);
+
+        return {
+            openReports:     parseInt(openReportsRow.count, 10),
+            openTickets:     parseInt(openTicketsRow.count, 10),
+            strikesThisWeek: parseInt(strikesThisWeekRow.count, 10),
+            pendingMedia:    parseInt(pendingMediaRow.count, 10),
+        };
     }
 }

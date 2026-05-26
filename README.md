@@ -40,6 +40,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 | `SystemSettingsModule` | `src/modules/core/system-settings` | Admin-editable key/value settings with in-memory cache |
 | `SetupModule` | `src/modules/core/setup` | One-time owner account bootstrap; setup-status check |
 | `SupportModule` | `src/modules/core/support` | Anonymous contact-support tickets (public endpoint) |
+| `CitiesModule` | `src/modules/core/cities` | City autocomplete search backed by seeded `cities` table |
 | `CommonModule` | `src/common` | `PremiumGuard`, `@RequiresPremium()`, `HttpExceptionFilter`, RLS helpers |
 
 ---
@@ -81,7 +82,9 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 - `DELETE /auth/account` soft-deletes (Art. 17); `admin/:id/export` for admin-side export
 
 ### Profile & Search
-- PostGIS radius search on `profiles.location`
+- PostGIS radius search on `profiles.location` — `GET /profile/search` accepts `lat`, `lng`, `radius` (km, default 50) for coordinate-based filtering via `ST_DWithin`; falls back to city text search when no coordinates provided
+- `PUT /profile/me` accepts optional `lat` + `lng` to update `profiles.location` via `ST_SetSRID(ST_MakePoint(lng, lat), 4326)`
+- `GET /cities/search?q=` — city autocomplete backed by a seeded `cities` table (name, country, region, lat, lng, population); returns top 10 by population
 - Visibility flags (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`) — masking applied at API layer
 - `enhanced_protection` and `vulnerable_flag` users excluded from search at DB level
 - Status system: `status_visible` + `status_message` enum (available / looking_for_chat / looking_for_date / busy / do_not_disturb)
@@ -172,12 +175,12 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 |---|---|---|---|
 | GET | `/profile/interests` | — | List all available interests. |
 | GET | `/profile/me` | JWT | Get own profile. Returns `photo_url`, `photo_needs_review`, `audio_url`, `audio_moderation_status`, all six `show_*` visibility flags (`show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`), `subscription: { plan, status, current_period_end } \| null` (active subscription row, or `null`), and `is_banned: boolean` (sourced from `users` table — source of truth for the frontend ban screen). |
-| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, birthdate, gender, looking_for, `is_published`, `status_visible`, `status_message`, `profanity_filter`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`). Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
+| PUT | `/profile/me` | JWT | Update own profile (nickname, bio, city, birthdate, gender, looking_for, `is_published`, `status_visible`, `status_message`, `profanity_filter`, `show_bio`, `show_city`, `show_age`, `show_gender`, `show_interests`, `show_audio`). Optional `lat` + `lng` (decimal) update `profiles.location` via PostGIS `ST_MakePoint`. Triggers onboarding check. Nickname changes containing profanity create an admin ticket for review; bio, `status_message`, and chat messages with profanity are silently logged to `profanity_flags`. |
 | PATCH | `/profile/me/publish` | JWT | Publish profile. Requires onboarding completed (nickname + birthdate + city + ≥1 interest + verified email). |
 | GET | `/profile/me/interests` | JWT | Get own selected interests. |
 | POST | `/profile/me/interests/:interestId` | JWT | Add an interest. Triggers onboarding check. |
 | DELETE | `/profile/me/interests/:interestId` | JWT | Remove an interest. |
-| GET | `/profile/search?city=&interests=` | JWT | Search published profiles. Filters by city, interests, gender, looking_for, age range, online_only. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online`, `photo_needs_review`, `birthdate` (null when `show_age = false`). Fields masked by `show_*` flags: `bio`, `city`, `gender`, `looking_for` return `null` when hidden; interests return `[]` when `show_interests = false`. |
+| GET | `/profile/search` | JWT | Search published profiles. Query params: `city` (text), `lat`+`lng`+`radius` (coordinate search, radius in km, default 50), `interests`, `gender`, `looking_for`, `min_age`, `max_age`, `online_only`, `connection_status`. When `lat`/`lng` are present, uses `ST_DWithin` PostGIS radius search; otherwise falls back to city text match. Excludes banned, deleted, self, blocked (both directions), `enhanced_protection`, and `vulnerable_flag` users at DB level. Returns `status_visible`, `status_message`, `is_online`, `photo_needs_review`, `birthdate` (null when `show_age = false`). Fields masked by `show_*` flags: `bio`, `city`, `gender`, `looking_for` return `null` when hidden; interests return `[]` when `show_interests = false`. |
 | POST | `/profile/me/consent/sensitive-data` | JWT | Record AGB consent for sensitive data collection. Returns consent log ID. IP is SHA-256 hashed. |
 | POST | `/profile/me/sensitive-data` | JWT | Submit sensitive data (disability type + visibility). Requires valid consent ID. Disability type stored AES-256-CBC encrypted. |
 | GET | `/profile/me/blocks` | JWT | List all users blocked by the authenticated user. Returns `[{ block_id, user_id, nickname, photo_url }]`, ordered by block date descending. |
@@ -328,6 +331,14 @@ All admin routes require JWT with `role: admin`.
 | POST | `/admin/profanity` | Add a word. Body: `{ word: string }`. Persists to `profanity_words` table and loads into leo-profanity runtime. |
 | DELETE | `/admin/profanity/:word` | Remove a word. |
 
+**Dashboard stats**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/dashboard/user-stats` | JWT. Returns `{ pendingRequests, activeConversations, subscription: { plan, status, expires_at } \| null }` for the calling user. Used by the frontend dashboard "Mein Überblick" section. |
+| GET | `/admin/dashboard/admin-stats` | JWT (admin). Returns `{ openReports, openTickets, strikesThisWeek, pendingMedia }`. Used by the frontend dashboard "Moderations-Überblick" section. |
+| GET | `/admin/dashboard/stats` | JWT (owner). Full platform metrics: `{ totalUsers, activeUsers, bannedUsers, newUsersToday, newUsersThisWeek, activeSubscriptions, totalRevenue, onlineUsers, messagesToday, messagesThisWeek, contactRequestsToday, contactRequestsThisWeek, openReports, strikesThisWeek, openTickets, pendingMedia }`. |
+
 **Admin management (owner only)**
 
 | Method | Path | Description |
@@ -353,6 +364,16 @@ All admin routes require JWT with `role: admin`.
 |---|---|---|
 | GET | `/admin/settings` | **Owner only.** List all system settings (`key`, `value`, `updated_by`, `updated_at`). |
 | PATCH | `/admin/settings/:key` | **Owner only.** Create or update a setting. Body: `{ value: string }`. |
+
+---
+
+### Cities — `/cities`
+
+Public, unauthenticated.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/cities/search?q=&country=` | City autocomplete. `q` (required) — partial name; `country` (optional) — ISO 3166-1 alpha-2 filter. Returns up to 10 cities ordered by population descending: `{ id, name, country, region, lat, lng }[]`. |
 
 ---
 
@@ -475,6 +496,17 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-26 (latest)
+- Cities: new `CitiesModule` — `GET /cities/search?q=&country=` (public); queries a seeded `cities` table (`id`, `name`, `country`, `region`, `lat`, `lng`, `population`, `is_capital`); returns top 10 results ordered by population descending
+- Profile: `GET /profile/search` now accepts `lat`, `lng`, `radius` (km, 1–500, default 50) — uses PostGIS `ST_DWithin` radius search when coordinates are provided; city text search used as fallback
+- Profile: `PUT /profile/me` now accepts optional `lat` + `lng` — updates `profiles.location` with `ST_SetSRID(ST_MakePoint(lng, lat), 4326)`
+- Notifications: `notifications` table gains `title` (varchar 255, nullable) and `related_id` (text, nullable) columns (migration `021_notification_title_related_id.sql`); `createNotification()` now accepts optional `title` and `relatedId` parameters
+- Admin: `PATCH /admin/users/:id/unban` now also sends the unbanned user an in-app notification ("Deine Sperre wurde aufgehoben.")
+- Admin: new `GET /admin/dashboard/user-stats` (JWT) — returns pending contact requests, active conversation count, and subscription for the calling user
+- Admin: new `GET /admin/dashboard/admin-stats` (admin) — returns open reports, open tickets, strikes this week, pending media count
+- Admin: new `GET /admin/dashboard/stats` (owner only) — full platform metrics: users, activity, revenue, and moderation counts
+- TypeORM: `package.json` gains `seed:cities`, `migration:run`, `backfill:locations` npm scripts; data source configured with `migrations` path + `migrationsTableName`
+
+### 2026-05-26
 - System settings: new `SystemSettingsController` with public `GET /system-settings/prices` (returns `{ monthly, yearly, lifetime }`) and owner-only `PATCH /system-settings/prices`
 - System settings: `SystemSettingsService` gains `getString(key, fallback)` method; `20_subscription_prices.sql` seeds default prices
 - Admin: `PATCH /admin/users/:id/ban` now rejects attempts to ban an `owner` account (403); admins cannot ban other admins — only the `owner` can

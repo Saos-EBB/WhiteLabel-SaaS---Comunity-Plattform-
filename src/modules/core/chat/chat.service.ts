@@ -16,6 +16,7 @@ import { Block } from '../profile/entities/block.entity';
 import { SendContactRequestDto } from './dto/send-contact-request.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ProfanityService } from '../moderation/profanity.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
@@ -34,6 +35,7 @@ export class ChatService {
         @InjectRepository(Block)
         private readonly blockRepository: Repository<Block>,
         private readonly profanityService: ProfanityService,
+        private readonly notificationsService: NotificationsService,
         private readonly eventEmitter: EventEmitter2,
     ) { }
 
@@ -64,6 +66,7 @@ export class ChatService {
 
         const saved = await this.contactRequestRepository.save(request);
         this.eventEmitter.emit('contact_request.created', { recipientId: dto.receiver_id, request: saved });
+
         return saved;
     }
 
@@ -130,6 +133,14 @@ export class ChatService {
             conversationId: savedConversation.id,
             acceptedByNickname: acceptorProfile?.nickname ?? 'Jemand',
         });
+
+        this.notificationsService.createNotification(
+            request.sender_id,
+            'match',
+            `${acceptorProfile?.nickname ?? 'Jemand'} hat deine Anfrage angenommen.`,
+            'Kontaktanfrage angenommen',
+            savedConversation.id,
+        ).catch(() => {});
 
         return savedConversation;
     }

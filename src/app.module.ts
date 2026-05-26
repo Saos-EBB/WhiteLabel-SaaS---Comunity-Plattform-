@@ -19,6 +19,7 @@ import { GdprModule } from './modules/core/gdpr/gdpr.module';
 import { CommonModule } from './common/common.module';
 import { SupportModule } from './modules/core/support/support.module';
 import { SetupModule } from './modules/core/setup/setup.module';
+import { CitiesModule } from './modules/core/cities/cities.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -46,6 +47,9 @@ import databaseConfig from './config/database.config';
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
         logging: configService.get('app.nodeEnv') === 'development',
+        migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
+        migrationsTableName: 'typeorm_migrations',
+        migrationsRun: false,
       }),
       inject: [ConfigService],
     }),
@@ -62,6 +66,7 @@ import databaseConfig from './config/database.config';
     GdprModule,
     SupportModule,
     SetupModule,
+    CitiesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

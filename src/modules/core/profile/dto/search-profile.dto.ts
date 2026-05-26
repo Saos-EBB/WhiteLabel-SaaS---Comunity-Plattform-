@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsArray, IsUUID, IsEnum, IsInt, IsBoolean, IsIn, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, IsEnum, IsInt, IsNumber, IsBoolean, IsIn, Min, Max } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { GenderOption, LookingForOption } from '../entities/profile.entity';
 
@@ -6,6 +6,27 @@ export class SearchProfileDto {
     @IsOptional()
     @IsString()
     city?: string;
+
+    @IsOptional()
+    @Transform(({ value }) => parseFloat(value))
+    @IsNumber()
+    @Min(-90)
+    @Max(90)
+    lat?: number;
+
+    @IsOptional()
+    @Transform(({ value }) => parseFloat(value))
+    @IsNumber()
+    @Min(-180)
+    @Max(180)
+    lng?: number;
+
+    @IsOptional()
+    @Transform(({ value }) => parseInt(value, 10))
+    @IsInt()
+    @Min(1)
+    @Max(500)
+    radius?: number;
 
     @IsOptional()
     @IsArray()

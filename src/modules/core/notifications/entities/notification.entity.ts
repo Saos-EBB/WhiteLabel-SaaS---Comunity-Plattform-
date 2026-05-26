@@ -16,6 +16,12 @@ export class Notification {
     @Column({ nullable: true })
     content!: string;
 
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    title!: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    related_id!: string | null;
+
     @Column({ default: false })
     is_read!: boolean;
 

@@ -215,6 +215,25 @@ export class AdminController {
         return this.adminService.updateAdminTicketStatus(id, status);
     }
 
+    // ── Dashboard stats ────────────────────────────────────────────────────────
+
+    @Get('dashboard/user-stats')
+    getUserDashboardStats(@Request() req: any) {
+        return this.adminService.getUserDashboardStats(req.user.sub);
+    }
+
+    @Get('dashboard/admin-stats')
+    @Roles('admin')
+    getAdminStats() {
+        return this.adminService.getAdminStats();
+    }
+
+    @Get('dashboard/stats')
+    @UseGuards(OwnerGuard)
+    getDashboardStats() {
+        return this.adminService.getDashboardStats();
+    }
+
     // ── Admin management (owner only) ─────────────────────────────────────────
 
     @Get('admins')
