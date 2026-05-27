@@ -20,6 +20,10 @@ import { CommonModule } from './common/common.module';
 import { SupportModule } from './modules/core/support/support.module';
 import { SetupModule } from './modules/core/setup/setup.module';
 import { CitiesModule } from './modules/core/cities/cities.module';
+import { BeefModule } from './modules/hidden/beef/beef.module';
+import { CoinModule } from './modules/hidden/coin/coin.module';
+import { TeethModule } from './modules/hidden/teeth/teeth.module';
+import { BadgeModule } from './modules/hidden/badge/badge.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -67,6 +71,10 @@ import databaseConfig from './config/database.config';
     SupportModule,
     SetupModule,
     CitiesModule,
+    BeefModule,
+    CoinModule,
+    TeethModule,
+    BadgeModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

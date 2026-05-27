@@ -42,6 +42,10 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 | `SupportModule` | `src/modules/core/support` | Anonymous contact-support tickets (public endpoint) |
 | `CitiesModule` | `src/modules/core/cities` | City autocomplete search backed by seeded `cities` table |
 | `CommonModule` | `src/common` | `PremiumGuard`, `@RequiresPremium()`, `HttpExceptionFilter`, RLS helpers |
+| `BeefModule` | `src/modules/hidden/beef` | Hidden zone: beef challenges, voting, comments |
+| `CoinModule` | `src/modules/hidden/coin` | Hidden zone: coin balance ledger and transactions |
+| `TeethModule` | `src/modules/hidden/teeth` | Hidden zone: tooth collection and tooth-chain crafting |
+| `BadgeModule` | `src/modules/hidden/badge` | Hidden zone: winner/loser/chicken badges with expiry |
 
 ---
 
@@ -494,6 +498,14 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ---
 
 ## Changelog
+
+### 2026-05-27 (latest)
+- Hidden Zone: new `BeefModule` (`src/modules/hidden/beef`) — full beef challenge system: `POST /hidden/beef` (create), `POST /hidden/beef/:id/respond` (fight/chicken), `PATCH /hidden/beef/:id/approve` (admin), `GET /hidden/beef` (list active), `POST /hidden/beef/:id/vote`, `POST /hidden/beef/:id/comment`, `GET /hidden/beef/:id/comments`, `GET /hidden/beef/:id/votes`
+- Hidden Zone: new `CoinModule` (`src/modules/hidden/coin`) — `GET /hidden/coin/balance`; `CoinService` exports `addCoins()` and `spendCoins()` (atomic upsert on `user_coin_balance` + transaction log)
+- Hidden Zone: new `TeethModule` (`src/modules/hidden/teeth`) — `GET /hidden/teeth`, `GET /hidden/teeth/chains`, `POST /hidden/teeth/transform` (converts 15 unconverted teeth into a `tooth_chain`)
+- Hidden Zone: new `BadgeModule` (`src/modules/hidden/badge`) — service-only (no controller); `BadgeService.getActiveBadges()` filters by `expires_at > NOW()`; `createBadge()` used internally when beef resolves
+- Users: `chicken_count INT NOT NULL DEFAULT 0` column added to `users` table; incremented when a target chickens out of a beef challenge (`respond` endpoint, `response = 'chicken'`)
+- Migration `022_hidden_beef_feature.sql` — creates `beefs`, `beef_votes`, `beef_comments`, `coin_transactions`, `user_coin_balance`, `teeth`, `tooth_chains`, `badges` tables with all constraints and FK cascades
 
 ### 2026-05-26 (latest)
 - Cities: new `CitiesModule` — `GET /cities/search?q=&country=` (public); queries a seeded `cities` table (`id`, `name`, `country`, `region`, `lat`, `lng`, `population`, `is_capital`); returns top 10 results ordered by population descending
