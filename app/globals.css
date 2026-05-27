@@ -43,6 +43,48 @@
   --color-error-container:           #F9DEDC;
 }
 
+/* ── Underground: Brick ─────────────────────────────────────────────────── */
+.underground-brick {
+  /* Dirty backyard — brick, graffiti, gritty urban */
+  --color-background:                #1a1208;
+  --color-surface-container-lowest:  #0f0b04;
+  --color-surface-container-low:     #231a0e;
+  --color-surface-container:         #2e2010;
+  --color-surface-container-high:    #3d2c14;
+  --color-surface-container-highest: #4d3818;
+  --color-on-surface:                #e8d5b0;
+  --color-on-surface-variant:        #b8a07a;
+  --color-primary-fixed-dim:         #c8a84b;
+  --color-primary-container:         #8b6914;
+  --color-on-primary-container:      #f5e6c0;
+  --color-secondary-container:       #3d2c14;
+  --color-outline:                   #6b5030;
+  --color-outline-variant:           #3d2c14;
+  --color-error:                     #ff6b4a;
+  --color-error-container:           #7a1a0a;
+}
+
+/* ── Underground: Neon ──────────────────────────────────────────────────── */
+.underground-neon {
+  /* Neon arcade — cyber, pulsing, electric */
+  --color-background:                #020008;
+  --color-surface-container-lowest:  #000005;
+  --color-surface-container-low:     #08001a;
+  --color-surface-container:         #0d0020;
+  --color-surface-container-high:    #150030;
+  --color-surface-container-highest: #1e0040;
+  --color-on-surface:                #f0e6ff;
+  --color-on-surface-variant:        #c084fc;
+  --color-primary-fixed-dim:         #00fff5;
+  --color-primary-container:         #7c00ff;
+  --color-on-primary-container:      #e8d5ff;
+  --color-secondary-container:       #1e0040;
+  --color-outline:                   #7c00ff;
+  --color-outline-variant:           #3d0080;
+  --color-error:                     #ff0080;
+  --color-error-container:           #4a0030;
+}
+
 /* Smooth theme transition */
 html, body {
   background-color: var(--color-background);
@@ -59,4 +101,19 @@ html, body {
 
 .text-xl * {
   font-size: 1.25rem !important;
+}
+
+@keyframes shake-wrong {
+  0%,100% { transform: translateX(0); }
+  15%     { transform: translateX(-10px); }
+  30%     { transform: translateX(10px); }
+  45%     { transform: translateX(-8px); }
+  60%     { transform: translateX(8px); }
+  75%     { transform: translateX(-4px); }
+  90%     { transform: translateX(4px); }
+}
+.shake-wrong {
+  animation: shake-wrong 0.45s ease-in-out;
+  border-color: var(--color-error) !important;
+  color: var(--color-error) !important;
 }

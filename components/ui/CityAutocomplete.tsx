@@ -80,7 +80,7 @@ export function CityAutocomplete({
     setOpen(false)
     setResults([])
     setActiveIndex(-1)
-    onSelect(city)
+    onSelect({ ...city, lat: parseFloat(String(city.lat)), lng: parseFloat(String(city.lng)) })
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {

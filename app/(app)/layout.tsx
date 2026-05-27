@@ -6,6 +6,7 @@ import TopNav from '@/components/nav/TopNav'
 import BottomNav from '@/components/nav/BottomNav'
 import AuthProvider from '@/components/AuthProvider'
 import ToastNotification from '@/components/ui/ToastNotification'
+import { HiddenEntryOverlay } from '@/components/HiddenEntryOverlay'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const fontSizeClass = useAccessibilityStore((s) => s.fontSizeClass)
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </footer>
         <BottomNav />
         <ToastNotification />
+<HiddenEntryOverlay />
       </div>
     </AuthProvider>
   )

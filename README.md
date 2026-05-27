@@ -95,6 +95,37 @@ Accessible to `role: admin` or `role: owner` users. Auth guard waits for Zustand
 | Einstellungen | System settings key/value editor — `owner` only |
 | Verwaltung | **Owner only.** Admin account list (paginated) + "Admin erstellen" form; "Abonnement-Preise" editor; **Dashboard** accordion with platform stats (lazy-loaded via `GET /admin/dashboard/stats`, refresh button) |
 
+### Hidden Zone
+
+A secret area unlocked by clicking the app logo 13 times within a 3-second window.
+
+**Entry flow:**
+1. Click the logo 13 times — letter physics animation fires (`lib/physics/letterPhysics.ts`): letters shake, break off, scatter; `HiddenEntryOverlay` opens after 900 ms
+2. "Where Is My Mind" begins playing at the same moment the overlay appears (`lib/hiddenAudio.ts` — singleton, looping, 50 % volume)
+3. User types the correct password → particle explosion animation → hidden zone unlocked (`isHidden = true` in `hiddenStore`)
+4. Failed attempts increment a tally counter shown as SVG tally marks inside the overlay
+5. On logout, `HiddenInitializer` calls `stopHiddenAudio()` and `lock()`, reverting all hidden state
+
+**Theme:** two underground themes toggle via the 🎰/🧱 button that appears in `TopNav` when `isHidden = true` (replaces the former `?` avatar placeholder):
+- `underground-brick` — Hinterhof theme (🧱)
+- `underground-neon` — Spielhölle theme (🎰)
+
+`HiddenInitializer` (`components/HiddenInitializer.tsx`) adds/removes the corresponding CSS class on `document.documentElement` whenever `isHidden` or `theme` changes.
+
+**New route:** `app/beef/` — the Beef arena, accessible only when `isHidden = true`; linked from the nav as "Beef 🥊".
+
+**Key files:**
+| File | Role |
+|---|---|
+| `lib/store/hiddenStore.ts` | Zustand store: `isHidden`, `theme`, `toggleTheme`, `clickCount`, `openOverlay`, `unlock`, `lock`, `passwordAttempts` |
+| `lib/hiddenAudio.ts` | Singleton `HTMLAudioElement` (`/sounds/where_is_my_mind.mp3`); `playHiddenAudio()` / `stopHiddenAudio()` |
+| `lib/physics/letterPhysics.ts` | Canvas/DOM letter physics: `initLogoLetters`, `startShaking`, `triggerBreak`, `triggerExplosion`, `spawnTextLetters`, `cleanup` |
+| `components/HiddenEntryOverlay.tsx` | Password dialog with tally marks; physics explosion on correct password |
+| `components/HiddenInitializer.tsx` | Applies underground theme classes; stops audio on logout |
+| `public/sounds/where_is_my_mind.mp3` | Hidden zone unlock audio |
+
+---
+
 ### Ban Screen
 - `BanScreen` component: full-screen overlay (`z-[9999]`) shown when `isBanned` is `true` in auth store
 - Ban state derived from `/profile/me` on startup and from `user.banned` / `user.unbanned` socket events
@@ -584,7 +615,7 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 | Area | Gap |
 |---|---|
-| `TopNav` | Avatar placeholder (`?`) — profile photo not fetched |
+| `TopNav` | Top-right slot shows the 🎰/🧱 theme toggle when `isHidden = true`; shows nothing when `isHidden = false` — profile photo is not loaded there |
 | `chat/[id]` header | Generic user icon — partner photo not loaded |
 | `BottomNav` | No unread badge on Chat or Requests tabs |
 | `chat/[id]` | `read_at` exists on messages but read receipts not rendered |
@@ -593,6 +624,18 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ---
 
 ## Changelog
+
+### 2026-05-27 (latest)
+- Hidden Zone: `lib/store/hiddenStore.ts` — Zustand store (`isHidden`, `theme`, `toggleTheme`, `clickCount`, `openOverlay`, `unlock`, `lock`, `passwordAttempts`, `incrementPasswordAttempts`, `resetClickCount`)
+- Hidden Zone: `lib/hiddenAudio.ts` — singleton audio module; `playHiddenAudio()` starts "Where Is My Mind" (looping, 50 % volume) when the overlay opens (900 ms after the logo animation fires); `stopHiddenAudio()` called on logout
+- Hidden Zone: `lib/physics/letterPhysics.ts` — DOM letter physics: logo letters shake and break apart on the 13th click; particle explosion plays on correct password; failed-attempt text spawns and scatters from the input field
+- Hidden Zone: `components/HiddenEntryOverlay.tsx` — password dialog with SVG tally marks for failed attempts; correct password triggers explosion animation then `unlock()`
+- Hidden Zone: `components/HiddenInitializer.tsx` — watches `isHidden` + `theme`; adds/removes `underground-brick` / `underground-neon` on `<html>`; calls `stopHiddenAudio()` + `lock()` when `accessToken` becomes `null`
+- Hidden Zone: new route `app/beef/` — Beef arena page (accessible when `isHidden = true`); added to nav as "Beef 🥊" link
+- `TopNav`: logo now counts clicks (reset after 3 s of inactivity); at 13 clicks fires physics animation and opens overlay with audio after 900 ms delay; theme toggle button (🎰/🧱) shown in top-right slot when `isHidden = true`, slot empty otherwise (removed the `?` placeholder)
+- `app/(app)/layout.tsx`: `<HiddenThemeToggle />` removed (toggle moved inline to `TopNav`); `HiddenInitializer` added
+- `components/HiddenThemeToggle.tsx`: deleted — functionality absorbed into `TopNav`
+- `public/sounds/where_is_my_mind.mp3`: audio file added (renamed from original, spaces/special chars removed)
 
 ### 2026-05-26 (latest)
 - New screens: `app/not-found.tsx` (404), `app/error.tsx` (runtime error boundary), `app/global-error.tsx` (root error boundary) — all use existing CSS variables for automatic dark/light mode; `global-error.tsx` wraps in `<html><body>`, imports `globals.css`, re-runs the theme-init script, and falls back to inline `var(--color-..., hardcoded-dark)` styles in case the stylesheet fails to load

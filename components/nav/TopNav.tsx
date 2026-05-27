@@ -11,6 +11,9 @@ import {
 } from '@/lib/store/notificationStore'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import { useHiddenStore } from '@/lib/store/hiddenStore'
+import { initLogoLetters, startShaking, triggerBreak } from '@/lib/physics/letterPhysics'
+import { playHiddenAudio } from '@/lib/hiddenAudio'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import { connect } from '@/lib/socket'
 import { useTranslation } from '@/lib/i18n'
@@ -85,11 +88,19 @@ export default function TopNav() {
   const accessToken = useAuthStore((s) => s.accessToken)
   const _role = getJwtRole(accessToken)
   const isAdmin = _role === 'admin' || _role === 'owner'
+  const isHidden        = useHiddenStore((s) => s.isHidden)
+  const theme           = useHiddenStore((s) => s.theme)
+  const toggleTheme     = useHiddenStore((s) => s.toggleTheme)
+  const clickCount      = useHiddenStore((s) => s.clickCount)
+  const incrementClick  = useHiddenStore((s) => s.incrementClick)
+  const resetClickCount = useHiddenStore((s) => s.resetClickCount)
+  const openOverlay     = useHiddenStore((s) => s.openOverlay)
 
   const navLinks = [
-    { href: '/discover', label: t.nav.discover },
-    { href: '/requests', label: t.nav.requests },
-    { href: '/chat',     label: t.nav.chat },
+    { href: '/dashboard', label: t.nav.home },
+    { href: '/discover',  label: t.nav.discover },
+    { href: '/requests',  label: t.nav.requests },
+    { href: '/chat',      label: t.nav.chat },
   ]
 
   const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] = [
@@ -100,9 +111,12 @@ export default function TopNav() {
     { value: 'do_not_disturb',   label: t.status.doNotDisturb,   color: '#f87171' },
   ]
 
-  const activeNavLinks = isAdmin
+  const baseNavLinks = isAdmin
     ? navLinks.map((l) => l.href === '/requests' ? { href: '/admin', label: t.nav.admin } : l)
     : navLinks
+  const activeNavLinks = isHidden
+    ? [...baseNavLinks, { href: '/beef', label: 'Beef 🥊' }]
+    : baseNavLinks
 
   // Bell dropdown
   const [bellOpen, setBellOpen]     = useState(false)
@@ -280,19 +294,41 @@ export default function TopNav() {
     .filter((n) => activeTab === 'neu' ? !n.is_read : n.is_read)
     .slice(0, 5)
 
+  const logoResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const logoButtonRef     = useRef<HTMLButtonElement>(null)
+
+  function handleLogoClick() {
+    if (logoResetTimerRef.current) clearTimeout(logoResetTimerRef.current)
+    incrementClick()
+    if (clickCount + 1 >= 13) {
+      const rect = logoButtonRef.current?.getBoundingClientRect()
+      const text = logoButtonRef.current?.textContent ?? ''
+      if (rect && text) {
+        initLogoLetters(text, rect)
+        startShaking()
+        setTimeout(() => triggerBreak(), 700)
+      }
+      setTimeout(() => {
+        playHiddenAudio()
+        openOverlay()
+      }, 900)
+      resetClickCount()
+    } else {
+      logoResetTimerRef.current = setTimeout(() => {
+        resetClickCount()
+      }, 3000)
+    }
+  }
+
   return (
     <header className="sticky top-0 z-50 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant">
       <nav
         className="mx-auto flex h-16 max-w-screen-lg items-center px-4"
         aria-label="Main navigation"
       >
-        <Link
-          href="/dashboard"
-          className="text-xl font-bold text-on-surface tracking-tight"
-          aria-label="XXX home"
-        >
+        <button ref={logoButtonRef} onClick={handleLogoClick} className="text-xl font-bold text-on-surface tracking-tight" aria-label="Paarship home">
           XXX
-        </Link>
+        </button>
 
         <ul className="hidden md:flex items-center gap-1 ml-8" role="list">
           {activeNavLinks.map(({ href, label }) => {
@@ -543,13 +579,17 @@ export default function TopNav() {
             <User size={20} aria-hidden />
           </Link>
 
-          <div
-            className="h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center"
-            role="img"
-            aria-label="User avatar"
-          >
-            <span className="text-xs text-on-surface-variant select-none">?</span>
-          </div>
+          {isHidden && (
+            <button
+              onClick={toggleTheme}
+              title={theme === 'brick' ? 'Switch to Spielhölle' : 'Switch to Hinterhof'}
+              className="h-8 w-8 rounded-full bg-surface-container-highest
+                flex items-center justify-center text-base hover:scale-110
+                transition-all border border-outline-variant"
+            >
+              {theme === 'brick' ? '🎰' : '🧱'}
+            </button>
+          )}
         </div>
       </nav>
     </header>

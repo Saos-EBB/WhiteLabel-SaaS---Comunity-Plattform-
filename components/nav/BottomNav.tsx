@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Compass, Heart, MessageCircle, User, Shield } from 'lucide-react'
+import { Home, Compass, Heart, MessageCircle, User, Shield, Swords } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
+import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useTranslation } from '@/lib/i18n'
 
 function getJwtRole(token: string | null): string | null {
@@ -33,9 +34,14 @@ export default function BottomNav() {
 
   const _role = getJwtRole(accessToken)
   const isAdmin = _role === 'admin' || _role === 'owner'
-  const displayItems = isAdmin
+  const isHidden = useHiddenStore((s) => s.isHidden)
+
+  const baseDisplayItems = isAdmin
     ? navItems.map((item) => item.href === '/requests' ? { href: '/admin', label: t.nav.admin, Icon: Shield } : item)
     : navItems
+  const displayItems = isHidden
+    ? [...baseDisplayItems, { href: '/beef', label: 'Beef', Icon: Swords }]
+    : baseDisplayItems
 
   return (
     <nav

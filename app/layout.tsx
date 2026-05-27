@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeInitializer } from "@/components/ThemeInitializer";
+import { HiddenInitializer } from "@/components/HiddenInitializer";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({
       </head>
       <body className={`${plusJakartaSans.variable} bg-background min-h-screen font-sans text-on-surface`}>
         <ThemeInitializer />
+        <HiddenInitializer />
         {children}
       </body>
     </html>
