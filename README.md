@@ -500,6 +500,14 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-27 (latest)
+- Beef: `exile_until TIMESTAMPTZ` column added to `users` table; `User` entity updated; migration `023_user_exile.sql` applied
+- Beef: `create()` guards — initiator exile check, target exile check, duplicate active-beef check (either direction, statuses: `pending_approval | waiting | active`); throws `BadRequestException` or `ConflictException` accordingly
+- Beef: `respond()` chicken branch — on chicken-out both initiator and target receive a 24 h exile (`exile_until = NOW() + 24h`); `userRepo.update` for each
+- Beef: new service methods `leaveExile(userId)` and `getExileStatus(userId)` → `{ in_exile, exile_until }`
+- Beef: new service methods `getIncoming(userId)` (WAITING beefs targeting caller), `getMyActive(userId)` (ACTIVE beefs involving caller), `listPublic(userId)` (ACTIVE beefs not involving caller), `getPending()` (PENDING_APPROVAL with initiator/target nicknames via LEFT JOIN on `profiles`)
+- Beef: new controller routes — `GET /hidden/beef/pending`, `GET /hidden/beef/incoming`, `GET /hidden/beef/my-active`, `GET /hidden/beef/public`, `GET /hidden/beef/exile/status`, `POST /hidden/beef/exile/leave`; all named routes ordered before bare `@Get()` to prevent routing conflicts
+
+### 2026-05-27
 - Hidden Zone: new `BeefModule` (`src/modules/hidden/beef`) — full beef challenge system: `POST /hidden/beef` (create), `POST /hidden/beef/:id/respond` (fight/chicken), `PATCH /hidden/beef/:id/approve` (admin), `GET /hidden/beef` (list active), `POST /hidden/beef/:id/vote`, `POST /hidden/beef/:id/comment`, `GET /hidden/beef/:id/comments`, `GET /hidden/beef/:id/votes`
 - Hidden Zone: new `CoinModule` (`src/modules/hidden/coin`) — `GET /hidden/coin/balance`; `CoinService` exports `addCoins()` and `spendCoins()` (atomic upsert on `user_coin_balance` + transaction log)
 - Hidden Zone: new `TeethModule` (`src/modules/hidden/teeth`) — `GET /hidden/teeth`, `GET /hidden/teeth/chains`, `POST /hidden/teeth/transform` (converts 15 unconverted teeth into a `tooth_chain`)

@@ -71,4 +71,7 @@ export class User {
     @Column({ type: 'varchar', length: 12, unique: true, nullable: true })
     public_id!: string | null;
 
+    @Column({ type: 'timestamptz', nullable: true })
+    exile_until!: Date | null;
+
 }

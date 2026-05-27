@@ -198,26 +198,38 @@ export class GdprService {
             );
 
             const section = (title: string) => {
-                doc.addPage();
-                doc.fontSize(16).fillColor('#111827').text(title, M, doc.page.margins.top, { width: pageW });
+                const spaceNeeded = 80;
+                if (doc.y + spaceNeeded > doc.page.height - doc.page.margins.bottom) {
+                    doc.addPage();
+                } else {
+                    doc.moveDown(1.2);
+                }
+                const headerY = doc.y;
+                doc.rect(M, headerY, pageW, 22).fill('#f0fdf4');
+                doc.fontSize(12).fillColor('#111827')
+                   .text(title, M + 8, headerY + 5, { width: pageW - 16 });
+                doc.y = headerY + 28;
+                doc.strokeColor('#73db9a').lineWidth(1)
+                   .moveTo(M, doc.y).lineTo(M + pageW, doc.y).stroke();
                 doc.moveDown(0.4);
-                doc.strokeColor('#73db9a').lineWidth(1.5).moveTo(M, doc.y).lineTo(M + pageW, doc.y).stroke();
-                doc.moveDown(0.6);
             };
 
             const kv = (label: string, value: string | null | undefined) => {
+                if (doc.y + 20 > doc.page.height - doc.page.margins.bottom) {
+                    doc.addPage();
+                }
                 const startY = doc.y;
                 doc.fontSize(10).fillColor('#6b7280').text(label + ':', M, startY, { width: 160 });
                 const afterLabel = doc.y;
                 doc.fontSize(10).fillColor('#1f2937').text(String(value ?? '—'), M + 165, startY, { width: pageW - 165 });
                 doc.y = Math.max(afterLabel, doc.y);
-                doc.moveDown(0.15);
+                doc.moveDown(0.1);
             };
 
             const subheading = (text: string) => {
-                doc.moveDown(0.5);
-                doc.fontSize(11).fillColor('#374151').text(text, M, doc.y, { width: pageW });
                 doc.moveDown(0.3);
+                doc.fontSize(11).fillColor('#374151').text(text, M, doc.y, { width: pageW });
+                doc.moveDown(0.2);
             };
 
             const empty = (msg: string) => {
@@ -339,7 +351,7 @@ export class GdprService {
                     'Es werden maximal 100 eigene Nachrichten exportiert.',
                     M, doc.y, { width: pageW },
                 );
-                doc.moveDown(0.5);
+                doc.moveDown(0.2);
                 messageRows.forEach((msg: any, i: number) => {
                     if (i > 0) doc.moveDown(0.3);
                     kv('Typ', msg.type);
@@ -422,15 +434,18 @@ export class GdprService {
                 });
             }
 
+            doc.flushPages();
             const range = doc.bufferedPageRange();
             for (let i = 0; i < range.count; i++) {
                 doc.switchToPage(i);
                 const footerY = doc.page.height - doc.page.margins.bottom + 10;
                 doc.fontSize(8).fillColor('#9ca3af')
-                   .text(`Paarship – Datenschutz-Export – Seite ${i + 1}`,
-                         M, footerY, { width: pageW, align: 'center' });
+                   .text(
+                       `Paarship – Datenschutz-Export – Seite ${i + 1} von ${range.count}`,
+                       M, footerY,
+                       { width: pageW, align: 'center', lineBreak: false },
+                   );
             }
-            doc.flushPages();
             doc.end();
         });
     }

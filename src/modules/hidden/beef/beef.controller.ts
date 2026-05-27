@@ -35,6 +35,36 @@ export class BeefController {
         return this.beefService.respond(id, req.user.sub, dto);
     }
 
+    @Get('pending')
+    getPending() {
+        return this.beefService.getPending();
+    }
+
+    @Get('incoming')
+    getIncoming(@Request() req: any) {
+        return this.beefService.getIncoming(req.user.sub);
+    }
+
+    @Get('my-active')
+    getMyActive(@Request() req: any) {
+        return this.beefService.getMyActive(req.user.sub);
+    }
+
+    @Get('exile/status')
+    getExileStatus(@Request() req: any) {
+        return this.beefService.getExileStatus(req.user.sub);
+    }
+
+    @Post('exile/leave')
+    leaveExile(@Request() req: any) {
+        return this.beefService.leaveExile(req.user.sub);
+    }
+
+    @Get('public')
+    listPublic(@Request() req: any) {
+        return this.beefService.listPublic(req.user.sub);
+    }
+
     @Get()
     listActive() {
         return this.beefService.listActive();

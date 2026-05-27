@@ -12,6 +12,7 @@ import {
     Min,
     MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { FontSizeOption, GenderOption, LookingForOption, StatusMessageOption } from '../entities/profile.entity';
 
 export class UpdateProfileDto {
@@ -35,12 +36,14 @@ export class UpdateProfileDto {
     city?: string;
 
     @IsOptional()
+    @Transform(({ value }) => value !== undefined && value !== null ? parseFloat(value) : value)
     @IsNumber()
     @Min(-90)
     @Max(90)
     lat?: number;
 
     @IsOptional()
+    @Transform(({ value }) => value !== undefined && value !== null ? parseFloat(value) : value)
     @IsNumber()
     @Min(-180)
     @Max(180)
