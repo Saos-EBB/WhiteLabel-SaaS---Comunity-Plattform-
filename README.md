@@ -626,6 +626,11 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-27 (latest)
+- Chat (`/chat/[id]`): **Beef flow** — Swords button added to conversation header (visible only when `isHidden = true`); opens a two-step bottom-sheet modal: step 1 enters a TLDR (max 50 chars); step 2 selects a passage range — tap first message to set START, tap another to set END (highlights contiguous range with `bg-primary-fixed-dim/20` border and START/END labels); tapping a third message resets selection; submit posts `{ target_id, tldr, chat_passage }` to `POST /hidden/beef`; `closeBeef()` resets all state on dismiss or success
+- Admin (`/admin`): **Beef tab** — visible to `admin`, `owner`, and hidden-zone users; loads `GET /hidden/beef/pending` on tab select and on role hydration; each card shows initiator vs target nicknames (joined server-side), TLDR, chat passage blockquote, creation timestamp, and an Approve button (`PATCH /hidden/beef/:id/approve`); pending count badge on tab button and in the admin header
+- Beef (`/beef`): **Full redesign** — 4 tabs: **Anfragen** (incoming WAITING beefs, Fight 🥊 / Chicken 🐔 respond buttons, `POST /hidden/beef/:id/respond`), **Meine Beefs** (ACTIVE beefs involving the caller, `GET /hidden/beef/my-active`), **Public** (ACTIVE beefs not involving the caller, `GET /hidden/beef/public`), **Highscore** (placeholder); all three lists fetched in parallel on page load; red badge on title and Anfragen tab when incoming count > 0; `Flame` icon added for Meine Beefs tab
+
+### 2026-05-27
 - Hidden Zone: `lib/store/hiddenStore.ts` — Zustand store (`isHidden`, `theme`, `toggleTheme`, `clickCount`, `openOverlay`, `unlock`, `lock`, `passwordAttempts`, `incrementPasswordAttempts`, `resetClickCount`)
 - Hidden Zone: `lib/hiddenAudio.ts` — singleton audio module; `playHiddenAudio()` starts "Where Is My Mind" (looping, 50 % volume) when the overlay opens (900 ms after the logo animation fires); `stopHiddenAudio()` called on logout
 - Hidden Zone: `lib/physics/letterPhysics.ts` — DOM letter physics: logo letters shake and break apart on the 13th click; particle explosion plays on correct password; failed-attempt text spawns and scatters from the input field

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2, MoreVertical, Flag, Ban } from 'lucide-react'
+import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2, MoreVertical, Flag, Ban, Swords } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
@@ -12,6 +12,7 @@ import { connect, getSocket } from '@/lib/socket'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import ReportModal from '@/components/ui/ReportModal'
 import { useTranslation } from '@/lib/i18n'
+import { useHiddenStore } from '@/lib/store/hiddenStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,15 @@ export default function ConversationPage() {
   const currentUserId   = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
   const accessToken     = useAuthStore((s) => s.accessToken)
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
+
+  const isHidden = useHiddenStore((s) => s.isHidden)
+  const [beefOpen, setBeefOpen]             = useState(false)
+  const [beefTldr, setBeefTldr]             = useState('')
+  const [rangeStart, setRangeStart]         = useState<number | null>(null)
+  const [rangeEnd, setRangeEnd]             = useState<number | null>(null)
+  const [beefStep, setBeefStep]             = useState<'tldr' | 'passage'>('tldr')
+  const [beefSubmitting, setBeefSubmitting] = useState(false)
+  const [beefError, setBeefError]           = useState<string | null>(null)
 
   const [messages, setMessages] = useState<LocalMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -415,6 +425,45 @@ export default function ConversationPage() {
     }
   }
 
+  // ── Beef ───────────────────────────────────────────────────────────────────
+
+  function closeBeef() {
+    setBeefOpen(false)
+    setBeefTldr('')
+    setRangeStart(null)
+    setRangeEnd(null)
+    setBeefStep('tldr')
+    setBeefError(null)
+  }
+
+  async function handleBeefSubmit() {
+    if (!beefTldr.trim() || rangeStart === null || !partnerId) return
+    setBeefSubmitting(true)
+    setBeefError(null)
+    try {
+      const filteredMsgs = messages.filter(m => !m.is_deleted && m.content)
+      const lo = Math.min(rangeStart, rangeEnd ?? rangeStart)
+      const hi = Math.max(rangeStart, rangeEnd ?? rangeStart)
+      const selected = filteredMsgs.slice(lo, hi + 1)
+      const chat_passage = selected
+        .map(m => `[${m.sender_id === currentUserId ? 'Du' : partnerNickname ?? 'Partner'}]: ${m.content}`)
+        .join('\n')
+      await fetchApi('/hidden/beef', {
+        method: 'POST',
+        body: JSON.stringify({
+          target_id: partnerId,
+          tldr: beefTldr.trim(),
+          chat_passage,
+        }),
+      })
+      closeBeef()
+    } catch {
+      setBeefError('Fehler beim Senden — versuch nochmal')
+    } finally {
+      setBeefSubmitting(false)
+    }
+  }
+
   // ── Partner ID ─────────────────────────────────────────────────────────────
 
   const partnerId =
@@ -452,6 +501,17 @@ export default function ConversationPage() {
             size="sm"
           />
         </div>
+
+        {/* Beef button — hidden-zone only */}
+        {isHidden && (
+          <button
+            onClick={() => setBeefOpen(true)}
+            className="p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+            aria-label="Beef starten"
+          >
+            <Swords size={20} aria-hidden />
+          </button>
+        )}
 
         {/* Three-dot menu */}
         <div className="relative flex-shrink-0">
@@ -703,6 +763,155 @@ export default function ConversationPage() {
                 {t.common.cancel}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Beef modal */}
+      {beefOpen && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end justify-center"
+          onClick={(e) => { if (e.target === e.currentTarget) closeBeef() }}
+        >
+          <div className="w-full max-w-lg bg-surface-container rounded-t-2xl p-6 flex flex-col gap-4 max-h-[80vh]">
+
+            {/* Header */}
+            <div className="flex items-center justify-between flex-shrink-0">
+              <span className="font-bold text-on-surface flex items-center gap-2">
+                <Swords size={18}/> Beef starten
+              </span>
+              <button onClick={closeBeef} className="text-on-surface-variant text-sm hover:text-on-surface">
+                Abbrechen
+              </button>
+            </div>
+
+            {/* Step 1: TLDR */}
+            {beefStep === 'tldr' && (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-on-surface-variant">
+                  Worum geht's? (max. 50 Zeichen)
+                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={50}
+                    value={beefTldr}
+                    onChange={(e) => setBeefTldr(e.target.value)}
+                    placeholder="z.B. er hat mich disrespected"
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface text-sm outline-none focus:border-primary-fixed-dim"
+                    autoFocus
+                  />
+                  <span className="absolute right-3 top-3 text-xs text-on-surface-variant">
+                    {beefTldr.length}/50
+                  </span>
+                </div>
+                <button
+                  onClick={() => setBeefStep('passage')}
+                  disabled={beefTldr.trim().length === 0}
+                  className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
+                >
+                  Weiter → Passage wählen
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Passage picker */}
+            {beefStep === 'passage' && (() => {
+              const filteredMsgs = messages.filter(m => !m.is_deleted && m.content)
+              const lo = rangeStart !== null ? Math.min(rangeStart, rangeEnd ?? rangeStart) : -1
+              const hi = rangeStart !== null ? Math.max(rangeStart, rangeEnd ?? rangeStart) : -1
+              const selectedCount = rangeStart !== null ? hi - lo + 1 : 0
+
+              function handleMsgTap(idx: number) {
+                if (rangeStart === null) {
+                  setRangeStart(idx)
+                  setRangeEnd(null)
+                } else if (rangeEnd === null && idx !== rangeStart) {
+                  setRangeEnd(idx)
+                } else {
+                  setRangeStart(null)
+                  setRangeEnd(null)
+                }
+              }
+
+              return (
+                <div className="flex flex-col gap-3 min-h-0">
+
+                  {/* Header row */}
+                  <div className="flex items-center justify-between flex-shrink-0">
+                    <button onClick={() => setBeefStep('tldr')}
+                      className="text-xs text-on-surface-variant hover:text-on-surface">
+                      ← zurück
+                    </button>
+                    <span className="text-xs text-on-surface-variant">
+                      {rangeStart === null
+                        ? 'Erste Nachricht antippen'
+                        : rangeEnd === null
+                        ? 'Letzte Nachricht antippen'
+                        : `${selectedCount} Nachricht${selectedCount > 1 ? 'en' : ''} gewählt`}
+                    </span>
+                  </div>
+
+                  {/* Message list */}
+                  <div className="overflow-y-auto flex flex-col gap-1 flex-1 min-h-0 max-h-[45vh] px-1">
+                    {filteredMsgs.map((m, idx) => {
+                      const isOwn = m.sender_id === currentUserId
+                      const inRange = idx >= lo && idx <= hi
+                      const isStart = idx === lo && rangeStart !== null
+                      const isEndEdge = idx === hi && rangeEnd !== null
+
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => handleMsgTap(idx)}
+                          className={`
+                            w-full text-left px-3 py-2 rounded-xl text-sm
+                            transition-all border
+                            ${inRange
+                              ? 'bg-primary-fixed-dim/20 border-primary-fixed-dim'
+                              : 'bg-surface-container-low border-transparent hover:border-outline-variant'
+                            }
+                          `}
+                        >
+                          <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                            <span className={`text-[10px] font-semibold ${
+                              isOwn ? 'text-primary-fixed-dim' : 'text-on-surface-variant'
+                            }`}>
+                              {isOwn ? 'Du' : partnerNickname ?? 'Partner'}
+                            </span>
+                            {isStart && (
+                              <span className="text-[9px] text-primary-fixed-dim font-bold">START</span>
+                            )}
+                            {isEndEdge && rangeEnd !== null && (
+                              <span className="text-[9px] text-primary-fixed-dim font-bold">END</span>
+                            )}
+                          </div>
+                          <span className={`leading-snug ${
+                            inRange ? 'text-on-surface' : 'text-on-surface-variant'
+                          }`}>
+                            {m.content}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {beefError && (
+                    <p className="text-error text-xs text-center flex-shrink-0">{beefError}</p>
+                  )}
+
+                  <button
+                    onClick={handleBeefSubmit}
+                    disabled={rangeStart === null || beefSubmitting}
+                    className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity flex-shrink-0"
+                  >
+                    {beefSubmitting ? 'Sende...' : `🥊 Beef starten${selectedCount > 0 ? ` (${selectedCount} Msg)` : ''}`}
+                  </button>
+
+                </div>
+              )
+            })()}
+
           </div>
         </div>
       )}

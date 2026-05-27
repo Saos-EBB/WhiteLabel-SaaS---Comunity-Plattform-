@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation'
 import {
   AlertCircle, Ban, BookOpen, Check, CheckCircle2, ChevronDown,
   ChevronLeft, ChevronRight, Crown, Eye, EyeOff, FileText, Image as ImageIcon,
-  Inbox, Key, Loader2, Mail, Music, Pause, Play, Plus, Settings, Shield, Trash2, Users, X, Zap,
+  Inbox, Key, Loader2, Mail, Music, Pause, Play, Plus, Settings, Shield, Swords, Trash2, Users, X, Zap,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import BanModal from '@/components/ui/BanModal'
 import { useTranslation } from '@/lib/i18n'
 import { useSearch } from '@/hooks/useSearch'
+import { useHiddenStore } from '@/lib/store/hiddenStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AdminTab = 'tickets' | 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings' | 'verwaltung'
+type AdminTab = 'tickets' | 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings' | 'verwaltung' | 'beef'
 
 interface PendingMedia {
   id: string
@@ -533,6 +534,19 @@ export default function AdminPage() {
     toastTimer.current = setTimeout(() => setToast(null), 2500)
   }
 
+  const isHidden = useHiddenStore((s) => s.isHidden)
+  const [pendingBeefs, setPendingBeefs] = useState<{
+    id: string
+    initiator_id: string
+    target_id: string
+    tldr: string
+    chat_passage: string
+    created_at: string
+    initiator_nickname: string | null
+    target_nickname: string | null
+  }[]>([])
+  const [beefApproving, setBeefApproving] = useState<string | null>(null)
+
   // ── Media ──────────────────────────────────────────────────────────────────
   const [media, setMedia]             = useState<PendingMedia[]>([])
   const [mediaLoading, setMediaLoading] = useState(false)
@@ -553,6 +567,13 @@ export default function AdminPage() {
     } finally {
       setMediaLoading(false)
     }
+  }
+
+  async function loadPendingBeefs() {
+    try {
+      const data = await fetchApi<typeof pendingBeefs>('/hidden/beef/pending')
+      setPendingBeefs(Array.isArray(data) ? data : [])
+    } catch { /* non-critical */ }
   }
 
   async function approveMedia(id: string) {
@@ -1099,6 +1120,21 @@ export default function AdminPage() {
     }
   }
 
+  // ── Beef ───────────────────────────────────────────────────────────────────
+  async function handleBeefApprove(id: string) {
+    setBeefApproving(id)
+    try {
+      await fetchApi(`/hidden/beef/${id}/approve`, { method: 'PATCH' })
+      await loadPendingBeefs()
+    } catch { /* ignore */ }
+    finally { setBeefApproving(null) }
+  }
+
+  useEffect(() => {
+    if (role === 'admin' || role === 'owner') loadPendingBeefs()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role])
+
   // ── Load on tab change ─────────────────────────────────────────────────────
   useEffect(() => {
     if (role !== 'admin' && role !== 'owner') return
@@ -1110,6 +1146,7 @@ export default function AdminPage() {
     if (activeTab === 'profanity')   loadProfanity()
     if (activeTab === 'settings')    loadSettings()
     if (activeTab === 'verwaltung')  { void loadVerwaltungAdmins(1); void loadVerwaltungSettings() }
+    if (activeTab === 'beef')        loadPendingBeefs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -1191,6 +1228,24 @@ export default function AdminPage() {
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
+          {(isHidden || role === 'admin' || role === 'owner') && (
+            <button
+              onClick={() => setActiveTab('beef')}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                activeTab === 'beef'
+                  ? 'bg-primary-fixed-dim text-on-primary-container'
+                  : 'text-on-surface-variant hover:bg-surface-container-high'
+              }`}
+            >
+              <Swords size={15}/>
+              <span className="hidden sm:inline">Beef</span>
+              {pendingBeefs.length > 0 && (
+                <span className="bg-error text-on-error text-[10px] font-bold px-1.5 rounded-full">
+                  {pendingBeefs.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* ── Tab: Tickets ──────────────────────────────────────────────────── */}
@@ -2274,6 +2329,69 @@ export default function AdminPage() {
 
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Tab: Beef ─────────────────────────────────────────────────────── */}
+        {activeTab === 'beef' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-on-surface">Beef Approvals</h2>
+              <button onClick={loadPendingBeefs}
+                className="text-xs text-on-surface-variant hover:text-on-surface">
+                Refresh
+              </button>
+            </div>
+
+            {pendingBeefs.length === 0 ? (
+              <div className="text-center py-12 text-on-surface-variant">
+                <Swords size={36} className="mx-auto mb-3 opacity-30"/>
+                <p className="text-sm">Keine offenen Beef-Anfragen</p>
+              </div>
+            ) : pendingBeefs.map(beef => (
+              <div key={beef.id}
+                className="bg-surface-container border border-outline-variant rounded-2xl p-5 flex flex-col gap-3">
+                <div>
+                  <span className="text-xs text-on-surface-variant uppercase tracking-widest font-mono">
+                    Beef Anfrage
+                  </span>
+                  <div className="flex items-center gap-2 mt-2 text-sm">
+                    <span className="font-bold text-on-surface">
+                      {beef.initiator_nickname ?? '???'}
+                    </span>
+                    <Swords size={14} className="text-primary-fixed-dim"/>
+                    <span className="font-bold text-on-surface">
+                      {beef.target_nickname ?? '???'}
+                    </span>
+                  </div>
+                  <p className="font-bold text-on-surface mt-2 text-lg">
+                    {beef.tldr}
+                  </p>
+                </div>
+                <div className="bg-surface-container-low rounded-xl p-3 border-l-2 border-outline-variant">
+                  <p className="text-xs text-on-surface-variant mb-1">Passage</p>
+                  <p className="text-sm text-on-surface-variant italic leading-relaxed">
+                    {beef.chat_passage}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-on-surface-variant font-mono">
+                    {new Date(beef.created_at).toLocaleString('de-AT')}
+                  </span>
+                  <button
+                    onClick={() => handleBeefApprove(beef.id)}
+                    disabled={beefApproving === beef.id}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
+                  >
+                    {beefApproving === beef.id
+                      ? <Loader2 size={14} className="animate-spin"/>
+                      : <Check size={14}/>
+                    }
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
