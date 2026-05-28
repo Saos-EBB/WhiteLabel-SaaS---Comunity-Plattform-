@@ -71,6 +71,22 @@ export default function BeefPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Handle Stripe coin-purchase redirect
+  useEffect(() => {
+    const params    = new URLSearchParams(window.location.search)
+    const sessionId = params.get('session_id')
+    const uid       = params.get('uid')
+    if (!sessionId || !uid) return
+
+    fetchApi('/hidden/coin/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId }),
+    }).then(() => {
+      window.history.replaceState({}, '', '/beef')
+      window.dispatchEvent(new Event('coin-balance-refresh'))
+    }).catch(() => {})
+  }, [])
+
   async function respond(beefId: string, response: 'fight' | 'chicken') {
     setResponding(beefId)
     try {
@@ -202,33 +218,35 @@ export default function BeefPage() {
                   <p className="text-sm">Keine laufenden Beefs gerade</p>
                 </div>
               ) : myBeefs.map(beef => (
-                <div key={beef.id}
-                  className="bg-surface-container border-2 border-primary-fixed-dim
-                    rounded-2xl p-5 flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs text-primary-fixed-dim font-bold
-                        uppercase tracking-widest font-mono">
-                        Du bist dabei
-                      </span>
-                      <p className="font-bold text-on-surface">{beef.tldr}</p>
+                <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
+                  <div className="bg-surface-container border-2 border-primary-fixed-dim
+                    rounded-2xl p-5 flex flex-col gap-3 hover:border-primary-fixed-dim
+                    transition-colors cursor-pointer">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-primary-fixed-dim font-bold
+                          uppercase tracking-widest font-mono">
+                          Du bist dabei
+                        </span>
+                        <p className="font-bold text-on-surface">{beef.tldr}</p>
+                      </div>
+                      {beef.ends_at && (
+                        <span className="text-xs text-on-surface-variant
+                          bg-surface-container-high px-2 py-0.5 rounded-full
+                          whitespace-nowrap flex-shrink-0">
+                          🕐 läuft
+                        </span>
+                      )}
                     </div>
-                    {beef.ends_at && (
-                      <span className="text-xs text-on-surface-variant
-                        bg-surface-container-high px-2 py-0.5 rounded-full
-                        whitespace-nowrap flex-shrink-0">
-                        🕐 läuft
-                      </span>
-                    )}
+                    <div className="bg-surface-container-low rounded-xl p-3
+                      border-l-2 border-primary-fixed-dim">
+                      <p className="text-sm text-on-surface-variant italic
+                        leading-relaxed line-clamp-3">
+                        {beef.chat_passage}
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-surface-container-low rounded-xl p-3
-                    border-l-2 border-primary-fixed-dim">
-                    <p className="text-sm text-on-surface-variant italic
-                      leading-relaxed line-clamp-3">
-                      {beef.chat_passage}
-                    </p>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

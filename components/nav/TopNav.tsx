@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, Coins, Inbox, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
+import { Bell, Coins, Inbox, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings, Swords, Trophy } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -31,19 +31,27 @@ function getJwtRole(token: string | null): string | null {
 }
 
 const TYPE_ICONS: Record<NotificationType, ElementType> = {
-  message: MessageCircle,
-  match:   Heart,
-  system:  Info,
-  ban:     ShieldX,
-  request: UserPlus,
+  message:       MessageCircle,
+  match:         Heart,
+  system:        Info,
+  ban:           ShieldX,
+  request:       UserPlus,
+  beef_request:  Swords,
+  beef_accepted: Swords,
+  beef_won:      Trophy,
+  beef_lost:     Swords,
 }
 
 const TYPE_ROUTES: Record<NotificationType, string> = {
-  message: '/chat',
-  match:   '/notifications',
-  system:  '/notifications',
-  ban:     '/notifications',
-  request: '/requests',
+  message:       '/chat',
+  match:         '/notifications',
+  system:        '/notifications',
+  ban:           '/notifications',
+  request:       '/requests',
+  beef_request:  '/beef',
+  beef_accepted: '/beef',
+  beef_won:      '/beef',
+  beef_lost:     '/beef',
 }
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -97,6 +105,7 @@ export default function TopNav() {
   const openOverlay     = useHiddenStore((s) => s.openOverlay)
 
   const [coinBalance, setCoinBalance] = useState<number | null>(null)
+  const [shopOpen, setShopOpen] = useState(false)
 
   const navLinks = [
     { href: '/dashboard', label: t.nav.home },
@@ -184,11 +193,16 @@ export default function TopNav() {
 
   useEffect(() => {
     if (!isHidden) { setCoinBalance(null); return }
-    let active = true
-    fetchApi<number>('/hidden/coin/balance')
-      .then((b) => { if (active) setCoinBalance(typeof b === 'number' ? b : 0) })
-      .catch(() => { if (active) setCoinBalance(0) })
-    return () => { active = false }
+
+    function refresh() {
+      fetchApi<number>('/hidden/coin/balance')
+        .then((b) => { setCoinBalance(typeof b === 'number' ? b : 0) })
+        .catch(() => { setCoinBalance(0) })
+    }
+
+    refresh()
+    window.addEventListener('coin-balance-refresh', refresh)
+    return () => window.removeEventListener('coin-balance-refresh', refresh)
   }, [isHidden])
 
   // ── Poll notifications + pending requests ─────────────────────────────────
@@ -334,6 +348,7 @@ export default function TopNav() {
   }
 
   return (
+    <>
     <header className="sticky top-0 z-50 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant">
       <nav
         className="mx-auto flex h-16 max-w-screen-lg items-center px-4"
@@ -593,15 +608,16 @@ export default function TopNav() {
           </Link>
 
           {isHidden && coinBalance !== null && (
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant"
-              title="Coins"
+            <button
+              onClick={() => setShopOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant hover:border-primary-fixed-dim transition-colors"
+              title="Coins kaufen"
             >
               <Coins size={15} className="text-primary-fixed-dim" />
               <span className="text-sm font-bold text-on-surface tabular-nums">
                 {coinBalance}
               </span>
-            </div>
+            </button>
           )}
 
           {isHidden && (
@@ -618,5 +634,55 @@ export default function TopNav() {
         </div>
       </nav>
     </header>
+
+    {shopOpen && (
+      <div
+        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={(e) => { if (e.target === e.currentTarget) setShopOpen(false) }}
+      >
+        <div className="bg-surface-container border border-outline-variant rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-on-surface text-lg">🪙 Coins kaufen</h2>
+            <button
+              onClick={() => setShopOpen(false)}
+              className="text-on-surface-variant hover:text-on-surface text-sm"
+            >
+              ✕
+            </button>
+          </div>
+          {[
+            { pkg: 'sardine',   label: '🐟 Sardine',   coins: '100',    price: '0,99 €'  },
+            { pkg: 'thunfisch', label: '🐟 Thunfisch',  coins: '500',    price: '3,99 €'  },
+            { pkg: 'hai',       label: '🦈 Hai',        coins: '2.000',  price: '12,99 €' },
+            { pkg: 'moby_dick', label: '🐋 Moby Dick',  coins: '10.000', price: '49,99 €' },
+          ].map(item => (
+            <button
+              key={item.pkg}
+              onClick={async () => {
+                setShopOpen(false)
+                try {
+                  const res = await fetchApi<{ url: string }>('/hidden/coin/purchase', {
+                    method: 'POST',
+                    body: JSON.stringify({ package: item.pkg }),
+                  })
+                  window.location.href = res.url
+                } catch { alert('Fehler beim Öffnen des Shops') }
+              }}
+              className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-container-low border border-outline-variant hover:border-primary-fixed-dim transition-colors w-full text-left"
+            >
+              <div>
+                <p className="font-semibold text-on-surface text-sm">{item.label}</p>
+                <p className="text-xs text-primary-fixed-dim">{item.coins} Coins</p>
+              </div>
+              <span className="font-bold text-on-surface text-sm">{item.price}</span>
+            </button>
+          ))}
+          <p className="text-xs text-on-surface-variant text-center">
+            Stripe Test Mode — keine echten Zahlungen
+          </p>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

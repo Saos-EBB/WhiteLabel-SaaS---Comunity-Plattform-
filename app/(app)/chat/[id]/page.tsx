@@ -452,6 +452,22 @@ export default function ConversationPage() {
     setBeefSubmitting(true)
     setBeefError(null)
     try {
+      const exileStatus = await fetchApi<{ in_exile: boolean; exile_until: string | null }>(
+        '/hidden/beef/exile/status'
+      ).catch(() => null)
+
+      if (exileStatus?.in_exile) {
+        const until = exileStatus.exile_until
+          ? new Date(exileStatus.exile_until).toLocaleString('de-AT',
+              { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+          : ''
+        const leave = window.confirm(
+          `Du bist im Exil bis ${until}.\nExil verlassen und Beef starten?`
+        )
+        if (!leave) { setBeefSubmitting(false); return }
+        await fetchApi('/hidden/beef/exile/leave', { method: 'POST' }).catch(() => {})
+      }
+
       const filteredMsgs = messages.filter(m => !m.is_deleted && m.content)
       const lo = Math.min(rangeStart, rangeEnd ?? rangeStart)
       const hi = Math.max(rangeStart, rangeEnd ?? rangeStart)

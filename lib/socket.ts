@@ -10,7 +10,7 @@ export function connect(): Socket {
     socket.disconnect()
     socket = null
   }
-  socket = io('http://localhost:3000', { auth: { token } })
+  socket = io(process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3000', { auth: { token } })
   return socket
 }
 
@@ -31,4 +31,18 @@ export function disconnect(): void {
 
 export function getSocket(): Socket | null {
   return socket
+}
+
+let hiddenBeefSocket: import('socket.io-client').Socket | null = null
+
+export function connectHiddenBeef(): import('socket.io-client').Socket {
+  const token = useAuthStore.getState().accessToken
+  if (hiddenBeefSocket?.connected) return hiddenBeefSocket
+  if (hiddenBeefSocket) { hiddenBeefSocket.disconnect(); hiddenBeefSocket = null }
+  hiddenBeefSocket = io(`${process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:3000'}/hidden-beef`, { auth: { token } })
+  return hiddenBeefSocket
+}
+
+export function disconnectHiddenBeef(): void {
+  if (hiddenBeefSocket) { hiddenBeefSocket.disconnect(); hiddenBeefSocket = null }
 }

@@ -7,6 +7,7 @@ import { ArrowLeft, Swords, Send, Trophy } from 'lucide-react'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
+import { connectHiddenBeef, disconnectHiddenBeef } from '@/lib/socket'
 
 interface BeefDetail {
   id: string
@@ -97,17 +98,42 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
     load()
   }, [isHidden, load, router])
 
-  // Poll comments every 10s when active
   useEffect(() => {
-    if (!beef || beef.status !== 'active') return
-    const iv = setInterval(async () => {
-      try {
-        const c = await fetchApi<Comment[]>(`/hidden/beef/${id}/comments`)
-        setComments(Array.isArray(c) ? c : [])
-      } catch {}
-    }, 10000)
-    return () => clearInterval(iv)
-  }, [beef, id])
+    if (!isHidden || !id) return
+    const socket = connectHiddenBeef()
+    socket.emit('join_beef', id)
+
+    socket.on('beef:vote_update', (data: {
+      initiator_coins: number; target_coins: number; total_votes: number
+    }) => {
+      setBeef(prev => prev ? {
+        ...prev,
+        initiator_coins: data.initiator_coins,
+        target_coins: data.target_coins,
+        total_votes: data.total_votes,
+      } : prev)
+    })
+
+    socket.on('beef:comment_new', (comment: Comment) => {
+      setComments(prev => [...prev, comment])
+    })
+
+    socket.on('beef:closed', (data: { winner_id: string | null }) => {
+      setBeef(prev => prev ? {
+        ...prev,
+        status: 'closed',
+        winner_id: data.winner_id,
+      } : prev)
+    })
+
+    return () => {
+      socket.emit('leave_beef', id)
+      socket.off('beef:vote_update')
+      socket.off('beef:comment_new')
+      socket.off('beef:closed')
+      disconnectHiddenBeef()
+    }
+  }, [isHidden, id])
 
   async function handleVote(side: 'initiator' | 'target') {
     if (!beef || voting) return

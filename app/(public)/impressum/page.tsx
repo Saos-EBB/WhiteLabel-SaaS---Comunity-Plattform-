@@ -1,11 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { RaygunButton } from '@/components/RaygunButton'
 
 export default function ImpressumPage() {
   const router = useRouter()
 
   return (
+    <>
     <main className="min-h-screen bg-background pb-8">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <button
@@ -46,5 +48,7 @@ export default function ImpressumPage() {
         </section>
       </div>
     </main>
+    <RaygunButton />
+    </>
   )
 }

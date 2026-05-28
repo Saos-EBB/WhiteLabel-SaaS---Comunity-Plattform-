@@ -29,10 +29,23 @@ export function HiddenInitializer() {
 
   // Apply / remove underground theme classes
   useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('underground-brick', 'underground-neon')
+    const html = document.documentElement
+    const UNDERGROUND = ['underground-brick', 'underground-neon']
+    const NORMAL = ['dark', 'light']
+
     if (isHidden) {
-      root.classList.add(theme === 'brick' ? 'underground-brick' : 'underground-neon')
+      // Save current normal theme, remove it, apply underground
+      const currentNormal = NORMAL.find(c => html.classList.contains(c)) ?? 'dark'
+      html.dataset.savedTheme = currentNormal
+      NORMAL.forEach(c => html.classList.remove(c))
+      UNDERGROUND.forEach(c => html.classList.remove(c))
+      html.classList.add(theme === 'brick' ? 'underground-brick' : 'underground-neon')
+    } else {
+      // Remove underground, restore saved normal theme
+      UNDERGROUND.forEach(c => html.classList.remove(c))
+      const saved = html.dataset.savedTheme ?? 'dark'
+      html.classList.add(saved)
+      delete html.dataset.savedTheme
     }
   }, [isHidden, theme])
 
