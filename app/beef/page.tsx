@@ -28,6 +28,7 @@ export default function BeefPage() {
   const isHidden = useHiddenStore((s) => s.isHidden)
   const token    = useAuthStore((s) => s.accessToken)
 
+  const [hydrated, setHydrated] = useState(false)
   const [tab, setTab]                   = useState<Tab>('requests')
   const [requests, setRequests]         = useState<Beef[]>([])
   const [myBeefs, setMyBeefs]           = useState<Beef[]>([])
@@ -36,8 +37,15 @@ export default function BeefPage() {
   const [responding, setResponding]     = useState<string | null>(null)
 
   useEffect(() => {
+    if (useHiddenStore.persist.hasHydrated()) setHydrated(true)
+    const unsub = useHiddenStore.persist.onFinishHydration(() => setHydrated(true))
+    return unsub
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
     if (!isHidden) { router.replace('/dashboard'); return }
-  }, [isHidden, router])
+  }, [hydrated, isHidden, router])
 
   const load = useCallback(async () => {
     if (!isHidden) return
@@ -69,6 +77,7 @@ export default function BeefPage() {
     finally { setResponding(null) }
   }
 
+  if (!hydrated) return null   // still hydrating, render nothing
   if (!isHidden) return null
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [

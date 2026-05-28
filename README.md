@@ -625,6 +625,12 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
+### 2026-05-28 (latest)
+- `TopNav`: coin balance pill added to the action row — visible only when `isHidden = true` and balance has loaded; fetches `GET /hidden/coin/balance` whenever the hidden zone becomes active, clears on zone exit; rendered as a rounded pill with a `Coins` icon (lucide-react) and `tabular-nums` balance count before the theme toggle button
+- `HiddenInitializer`: logout lock rewritten as transition-aware — now uses `isFirstRun` + `prevToken` refs so `lock()` and `stopHiddenAudio()` only fire when the token transitions from non-null → null (actual logout), not on initial mount; prevents the hidden zone from locking on first render when `accessToken` is already set
+- Beef (`/beef`): hydration gate added — `useHiddenStore.persist.hasHydrated()` checked synchronously on mount, with `onFinishHydration` subscription for the async case; redirect guard waits for hydration before evaluating `isHidden`; early return renders `null` during hydration to prevent flash-redirect to `/dashboard` on F5
+- i18n `lib/i18n/leet.ts`: fixed truncated file — was cut off mid-string at `changeEmail: 'Ch4n63 3`; completed the `changeEmail` value and added all missing sections: settings tail (24 entries: `currentPassword` → `deleteAccountConfirm`), `chat` (35 entries), `ban` (3 entries), `report` (17 entries), `support` (13 entries), `admin` (63 entries including moderation, strike, profanity, and management strings); TypeScript compile now passes cleanly
+
 ### 2026-05-27 (latest)
 - Chat (`/chat/[id]`): **Beef flow** — Swords button added to conversation header (visible only when `isHidden = true`); opens a two-step bottom-sheet modal: step 1 enters a TLDR (max 50 chars); step 2 selects a passage range — tap first message to set START, tap another to set END (highlights contiguous range with `bg-primary-fixed-dim/20` border and START/END labels); tapping a third message resets selection; submit posts `{ target_id, tldr, chat_passage }` to `POST /hidden/beef`; `closeBeef()` resets all state on dismiss or success
 - Admin (`/admin`): **Beef tab** — visible to `admin`, `owner`, and hidden-zone users; loads `GET /hidden/beef/pending` on tab select and on role hydration; each card shows initiator vs target nicknames (joined server-side), TLDR, chat passage blockquote, creation timestamp, and an Approve button (`PATCH /hidden/beef/:id/approve`); pending count badge on tab button and in the admin header

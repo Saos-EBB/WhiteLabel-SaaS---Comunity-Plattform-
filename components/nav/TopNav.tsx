@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, Inbox, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
+import { Bell, Coins, Inbox, MessageCircle, Heart, Info, ShieldX, UserPlus, Trash2, User, Settings } from 'lucide-react'
 import { useEffect, useRef, useState, type ElementType } from 'react'
 import {
   useNotificationStore,
@@ -96,6 +96,8 @@ export default function TopNav() {
   const resetClickCount = useHiddenStore((s) => s.resetClickCount)
   const openOverlay     = useHiddenStore((s) => s.openOverlay)
 
+  const [coinBalance, setCoinBalance] = useState<number | null>(null)
+
   const navLinks = [
     { href: '/dashboard', label: t.nav.home },
     { href: '/discover',  label: t.nav.discover },
@@ -177,6 +179,17 @@ export default function TopNav() {
       setStatusMessage(p.status_message)
     }).catch(() => {})
   }, [])
+
+  // ── Load coin balance when hidden zone is active ──────────────────────────
+
+  useEffect(() => {
+    if (!isHidden) { setCoinBalance(null); return }
+    let active = true
+    fetchApi<number>('/hidden/coin/balance')
+      .then((b) => { if (active) setCoinBalance(typeof b === 'number' ? b : 0) })
+      .catch(() => { if (active) setCoinBalance(0) })
+    return () => { active = false }
+  }, [isHidden])
 
   // ── Poll notifications + pending requests ─────────────────────────────────
 
@@ -578,6 +591,18 @@ export default function TopNav() {
           >
             <User size={20} aria-hidden />
           </Link>
+
+          {isHidden && coinBalance !== null && (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant"
+              title="Coins"
+            >
+              <Coins size={15} className="text-primary-fixed-dim" />
+              <span className="text-sm font-bold text-on-surface tabular-nums">
+                {coinBalance}
+              </span>
+            </div>
+          )}
 
           {isHidden && (
             <button

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { stopHiddenAudio } from '@/lib/hiddenAudio'
@@ -10,12 +10,21 @@ export function HiddenInitializer() {
   const isHidden    = useHiddenStore((s) => s.isHidden)
   const theme       = useHiddenStore((s) => s.theme)
 
-  // Lock hidden state on logout
+  const isFirstRun = useRef(true)
+  const prevToken  = useRef(accessToken)
+
   useEffect(() => {
-    if (accessToken === null) {
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      prevToken.current = accessToken
+      return
+    }
+    // Only lock on actual logout: token went from present → null
+    if (prevToken.current !== null && accessToken === null) {
       useHiddenStore.getState().lock()
       stopHiddenAudio()
     }
+    prevToken.current = accessToken
   }, [accessToken])
 
   // Apply / remove underground theme classes
