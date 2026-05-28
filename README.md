@@ -500,6 +500,7 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-28 (latest)
+- Notifications: migration `026_notification_beef_types.sql` — adds `beef_request`, `beef_accepted`, `beef_won`, `beef_lost` values to `notification_type` enum
 - Beef: `duration_seconds INT NOT NULL DEFAULT 86400` column added to `beefs` table; migration `025_beef_duration.sql`; `Beef` entity updated; `CreateBeefDto` gains optional `duration_seconds` (int, min 900 = 15 min, max 172800 = 48 h)
 - Beef: new `BeefScheduler` (`beef.scheduler.ts`) — `@Cron(EVERY_MINUTE)` closes ACTIVE beefs whose `ends_at` has passed (`closeExpiredBeefs`); `@Cron(EVERY_5_MINUTES)` auto-chickens WAITING beefs unanswered for >24 h (`autoChickenExpired`) — marks status `CHICKENED`, increments target's `chicken_count`, sets 24 h exile on both initiator and target; `BeefModule` updated to include `BeefScheduler` in providers
 - Beef: `create()` — initiator exile is now auto-cleared (`exile_until → null`) instead of throwing `BadRequestException`; target exile check still throws
