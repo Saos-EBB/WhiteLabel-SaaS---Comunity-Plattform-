@@ -8,6 +8,7 @@ import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
 import { useTranslation } from '@/lib/i18n'
 import { CityAutocomplete } from '@/components/ui/CityAutocomplete'
+import { useHiddenStore } from '@/lib/store/hiddenStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,17 @@ function formatGermanDate(dateStr: string): string {
 
 export default function ProfilePage() {
   const { t } = useTranslation()
+
+  const isHidden = useHiddenStore((s) => s.isHidden)
+  const [exileUntil, setExileUntil] = useState<string | null>(null)
+  const [leavingExile, setLeavingExile] = useState(false)
+  const [hiddenStats, setHiddenStats] = useState<{
+    balance: number
+    teeth: number
+    chains: number
+    chicken_count: number
+    badges: { id: string; type: string; expires_at: string }[]
+  } | null>(null)
 
   const [profile, setProfile]             = useState<Profile | null>(null)
   const [userInterests, setUserInterests] = useState<UserInterest[]>([])
@@ -149,6 +161,41 @@ export default function ProfilePage() {
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!isHidden) return
+    fetchApi<{ in_exile: boolean; exile_until: string | null }>(
+      '/hidden/beef/exile/status'
+    ).then(r => setExileUntil(r.in_exile ? r.exile_until : null))
+    .catch(() => {})
+  }, [isHidden])
+
+  useEffect(() => {
+    if (!isHidden) return
+    Promise.all([
+      fetchApi<number>('/hidden/coin/balance'),
+      fetchApi<any[]>('/hidden/teeth'),
+      fetchApi<any[]>('/hidden/teeth/chains'),
+      fetchApi<any[]>('/hidden/badge/mine'),
+    ]).then(([balance, teeth, chains, badges]) => {
+      setHiddenStats({
+        balance: typeof balance === 'number' ? balance : 0,
+        teeth: Array.isArray(teeth) ? teeth.length : 0,
+        chains: Array.isArray(chains) ? chains.length : 0,
+        chicken_count: 0,
+        badges: Array.isArray(badges) ? badges : [],
+      })
+    }).catch(() => {})
+  }, [isHidden])
+
+  async function handleLeaveExile() {
+    setLeavingExile(true)
+    try {
+      await fetchApi('/hidden/beef/exile/leave', { method: 'POST' })
+      setExileUntil(null)
+    } catch {}
+    finally { setLeavingExile(false) }
+  }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
 
@@ -578,6 +625,25 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {isHidden && exileUntil && (
+            <div className="flex items-center justify-between bg-surface-container border border-error/30 rounded-2xl px-4 py-3 mb-4">
+              <div>
+                <p className="text-sm font-semibold text-error">⛓️ Im Exil</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  bis {new Date(exileUntil).toLocaleString('de-AT',
+                    { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                </p>
+              </div>
+              <button
+                onClick={handleLeaveExile}
+                disabled={leavingExile}
+                className="px-4 py-2 rounded-lg bg-error/20 border border-error/30 text-error text-sm font-semibold disabled:opacity-40 transition-opacity hover:bg-error/30"
+              >
+                {leavingExile ? '...' : 'Verlassen'}
+              </button>
+            </div>
+          )}
+
           {editMode && draft.nickname !== originalNickname.current && (
             <p className="w-full text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3 py-2 mb-1" role="alert">
               ⚠ Achtung: Du kannst deinen Nickname nur einmal pro Jahr ändern.
@@ -821,6 +887,61 @@ export default function ProfilePage() {
               </p>
             )}
           </div>
+
+          {/* ── Underground Stats ────────────────────────────────────────── */}
+          {isHidden && hiddenStats && (
+            <div className="bg-surface-container border border-outline-variant rounded-2xl overflow-hidden mb-4">
+
+              <div className="px-5 py-3 border-b border-outline-variant flex items-center gap-2">
+                <span className="text-sm font-bold text-on-surface">🥊 Underground Stats</span>
+              </div>
+
+              <div className="grid grid-cols-3 divide-x divide-outline-variant border-b border-outline-variant">
+                <div className="px-4 py-3 text-center">
+                  <p className="text-lg font-bold text-primary-fixed-dim tabular-nums">
+                    {hiddenStats.balance}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">🪙 Coins</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-lg font-bold text-on-surface tabular-nums">
+                    {hiddenStats.teeth}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">🦷 Zähne</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-lg font-bold text-on-surface tabular-nums">
+                    {hiddenStats.chains}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">⛓️ Ketten</p>
+                </div>
+              </div>
+
+              {hiddenStats.badges.length > 0 && (
+                <div className="px-5 py-3 flex flex-wrap gap-2">
+                  {hiddenStats.badges.map(b => {
+                    const remaining = Math.max(0, new Date(b.expires_at).getTime() - Date.now())
+                    const hours = Math.floor(remaining / 3600000)
+                    const mins  = Math.floor((remaining % 3600000) / 60000)
+                    const timeStr = hours > 0 ? `${hours}h` : `${mins}m`
+                    const icon = b.type === 'winner' ? '🏆' : b.type === 'loser' ? '💀' : '🐔'
+                    return (
+                      <span key={b.id}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant text-xs text-on-surface-variant">
+                        {icon} {b.type} <span className="text-primary-fixed-dim">{timeStr}</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+
+              {hiddenStats.badges.length === 0 && (
+                <div className="px-5 py-3">
+                  <p className="text-xs text-on-surface-variant">Keine aktiven Badges</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Interests ─────────────────────────────────────────────────── */}
           <div className="w-full mb-6">

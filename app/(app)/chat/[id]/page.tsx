@@ -157,9 +157,19 @@ export default function ConversationPage() {
   const accessToken     = useAuthStore((s) => s.accessToken)
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
 
+  const DURATION_OPTIONS = [
+    { label: '15 Min',     value: 900 },
+    { label: '1 Stunde',   value: 3600 },
+    { label: '6 Stunden',  value: 21600 },
+    { label: '12 Stunden', value: 43200 },
+    { label: '24 Stunden', value: 86400 },
+    { label: '48 Stunden', value: 172800 },
+  ]
+
   const isHidden = useHiddenStore((s) => s.isHidden)
   const [beefOpen, setBeefOpen]             = useState(false)
   const [beefTldr, setBeefTldr]             = useState('')
+  const [beefDuration, setBeefDuration]     = useState(86400)
   const [rangeStart, setRangeStart]         = useState<number | null>(null)
   const [rangeEnd, setRangeEnd]             = useState<number | null>(null)
   const [beefStep, setBeefStep]             = useState<'tldr' | 'passage'>('tldr')
@@ -434,6 +444,7 @@ export default function ConversationPage() {
     setRangeEnd(null)
     setBeefStep('tldr')
     setBeefError(null)
+    setBeefDuration(86400)
   }
 
   async function handleBeefSubmit() {
@@ -454,6 +465,7 @@ export default function ConversationPage() {
           target_id: partnerId,
           tldr: beefTldr.trim(),
           chat_passage,
+          duration_seconds: beefDuration,
         }),
       })
       closeBeef()
@@ -804,6 +816,26 @@ export default function ConversationPage() {
                   <span className="absolute right-3 top-3 text-xs text-on-surface-variant">
                     {beefTldr.length}/50
                   </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-on-surface-variant">
+                    Dauer des Beefs
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {DURATION_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setBeefDuration(opt.value)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          beefDuration === opt.value
+                            ? 'border-primary-fixed-dim bg-primary-fixed-dim/20 text-on-surface'
+                            : 'border-outline-variant text-on-surface-variant hover:border-outline'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <button
                   onClick={() => setBeefStep('passage')}

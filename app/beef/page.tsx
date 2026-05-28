@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
@@ -35,6 +36,9 @@ export default function BeefPage() {
   const [publicBeefs, setPublicBeefs]   = useState<Beef[]>([])
   const [loading, setLoading]           = useState(true)
   const [responding, setResponding]     = useState<string | null>(null)
+  const [highscore, setHighscore]       = useState<{
+    user_id: string; nickname: string; wins: string
+  }[]>([])
 
   useEffect(() => {
     if (useHiddenStore.persist.hasHydrated()) setHydrated(true)
@@ -51,14 +55,16 @@ export default function BeefPage() {
     if (!isHidden) return
     setLoading(true)
     try {
-      const [req, mine, pub] = await Promise.all([
+      const [req, mine, pub, hs] = await Promise.all([
         fetchApi<Beef[]>('/hidden/beef/incoming'),
         fetchApi<Beef[]>('/hidden/beef/my-active'),
         fetchApi<Beef[]>('/hidden/beef/public'),
+        fetchApi<any[]>('/hidden/beef/highscore'),
       ])
       setRequests(Array.isArray(req) ? req : [])
       setMyBeefs(Array.isArray(mine) ? mine : [])
       setPublicBeefs(Array.isArray(pub) ? pub : [])
+      setHighscore(Array.isArray(hs) ? hs : [])
     } catch { /* non-critical */ }
     finally { setLoading(false) }
   }, [isHidden])
@@ -236,36 +242,66 @@ export default function BeefPage() {
                   <p className="text-sm">Keine aktiven Beefs gerade</p>
                 </div>
               ) : publicBeefs.map(beef => (
-                <div key={beef.id}
-                  className="bg-surface-container border border-outline-variant
-                    rounded-2xl p-5 flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-on-surface">{beef.tldr}</p>
-                    {beef.ends_at && (
-                      <span className="text-xs text-on-surface-variant
-                        bg-surface-container-high px-2 py-0.5 rounded-full
-                        whitespace-nowrap flex-shrink-0">
-                        🕐 läuft
-                      </span>
-                    )}
+                <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
+                  <div className="bg-surface-container border border-outline-variant
+                    rounded-2xl p-5 flex flex-col gap-3 hover:border-outline
+                    transition-colors cursor-pointer">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-bold text-on-surface">{beef.tldr}</p>
+                      {beef.ends_at && (
+                        <span className="text-xs text-on-surface-variant
+                          bg-surface-container-high px-2 py-0.5 rounded-full
+                          whitespace-nowrap flex-shrink-0">
+                          🕐 läuft
+                        </span>
+                      )}
+                    </div>
+                    <div className="bg-surface-container-low rounded-xl p-3
+                      border-l-2 border-outline-variant">
+                      <p className="text-sm text-on-surface-variant italic
+                        leading-relaxed line-clamp-3">
+                        {beef.chat_passage}
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-surface-container-low rounded-xl p-3
-                    border-l-2 border-outline-variant">
-                    <p className="text-sm text-on-surface-variant italic
-                      leading-relaxed line-clamp-3">
-                      {beef.chat_passage}
-                    </p>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
 
           {/* HIGHSCORE TAB */}
           {tab === 'highscore' && (
-            <div className="text-center py-16 text-on-surface-variant">
-              <Trophy size={40} className="mx-auto mb-3 opacity-30"/>
-              <p className="text-sm">Highscore kommt bald</p>
+            <div className="flex flex-col gap-3">
+              <h2 className="font-bold text-on-surface flex items-center gap-2">
+                <Trophy size={18} className="text-primary-fixed-dim"/>
+                Slain Enemies
+              </h2>
+              {highscore.length === 0 ? (
+                <div className="text-center py-16 text-on-surface-variant">
+                  <Trophy size={40} className="mx-auto mb-3 opacity-30"/>
+                  <p className="text-sm">Noch keine Beefs beendet</p>
+                </div>
+              ) : highscore.map((row, i) => (
+                <div key={row.user_id}
+                  className="flex items-center gap-4 bg-surface-container border border-outline-variant rounded-2xl px-5 py-4">
+                  <span className={`text-lg font-bold tabular-nums w-8 text-center ${
+                    i === 0 ? 'text-yellow-400' :
+                    i === 1 ? 'text-slate-400' :
+                    i === 2 ? 'text-amber-600' : 'text-on-surface-variant'
+                  }`}>
+                    #{i + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-bold text-on-surface text-sm">{row.nickname}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-primary-fixed-dim tabular-nums">
+                      {row.wins}
+                    </p>
+                    <p className="text-xs text-on-surface-variant">Wins</p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </>

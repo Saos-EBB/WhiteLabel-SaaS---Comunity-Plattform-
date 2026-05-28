@@ -1130,6 +1130,15 @@ export default function AdminPage() {
     finally { setBeefApproving(null) }
   }
 
+  async function handleBeefReject(id: string) {
+    setBeefApproving(id)
+    try {
+      await fetchApi(`/hidden/beef/${id}/reject`, { method: 'DELETE' })
+      await loadPendingBeefs()
+    } catch { }
+    finally { setBeefApproving(null) }
+  }
+
   useEffect(() => {
     if (role === 'admin' || role === 'owner') loadPendingBeefs()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2378,17 +2387,26 @@ export default function AdminPage() {
                   <span className="text-xs text-on-surface-variant font-mono">
                     {new Date(beef.created_at).toLocaleString('de-AT')}
                   </span>
-                  <button
-                    onClick={() => handleBeefApprove(beef.id)}
-                    disabled={beefApproving === beef.id}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
-                  >
-                    {beefApproving === beef.id
-                      ? <Loader2 size={14} className="animate-spin"/>
-                      : <Check size={14}/>
-                    }
-                    Approve
-                  </button>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      onClick={() => handleBeefReject(beef.id)}
+                      disabled={beefApproving === beef.id}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container-high border border-outline-variant text-on-surface-variant font-semibold text-sm disabled:opacity-40 transition-opacity"
+                    >
+                      <X size={14}/> Ablehnen
+                    </button>
+                    <button
+                      onClick={() => handleBeefApprove(beef.id)}
+                      disabled={beefApproving === beef.id}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
+                    >
+                      {beefApproving === beef.id
+                        ? <Loader2 size={14} className="animate-spin"/>
+                        : <Check size={14}/>
+                      }
+                      Approve
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
