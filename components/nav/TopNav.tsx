@@ -15,7 +15,6 @@ import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { initLogoLetters, startShaking, triggerBreak } from '@/lib/physics/letterPhysics'
 import { playHiddenAudio } from '@/lib/hiddenAudio'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
-import { connect } from '@/lib/socket'
 import { useTranslation } from '@/lib/i18n'
 
 function getJwtRole(token: string | null): string | null {
@@ -145,7 +144,7 @@ export default function TopNav() {
   const isFirstRequestPollRef = useRef(true)
 
   // ── Admin ticket badge ────────────────────────────────────────────────────
-  const [ticketCount, setTicketCount] = useState(0)
+  const ticketCount = useNotificationStore((s) => s.adminTicketCount)
 
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount   = useNotificationStore((s) => s.unreadCount)
@@ -164,17 +163,13 @@ export default function TopNav() {
           fetchApi<{ total: number }>('/admin/reports?status=open&limit=1&page=1'),
           fetchApi<{ total: number }>('/admin/tickets?status=open&limit=1&page=1'),
         ])
-        setTicketCount((reports.total ?? 0) + (support.total ?? 0))
+        useNotificationStore.getState().setAdminTicketCount((reports.total ?? 0) + (support.total ?? 0))
       } catch {
         // non-critical
       }
     }
 
     loadCount()
-
-    const socket = connect()
-    socket.on('ticket.new', () => setTicketCount((n) => n + 1))
-    return () => { socket.off('ticket.new') }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 

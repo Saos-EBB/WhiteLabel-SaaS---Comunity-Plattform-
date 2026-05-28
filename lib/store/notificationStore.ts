@@ -28,6 +28,9 @@ interface NotificationState {
   removeNotification: (id: string) => void
   setActiveConversationId: (id: string) => void
   clearActiveConversationId: () => void
+  adminTicketCount: number
+  setAdminTicketCount: (n: number) => void
+  incrementAdminTicketCount: () => void
 }
 
 export const useNotificationStore = create<NotificationState>()((set) => ({
@@ -121,4 +124,7 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
     }),
   setActiveConversationId: (id) => set({ activeConversationId: id }),
   clearActiveConversationId: () => set({ activeConversationId: null }),
+  adminTicketCount: 0,
+  setAdminTicketCount: (n) => set({ adminTicketCount: n }),
+  incrementAdminTicketCount: () => set((s) => ({ adminTicketCount: s.adminTicketCount + 1 })),
 }))

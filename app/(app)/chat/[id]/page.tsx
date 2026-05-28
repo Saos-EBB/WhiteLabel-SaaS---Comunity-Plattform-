@@ -9,23 +9,13 @@ import { useAuthStore } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
+import { useConversationStore, type Message } from '@/lib/store/conversationStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import ReportModal from '@/components/ui/ReportModal'
 import { useTranslation } from '@/lib/i18n'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Message {
-  id: string
-  conversation_id: string
-  sender_id: string
-  content: string
-  type: string
-  is_deleted: boolean
-  sent_at: string
-  read_at: string | null
-}
 
 // Extends Message with local-only optimistic status
 interface LocalMessage extends Message {
@@ -199,17 +189,18 @@ export default function ConversationPage() {
   const [blockOpen, setBlockOpen]   = useState(false)
   const [blocking, setBlocking]     = useState(false)
 
+  const partnerTyping = useConversationStore((s) => s.partnerTyping)
+  const pendingMessages = useConversationStore((s) => s.pendingMessages)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const isFirstScroll = useRef(true)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const [partnerTyping, setPartnerTyping] = useState(false)
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null)
   const [partnerIsOnline, setPartnerIsOnline] = useState(false)
   const [partnerStatusMessage, setPartnerStatusMessage] = useState<string | null>(null)
   // Ref so the socket closure always reads the current nickname without re-subscribing
   const partnerNicknameRef = useRef<string | null>(null)
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingEmit = useRef(0)
 
   function shortId(id: string): string {
@@ -221,8 +212,41 @@ export default function ConversationPage() {
   useEffect(() => {
     const { setActiveConversationId, clearActiveConversationId } = useNotificationStore.getState()
     setActiveConversationId(conversationId)
-    return () => { clearActiveConversationId() }
+    useConversationStore.getState().clearPendingMessages()
+    useConversationStore.getState().setPartnerTyping(false)
+    return () => {
+      clearActiveConversationId()
+      useConversationStore.getState().clearPendingMessages()
+      useConversationStore.getState().setPartnerTyping(false)
+    }
   }, [conversationId])
+
+  // ── Consume incoming messages pushed by useSocketBus ──────────────────────
+
+  useEffect(() => {
+    if (pendingMessages.length === 0) return
+    const msgs = pendingMessages.filter((m) => m.conversation_id === conversationId)
+    useConversationStore.getState().clearPendingMessages()
+    if (msgs.length === 0) return
+    const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+    setMessages((prev) => {
+      let next = [...prev]
+      for (const msg of msgs) {
+        if (msg.sender_id === myId) {
+          const pendingIdx = next.findIndex((m) => m._status === 'pending')
+          if (pendingIdx !== -1) {
+            next = [...next]
+            next[pendingIdx] = msg as LocalMessage
+            continue
+          }
+        }
+        if (!next.some((m) => m.id === msg.id)) {
+          next = [...next, msg as LocalMessage]
+        }
+      }
+      return next
+    })
+  }, [pendingMessages, conversationId])
 
   // ── Load messages ──────────────────────────────────────────────────────────
 
@@ -262,51 +286,13 @@ export default function ConversationPage() {
     load()
   }, [conversationId])
 
-  // ── Socket ─────────────────────────────────────────────────────────────────
+  // ── Socket — join room + mark read (listeners handled by useSocketBus) ─────
 
   useEffect(() => {
     if (!accessToken) return
-
     const sock = connect()
-
     sock.emit('join_conversation', conversationId)
     sock.emit('read_messages', conversationId)
-
-    function onNewMessage(msg: Message) {
-      if (msg.conversation_id !== conversationId) return
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-      setPartnerTyping(false)
-      const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
-      setMessages((prev) => {
-        if (msg.sender_id === myId) {
-          const pendingIdx = prev.findIndex((m) => m._status === 'pending')
-          if (pendingIdx !== -1) {
-            const next = [...prev]
-            next[pendingIdx] = msg
-            return next
-          }
-        }
-        if (prev.some((m) => m.id === msg.id)) return prev
-        return [...prev, msg]
-      })
-    }
-
-    function onUserTyping({ userId, conversationId: cid }: { userId: string; conversationId: string }) {
-      const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
-      if (cid !== conversationId || userId === myId) return
-      setPartnerTyping(true)
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-      typingTimeoutRef.current = setTimeout(() => setPartnerTyping(false), 3000)
-    }
-
-    sock.on('new_message', onNewMessage)
-    sock.on('user_typing', onUserTyping)
-
-    return () => {
-      sock.off('new_message', onNewMessage)
-      sock.off('user_typing', onUserTyping)
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    }
   }, [conversationId, accessToken])
 
   // ── Scroll button visibility (IntersectionObserver on bottom sentinel) ─────

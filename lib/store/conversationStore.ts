@@ -16,6 +16,18 @@ export interface Conversation {
   partner_last_active_at?: string | null
 }
 
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  content: string
+  type: string
+  is_deleted: boolean
+  sent_at: string
+  read_at: string | null
+  sender_nickname?: string
+}
+
 interface MessageUpdate {
   conversation_id: string
   content: string
@@ -27,6 +39,13 @@ interface ConversationState {
   conversations: Conversation[]
   setConversations: (convs: Conversation[]) => void
   applyMessage: (msg: MessageUpdate) => void
+  // Incoming socket messages for the open chat page to consume
+  pendingMessages: Message[]
+  pushPendingMessage: (msg: Message) => void
+  clearPendingMessages: () => void
+  // Partner typing indicator for the open chat page
+  partnerTyping: boolean
+  setPartnerTyping: (v: boolean) => void
 }
 
 export const useConversationStore = create<ConversationState>()((set) => ({
@@ -46,4 +65,10 @@ export const useConversationStore = create<ConversationState>()((set) => ({
       const rest = state.conversations.filter((_, i) => i !== idx)
       return { conversations: [updated, ...rest] }
     }),
+  pendingMessages: [],
+  pushPendingMessage: (msg) =>
+    set((state) => ({ pendingMessages: [...state.pendingMessages, msg] })),
+  clearPendingMessages: () => set({ pendingMessages: [] }),
+  partnerTyping: false,
+  setPartnerTyping: (v) => set({ partnerTyping: v }),
 }))
