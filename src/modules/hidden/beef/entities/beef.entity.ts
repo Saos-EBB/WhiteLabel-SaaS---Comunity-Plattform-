@@ -47,6 +47,9 @@ export class Beef {
     @JoinColumn({ name: 'winner_id' })
     winner!: User | null;
 
+    @Column({ type: 'int', default: 86400 })
+    duration_seconds!: number;
+
     @Column({ type: 'timestamptz', nullable: true })
     ends_at!: Date | null;
 

@@ -26,6 +26,16 @@ export class TeethService {
         return this.chainRepo.find({ where: { user_id: userId } });
     }
 
+    async awardTooth(ownerId: string, fromUserId: string, beefId: string): Promise<void> {
+        await this.toothRepo.save(
+            this.toothRepo.create({
+                owner_id: ownerId,
+                from_user_id: fromUserId,
+                beef_id: beefId,
+            })
+        );
+    }
+
     async transform(userId: string): Promise<ToothChain> {
         const teeth = await this.toothRepo.find({
             where: { owner_id: userId, converted_to_chain: false },

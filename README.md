@@ -45,7 +45,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 | `BeefModule` | `src/modules/hidden/beef` | Hidden zone: beef challenges, voting, comments |
 | `CoinModule` | `src/modules/hidden/coin` | Hidden zone: coin balance ledger and transactions |
 | `TeethModule` | `src/modules/hidden/teeth` | Hidden zone: tooth collection and tooth-chain crafting |
-| `BadgeModule` | `src/modules/hidden/badge` | Hidden zone: winner/loser/chicken badges with expiry |
+| `BadgeModule` | `src/modules/hidden/badge` | Hidden zone: winner/loser/chicken badges with expiry; `GET /hidden/badge/mine` |
 
 ---
 
@@ -500,6 +500,13 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-28 (latest)
+- Beef: `duration_seconds INT NOT NULL DEFAULT 86400` column added to `beefs` table; migration `025_beef_duration.sql`; `Beef` entity updated; `CreateBeefDto` gains optional `duration_seconds` (int, min 900 = 15 min, max 172800 = 48 h)
+- Beef: new `BeefScheduler` (`beef.scheduler.ts`) — `@Cron(EVERY_MINUTE)` closes ACTIVE beefs whose `ends_at` has passed (`closeExpiredBeefs`); `@Cron(EVERY_5_MINUTES)` auto-chickens WAITING beefs unanswered for >24 h (`autoChickenExpired`) — marks status `CHICKENED`, increments target's `chicken_count`, sets 24 h exile on both initiator and target; `BeefModule` updated to include `BeefScheduler` in providers
+- Beef: `create()` — initiator exile is now auto-cleared (`exile_until → null`) instead of throwing `BadRequestException`; target exile check still throws
+- Beef: `getHighscore()` new service method — groups closed beefs by `winner_id`, joins `profiles` for nickname, orders by win count DESC, limit 20; exposed as `GET /hidden/beef/highscore` (added before `@Get(':id')` to prevent routing conflict)
+- Badge: new `BadgeController` (`badge.controller.ts`) — `GET /hidden/badge/mine` returns `badgeService.getActiveBadges(req.user.sub)`; `BadgeModule` updated with `JwtModule.registerAsync`, `BadgeController` in controllers, `JwtGuard` in providers
+
+### 2026-05-28
 - CoinService: new `ensureBalance(userId)` method — inserts a `user_coin_balance` row with 100 starting coins and a `starting_bonus` transaction on first touch; called at the start of `getBalance()`, `addCoins()`, and `spendCoins()` so every user receives the bonus automatically on their first coin interaction
 - CoinService: `addCoins()` and `spendCoins()` rewritten using raw parameterised SQL (`INSERT … ON CONFLICT DO UPDATE` / `UPDATE … SET balance = balance - $1`) — replaces the TypeORM `upsert()` function-expression hack that silently failed in development
 - BeefService: `CoinService` injected via constructor; `BeefModule` imports `CoinModule`

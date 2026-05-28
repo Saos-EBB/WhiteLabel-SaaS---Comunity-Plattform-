@@ -1,5 +1,6 @@
 import {
     Controller,
+    Delete,
     Get,
     Post,
     Patch,
@@ -35,6 +36,11 @@ export class BeefController {
         return this.beefService.respond(id, req.user.sub, dto);
     }
 
+    @Delete(':id/reject')
+    reject(@Param('id', ParseUUIDPipe) id: string) {
+        return this.beefService.reject(id);
+    }
+
     @Get('pending')
     getPending() {
         return this.beefService.getPending();
@@ -63,6 +69,21 @@ export class BeefController {
     @Get('public')
     listPublic(@Request() req: any) {
         return this.beefService.listPublic(req.user.sub);
+    }
+
+    @Get('highscore')
+    getHighscore() {
+        return this.beefService.getHighscore();
+    }
+
+    @Get(':id')
+    getById(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+        return this.beefService.getById(id, req.user.sub);
+    }
+
+    @Post(':id/close')
+    close(@Param('id', ParseUUIDPipe) id: string) {
+        return this.beefService.closeBeef(id);
     }
 
     @Get()
