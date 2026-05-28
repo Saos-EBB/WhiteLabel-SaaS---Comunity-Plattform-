@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   MessageCircle, Heart, Info, ShieldX, UserPlus,
-  CheckCheck, Loader2, AlertCircle, Trash2,
+  CheckCheck, Loader2, AlertCircle, Trash2, Swords, Trophy,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import {
@@ -16,11 +16,15 @@ import { useTranslation } from '@/lib/i18n'
 type Tab = 'neu' | 'verlauf'
 
 const TYPE_ICONS: Record<NotificationType, typeof MessageCircle> = {
-  message: MessageCircle,
-  match:   Heart,
-  system:  Info,
-  ban:     ShieldX,
-  request: UserPlus,
+  message:       MessageCircle,
+  match:         Heart,
+  system:        Info,
+  ban:           ShieldX,
+  request:       UserPlus,
+  beef_request:  Swords,
+  beef_accepted: Swords,
+  beef_won:      Trophy,
+  beef_lost:     Swords,
 }
 
 export default function NotificationsPage() {
@@ -34,11 +38,15 @@ export default function NotificationsPage() {
   const unreadCount   = useNotificationStore((s) => s.unreadCount)
 
   const TYPE_LABELS: Record<NotificationType, string> = {
-    message: t.notifications.typeMessage,
-    match:   t.notifications.typeMatch,
-    system:  t.notifications.typeSystem,
-    ban:     t.notifications.typeBan,
-    request: t.notifications.typeRequest,
+    message:       t.notifications.typeMessage,
+    match:         t.notifications.typeMatch,
+    system:        t.notifications.typeSystem,
+    ban:           t.notifications.typeBan,
+    request:       t.notifications.typeRequest,
+    beef_request:  'Beef Anfrage',
+    beef_accepted: 'Beef angenommen',
+    beef_won:      'Beef gewonnen',
+    beef_lost:     'Beef verloren',
   }
 
   function relativeTime(dateString: string): string {

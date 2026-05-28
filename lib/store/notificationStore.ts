@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 
-export type NotificationType = 'message' | 'match' | 'system' | 'ban' | 'request'
+export type NotificationType =
+  'message' | 'match' | 'system' | 'ban' | 'request' |
+  'beef_request' | 'beef_accepted' | 'beef_won' | 'beef_lost'
 
 export interface Notification {
   id: string

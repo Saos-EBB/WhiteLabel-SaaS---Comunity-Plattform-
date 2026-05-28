@@ -79,7 +79,7 @@ Copy `.env.example` to `.env.local` and fill in the values.
 - Bell badge with count (max "9+") + pulse ring in `TopNav`
 - Dropdown preview in `TopNav` (last 5); full center at `/notifications`
 - Tabs: Neu / Verlauf; mark-as-read, delete, "Alle als gelesen markieren"
-- Supported types: `message`, `match`, `system`, `ban`, `request`
+- Supported types: `message`, `match`, `system`, `ban`, `request`, `beef_request`, `beef_accepted`, `beef_won`, `beef_lost`
 
 ### Admin Panel (`/admin`)
 Accessible to `role: admin` or `role: owner` users. Auth guard waits for Zustand `persist` hydration before checking role.
@@ -626,6 +626,7 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-28 (latest)
+- Notifications: `notificationStore` — `NotificationType` extended with `beef_request`, `beef_accepted`, `beef_won`, `beef_lost`; `notifications/page.tsx` — `TYPE_ICONS` (Swords / Trophy) and `TYPE_LABELS` wired for all four beef notification types
 - Chat (`/chat/[id]`): beef creation modal — duration selector added to TLDR step (6 presets: 15 Min / 1 Stunde / 6 Stunden / 12 Stunden / 24 Stunden / 48 Stunden); selected `duration_seconds` sent in `POST /hidden/beef` body; resets to 86400 on modal close
 - Admin (`/admin`): beef approval cards now have an "Ablehnen" button alongside "Approve"; `handleBeefReject` calls `DELETE /hidden/beef/:id/reject` and reloads the pending list
 - Profile (`/profile`): exile status banner added between the photo section and the nickname warning — shown when `isHidden && exileUntil !== null`; "Verlassen" button calls `POST /hidden/beef/exile/leave` and clears state; exile fetched from `GET /hidden/beef/exile/status` on mount when `isHidden`
