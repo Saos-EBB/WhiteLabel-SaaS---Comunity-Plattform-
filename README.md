@@ -499,6 +499,15 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
+### 2026-05-28 (latest)
+- CoinService: new `ensureBalance(userId)` method — inserts a `user_coin_balance` row with 100 starting coins and a `starting_bonus` transaction on first touch; called at the start of `getBalance()`, `addCoins()`, and `spendCoins()` so every user receives the bonus automatically on their first coin interaction
+- CoinService: `addCoins()` and `spendCoins()` rewritten using raw parameterised SQL (`INSERT … ON CONFLICT DO UPDATE` / `UPDATE … SET balance = balance - $1`) — replaces the TypeORM `upsert()` function-expression hack that silently failed in development
+- BeefService: `CoinService` injected via constructor; `BeefModule` imports `CoinModule`
+- Beef `create()`: after saving the beef, awards the initiator 50 coins (`earned_beef_open`)
+- Beef `vote()`: spends `dto.coins_wagered` coins (`spent_vote`) before creating the vote record; throws `BadRequestException` if balance is insufficient
+- Beef `addComment()`: awards 5 coins (`earned_comment`) for the user's first 3 comments on a beef (anti-spam cap)
+- Migration `024_coin_starting_bonus_type.sql`: drops and recreates `chk_coin_tx_type` constraint on `coin_transactions` to include `starting_bonus` alongside all existing types
+
 ### 2026-05-27 (latest)
 - Beef: `exile_until TIMESTAMPTZ` column added to `users` table; `User` entity updated; migration `023_user_exile.sql` applied
 - Beef: `create()` guards — initiator exile check, target exile check, duplicate active-beef check (either direction, statuses: `pending_approval | waiting | active`); throws `BadRequestException` or `ConflictException` accordingly

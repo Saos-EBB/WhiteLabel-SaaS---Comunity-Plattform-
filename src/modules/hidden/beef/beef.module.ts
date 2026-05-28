@@ -9,6 +9,7 @@ import { Beef } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
 import { BeefComment } from './entities/beef-comment.entity';
 import { User } from '../../core/auth/entities/user.entity';
+import { CoinModule } from '../coin/coin.module';
 
 @Module({
     imports: [
@@ -21,6 +22,7 @@ import { User } from '../../core/auth/entities/user.entity';
             }),
             inject: [ConfigService],
         }),
+        CoinModule,
     ],
     controllers: [BeefController],
     providers: [BeefService, JwtGuard],

@@ -15,6 +15,7 @@ import { CreateBeefDto } from './dto/create-beef.dto';
 import { RespondBeefDto } from './dto/respond-beef.dto';
 import { VoteBeefDto } from './dto/vote-beef.dto';
 import { CommentBeefDto } from './dto/comment-beef.dto';
+import { CoinService } from '../coin/coin.service';
 
 @Injectable()
 export class BeefService {
@@ -27,6 +28,7 @@ export class BeefService {
         private readonly commentRepo: Repository<BeefComment>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        private readonly coinService: CoinService,
     ) { }
 
     async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
@@ -71,7 +73,9 @@ export class BeefService {
             chat_passage: dto.chat_passage,
             status: BeefStatus.PENDING_APPROVAL,
         });
-        return this.beefRepo.save(beef);
+        const saved = await this.beefRepo.save(beef);
+        await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id);
+        return saved;
     }
 
     async getPending(): Promise<any[]> {
@@ -149,6 +153,7 @@ export class BeefService {
             where: { beef_id: beefId, voter_id: voterId },
         });
         if (existing) throw new ConflictException('Bereits gevotet');
+        await this.coinService.spendCoins(voterId, dto.coins_wagered, 'spent_vote', beefId);
         const vote = this.voteRepo.create({
             beef_id: beefId,
             voter_id: voterId,
@@ -167,7 +172,12 @@ export class BeefService {
             user_id: userId,
             content: dto.content,
         });
-        return this.commentRepo.save(comment);
+        const saved = await this.commentRepo.save(comment);
+        const count = await this.commentRepo.count({ where: { beef_id: beefId, user_id: userId } });
+        if (count <= 3) {
+            await this.coinService.addCoins(userId, 5, 'earned_comment', beefId);
+        }
+        return saved;
     }
 
     async getComments(beefId: string): Promise<BeefComment[]> {
