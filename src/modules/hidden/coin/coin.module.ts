@@ -20,6 +20,7 @@ import { User } from '../../core/auth/entities/user.entity';
             }),
             inject: [ConfigService],
         }),
+        ConfigModule,
     ],
     controllers: [CoinController],
     providers: [CoinService, JwtGuard],

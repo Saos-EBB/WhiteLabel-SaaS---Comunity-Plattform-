@@ -27,6 +27,9 @@ export class CoinTransaction {
     @JoinColumn({ name: 'beef_id' })
     beef!: Beef | null;
 
+    @Column({ name: 'idempotency_key', type: 'varchar', length: 255, nullable: true, unique: true })
+    idempotency_key!: string | null;
+
     @CreateDateColumn()
     created_at!: Date;
 }

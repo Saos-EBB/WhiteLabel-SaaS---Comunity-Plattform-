@@ -36,18 +36,7 @@ export class BeefScheduler {
             },
         });
         for (const beef of waiting) {
-            beef.status = BeefStatus.CHICKENED;
-            await this.beefRepo.save(beef);
-            await this.beefRepo.manager
-                .getRepository('users')
-                .increment({ id: beef.target_id }, 'chicken_count', 1);
-            const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            await this.beefRepo.manager
-                .getRepository('users')
-                .update(beef.initiator_id, { exile_until });
-            await this.beefRepo.manager
-                .getRepository('users')
-                .update(beef.target_id, { exile_until });
+            await this.beefService.chickenBeef(beef.id, 'timeout');
         }
     }
 }

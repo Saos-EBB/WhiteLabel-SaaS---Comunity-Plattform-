@@ -4,7 +4,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BeefController } from './beef.controller';
 import { BeefService } from './beef.service';
+import { BeefResolutionService } from './beef-resolution.service';
 import { BeefScheduler } from './beef.scheduler';
+import { HiddenBeefGateway } from './beef.gateway';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { Beef } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
@@ -13,6 +15,7 @@ import { User } from '../../core/auth/entities/user.entity';
 import { CoinModule } from '../coin/coin.module';
 import { BadgeModule } from '../badge/badge.module';
 import { TeethModule } from '../teeth/teeth.module';
+import { NotificationsModule } from '../../core/notifications/notifications.module';
 
 @Module({
     imports: [
@@ -28,9 +31,10 @@ import { TeethModule } from '../teeth/teeth.module';
         CoinModule,
         BadgeModule,
         TeethModule,
+        NotificationsModule,
     ],
     controllers: [BeefController],
-    providers: [BeefService, BeefScheduler, JwtGuard],
+    providers: [BeefService, BeefResolutionService, BeefScheduler, JwtGuard, HiddenBeefGateway],
     exports: [BeefService],
 })
 export class BeefModule { }

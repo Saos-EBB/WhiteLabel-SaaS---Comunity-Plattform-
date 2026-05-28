@@ -6,7 +6,8 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { DataSource, Repository, IsNull } from 'typeorm';
+import { BeefResolutionService } from './beef-resolution.service';
 import { User } from '../../core/auth/entities/user.entity';
 import { Beef, BeefStatus } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
@@ -15,9 +16,11 @@ import { CreateBeefDto } from './dto/create-beef.dto';
 import { RespondBeefDto } from './dto/respond-beef.dto';
 import { VoteBeefDto } from './dto/vote-beef.dto';
 import { CommentBeefDto } from './dto/comment-beef.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CoinService } from '../coin/coin.service';
 import { BadgeService } from '../badge/badge.service';
 import { TeethService } from '../teeth/teeth.service';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 
 @Injectable()
 export class BeefService {
@@ -33,6 +36,10 @@ export class BeefService {
         private readonly coinService: CoinService,
         private readonly badgeService: BadgeService,
         private readonly teethService: TeethService,
+        private readonly notificationsService: NotificationsService,
+        private readonly eventEmitter: EventEmitter2,
+        private readonly dataSource: DataSource,
+        private readonly resolutionService: BeefResolutionService,
     ) { }
 
     async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
@@ -77,7 +84,7 @@ export class BeefService {
             duration_seconds: dto.duration_seconds ?? 86400,
         });
         const saved = await this.beefRepo.save(beef);
-        await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id);
+        await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
         return saved;
     }
 
@@ -109,15 +116,18 @@ export class BeefService {
         if (beef.status !== BeefStatus.WAITING)
             throw new BadRequestException('Beef nicht im Waiting-Status');
         if (dto.response === 'chicken') {
-            beef.status = BeefStatus.CHICKENED;
-            await this.userRepo.increment({ id: userId }, 'chicken_count', 1);
-            const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            await this.userRepo.update({ id: beef.initiator_id }, { exile_until });
-            await this.userRepo.update({ id: userId }, { exile_until });
-        } else {
-            beef.status = BeefStatus.ACTIVE;
-            beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
+            await this.chickenBeef(beefId, 'manual');
+            return (await this.beefRepo.findOne({ where: { id: beefId } }))!;
         }
+        beef.status = BeefStatus.ACTIVE;
+        beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
+        await this.notificationsService.createNotification(
+            beef.initiator_id,
+            'beef_accepted',
+            `Hat deinen Beef angenommen! Der Kampf beginnt 💪`,
+            'Beef angenommen',
+            beef.id,
+        );
         return this.beefRepo.save(beef);
     }
 
@@ -128,7 +138,15 @@ export class BeefService {
             throw new BadRequestException('Bereits verarbeitet');
         beef.admin_approved = true;
         beef.status = BeefStatus.WAITING;
-        return this.beefRepo.save(beef);
+        const saved = await this.beefRepo.save(beef);
+        await this.notificationsService.createNotification(
+            beef.target_id,
+            'beef_request',
+            `fordert dich zum Beef heraus: "${beef.tldr}" 🥊`,
+            'Beef Anfrage',
+            beef.id,
+        );
+        return saved;
     }
 
     async listActive(): Promise<Beef[]> {
@@ -207,86 +225,92 @@ export class BeefService {
             .getRawMany()
     }
 
-    async closeBeef(beefId: string): Promise<void> {
+    async closeBeef(beefId: string, random: () => number = Math.random): Promise<void> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         if (!beef || beef.status !== BeefStatus.ACTIVE) return;
 
         const votes = await this.voteRepo.find({ where: { beef_id: beefId } });
-
-        let initiatorCoins = 0;
-        let targetCoins = 0;
-        for (const v of votes) {
-            if (v.side === 'initiator') initiatorCoins += v.coins_wagered;
-            else targetCoins += v.coins_wagered;
-        }
-
-        // ── Tie = Double KO → house takes all ──────────────────────
-        const isTie = initiatorCoins === targetCoins;
-
-        if (isTie) {
-            beef.status = BeefStatus.CLOSED;
-            beef.winner_id = null;
-            await this.beefRepo.save(beef);
-
-            const badgeDurationMs = beef.duration_seconds * 4 * 1000;
-            await this.badgeService.createBadge(beef.initiator_id, beefId, 'loser', badgeDurationMs);
-            await this.badgeService.createBadge(beef.target_id,   beefId, 'loser', badgeDurationMs);
-
-            const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            await this.userRepo.update({ id: beef.initiator_id }, { exile_until });
-            await this.userRepo.update({ id: beef.target_id },   { exile_until });
-
-            return;
-        }
-
-        // ── Normal win ───────────────────────────────────────────────
-        const winningSide = initiatorCoins > targetCoins ? 'initiator' : 'target';
-        const winnerId = winningSide === 'initiator' ? beef.initiator_id : beef.target_id;
-        const loserId  = winningSide === 'initiator' ? beef.target_id : beef.initiator_id;
-
-        beef.status = BeefStatus.CLOSED;
-        beef.winner_id = winnerId;
-        await this.beefRepo.save(beef);
-
-        const totalPool = initiatorCoins + targetCoins;
-        if (totalPool > 0) {
-            const winnerCut     = Math.floor(totalPool * 0.40);
-            const lotteryPerWin = Math.floor(totalPool * 0.05);
-
-            if (winnerCut > 0)
-                await this.coinService.addCoins(winnerId, winnerCut, 'earned_win', beefId);
-
-            const winningVoters = votes.filter(v => v.side === winningSide);
-            if (winningVoters.length > 0 && lotteryPerWin > 0) {
-                const tickets: string[] = [];
-                for (const v of winningVoters) {
-                    for (let i = 0; i < v.coins_wagered; i++) tickets.push(v.voter_id);
-                }
-
-                const lotteryWinners = new Set<string>();
-                const maxWinners = Math.min(10, winningVoters.length);
-                let attempts = 0;
-                while (lotteryWinners.size < maxWinners && attempts < tickets.length * 3 + 100) {
-                    lotteryWinners.add(tickets[Math.floor(Math.random() * tickets.length)]);
-                    attempts++;
-                }
-
-                for (const voterId of lotteryWinners) {
-                    await this.coinService.addCoins(voterId, lotteryPerWin, 'lottery_win', beefId);
-                }
-            }
-        }
-
-        const badgeDurationMs = beef.duration_seconds * 4 * 1000;
-
-        await this.badgeService.createBadge(winnerId, beefId, 'winner', badgeDurationMs);
-        await this.badgeService.createBadge(loserId,  beefId, 'loser',  badgeDurationMs);
-
-        await this.teethService.awardTooth(winnerId, loserId, beefId);
+        const result = this.resolutionService.resolve(beef, votes);
 
         const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        await this.userRepo.update({ id: winnerId }, { exile_until });
-        await this.userRepo.update({ id: loserId },  { exile_until });
+        const badgeDurationMs = beef.duration_seconds * 4 * 1000;
+
+        await this.dataSource.transaction(async (manager) => {
+            // ── Core state change ───────────────────────────────────────
+            beef.status = BeefStatus.CLOSED;
+            beef.winner_id = result.winnerId;
+            await manager.save(beef);
+
+            // TODO: emit hidden.beef.exile event — Candidate 5 zone boundary
+            await manager.update(User, { id: beef.initiator_id }, { exile_until });
+            await manager.update(User, { id: beef.target_id },    { exile_until });
+
+            if (result.isTie) {
+                // ── Double KO — house takes all ─────────────────────────
+                await this.badgeService.createBadge(beef.initiator_id, beefId, 'loser', badgeDurationMs);
+                await this.badgeService.createBadge(beef.target_id,   beefId, 'loser', badgeDurationMs);
+                await this.notificationsService.createNotification(
+                    beef.initiator_id, 'beef_lost', 'Unentschieden — Double KO! 💥', 'Beef beendet', beefId,
+                );
+                await this.notificationsService.createNotification(
+                    beef.target_id, 'beef_lost', 'Unentschieden — Double KO! 💥', 'Beef beendet', beefId,
+                );
+            } else {
+                const { winnerId, loserId, coinDistribution, correctVoters } = result;
+
+                // ── Coin distribution ───────────────────────────────────
+                if (coinDistribution.totalPool > 0) {
+                    if (coinDistribution.winnerShare > 0)
+                        await this.coinService.addCoins(winnerId!, coinDistribution.winnerShare, 'earned_win', beefId, `beef:${beefId}:winner:${winnerId}`);
+
+                    if (correctVoters.length > 0 && coinDistribution.lotteryPerWinner > 0) {
+                        const tickets: string[] = [];
+                        for (const v of correctVoters) {
+                            for (let i = 0; i < v.coins_wagered; i++) tickets.push(v.voter_id);
+                        }
+                        const lotteryWinners = new Set<string>();
+                        const maxWinners = Math.min(10, correctVoters.length);
+                        let attempts = 0;
+                        while (lotteryWinners.size < maxWinners && attempts < tickets.length * 3 + 100) {
+                            lotteryWinners.add(tickets[Math.floor(random() * tickets.length)]);
+                            attempts++;
+                        }
+                        for (const voterId of lotteryWinners) {
+                            await this.coinService.addCoins(voterId, coinDistribution.lotteryPerWinner, 'lottery_win', beefId, `beef:${beefId}:lottery:${voterId}`);
+                        }
+                    }
+                }
+
+                // ── Badges, teeth, notifications ────────────────────────
+                await this.badgeService.createBadge(winnerId!, beefId, 'winner', badgeDurationMs);
+                await this.badgeService.createBadge(loserId!,  beefId, 'loser',  badgeDurationMs);
+                await this.teethService.awardTooth(winnerId!, loserId!, beefId);
+                await this.notificationsService.createNotification(
+                    winnerId!, 'beef_won',
+                    `Du hast den Beef gewonnen! 🏆 +${coinDistribution.winnerShare} Coins`,
+                    'Beef gewonnen', beefId,
+                );
+                await this.notificationsService.createNotification(
+                    loserId!, 'beef_lost', `Du hast den Beef verloren. 💀`, 'Beef verloren', beefId,
+                );
+            }
+        });
+
+        this.eventEmitter.emit('hidden.beef.closed', { beefId, winnerId: result.winnerId });
+    }
+
+    async chickenBeef(beefId: string, _reason: 'manual' | 'timeout'): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.WAITING) return;
+
+        const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await this.dataSource.transaction(async (manager) => {
+            await manager.update(Beef, { id: beefId }, { status: BeefStatus.CHICKENED });
+            await manager.increment(User, { id: beef.target_id }, 'chicken_count', 1);
+            // TODO: emit hidden.beef.exile event — Candidate 5 zone boundary
+            await manager.update(User, { id: beef.initiator_id }, { exile_until });
+            await manager.update(User, { id: beef.target_id },    { exile_until });
+        });
     }
 
     async vote(beefId: string, voterId: string, dto: VoteBeefDto): Promise<BeefVote> {
@@ -297,14 +321,21 @@ export class BeefService {
             where: { beef_id: beefId, voter_id: voterId },
         });
         if (existing) throw new ConflictException('Bereits gevotet');
-        await this.coinService.spendCoins(voterId, dto.coins_wagered, 'spent_vote', beefId);
+        await this.coinService.spendCoins(voterId, dto.coins_wagered, 'spent_vote', beefId, `beef:${beefId}:vote:${voterId}`);
         const vote = this.voteRepo.create({
             beef_id: beefId,
             voter_id: voterId,
             side: dto.side,
             coins_wagered: dto.coins_wagered,
         });
-        return this.voteRepo.save(vote);
+        const saved = await this.voteRepo.save(vote);
+        const allVotes = await this.voteRepo.find({ where: { beef_id: beefId } });
+        const iC = allVotes.filter(v => v.side === 'initiator').reduce((s, v) => s + v.coins_wagered, 0);
+        const tC = allVotes.filter(v => v.side === 'target').reduce((s, v) => s + v.coins_wagered, 0);
+        this.eventEmitter.emit('hidden.beef.vote', {
+            beefId, initiatorCoins: iC, targetCoins: tC, totalVotes: allVotes.length,
+        });
+        return saved;
     }
 
     async addComment(beefId: string, userId: string, dto: CommentBeefDto): Promise<BeefComment> {
@@ -319,8 +350,16 @@ export class BeefService {
         const saved = await this.commentRepo.save(comment);
         const count = await this.commentRepo.count({ where: { beef_id: beefId, user_id: userId } });
         if (count <= 3) {
-            await this.coinService.addCoins(userId, 5, 'earned_comment', beefId);
+            await this.coinService.addCoins(userId, 5, 'earned_comment', beefId, `beef:${beefId}:comment:${userId}:${count}`);
         }
+        this.eventEmitter.emit('hidden.beef.comment', {
+            beefId,
+            comment: {
+                id: saved.id, user_id: saved.user_id,
+                content: saved.content, created_at: saved.created_at,
+                nickname: null,
+            },
+        });
         return saved;
     }
 

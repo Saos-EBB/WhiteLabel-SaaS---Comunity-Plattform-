@@ -1,6 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
 
-export type NotificationType = 'message' | 'match' | 'system' | 'ban' | 'request';
+export type NotificationType =
+    'message' | 'match' | 'system' | 'ban' | 'request' |
+    'beef_request' | 'beef_accepted' | 'beef_won' | 'beef_lost';
 
 @Entity('notifications')
 export class Notification {
