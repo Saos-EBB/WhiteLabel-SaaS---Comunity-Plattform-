@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BeefController } from './beef.controller';
 import { BeefService } from './beef.service';
 import { BeefResolutionService } from './beef-resolution.service';
+import { BeefStateMachineService } from './beef-state-machine.service';
 import { BeefScheduler } from './beef.scheduler';
 import { HiddenBeefGateway } from './beef.gateway';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
@@ -32,7 +33,7 @@ import { NotificationsModule } from '../../core/notifications/notifications.modu
         NotificationsModule,
     ],
     controllers: [BeefController],
-    providers: [BeefService, BeefResolutionService, BeefScheduler, JwtGuard, HiddenBeefGateway],
+    providers: [BeefService, BeefResolutionService, BeefStateMachineService, BeefScheduler, JwtGuard, HiddenBeefGateway],
     exports: [BeefService],
 })
 export class BeefModule { }

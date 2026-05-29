@@ -19,6 +19,7 @@ import { CommentBeefDto } from './dto/comment-beef.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CoinService } from '../coin/coin.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
 
 @Injectable()
 export class BeefService {
@@ -36,6 +37,7 @@ export class BeefService {
         private readonly eventEmitter: EventEmitter2,
         private readonly dataSource: DataSource,
         private readonly resolutionService: BeefResolutionService,
+        private readonly stateMachine: BeefStateMachineService,
     ) { }
 
     async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
@@ -115,7 +117,7 @@ export class BeefService {
             await this.chickenBeef(beefId, 'manual');
             return (await this.beefRepo.findOne({ where: { id: beefId } }))!;
         }
-        beef.status = BeefStatus.ACTIVE;
+        this.stateMachine.transition(beef, BeefEvent.ACCEPT);
         beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
         await this.notificationsService.notifyBeefAccepted(beef.initiator_id, beef.id);
         return this.beefRepo.save(beef);
@@ -127,7 +129,7 @@ export class BeefService {
         if (beef.status !== BeefStatus.PENDING_APPROVAL)
             throw new BadRequestException('Bereits verarbeitet');
         beef.admin_approved = true;
-        beef.status = BeefStatus.WAITING;
+        this.stateMachine.transition(beef, BeefEvent.APPROVE);
         const saved = await this.beefRepo.save(beef);
         await this.notificationsService.notifyBeefRequest(beef.target_id, beef.id, beef.tldr);
         return saved;
@@ -212,6 +214,7 @@ export class BeefService {
     async closeBeef(beefId: string, random: () => number = Math.random): Promise<void> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         if (!beef || beef.status !== BeefStatus.ACTIVE) return;
+        this.stateMachine.transition(beef, BeefEvent.CLOSE);
         await this.resolutionService.resolve(beef, random);
     }
 
@@ -219,9 +222,10 @@ export class BeefService {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         if (!beef || beef.status !== BeefStatus.WAITING) return;
 
+        this.stateMachine.transition(beef, BeefEvent.CHICKEN);
         const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await this.dataSource.transaction(async (manager) => {
-            await manager.update(Beef, { id: beefId }, { status: BeefStatus.CHICKENED });
+            await manager.update(Beef, { id: beefId }, { status: beef.status });
             await manager.increment(User, { id: beef.target_id }, 'chicken_count', 1);
             // TODO: emit hidden.beef.exile event — Candidate 5 zone boundary
             await manager.update(User, { id: beef.initiator_id }, { exile_until });
