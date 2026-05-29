@@ -121,13 +121,7 @@ export class BeefService {
         }
         beef.status = BeefStatus.ACTIVE;
         beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
-        await this.notificationsService.createNotification(
-            beef.initiator_id,
-            'beef_accepted',
-            `Hat deinen Beef angenommen! Der Kampf beginnt 💪`,
-            'Beef angenommen',
-            beef.id,
-        );
+        await this.notificationsService.notifyBeefAccepted(beef.initiator_id, beef.id);
         return this.beefRepo.save(beef);
     }
 
@@ -139,13 +133,7 @@ export class BeefService {
         beef.admin_approved = true;
         beef.status = BeefStatus.WAITING;
         const saved = await this.beefRepo.save(beef);
-        await this.notificationsService.createNotification(
-            beef.target_id,
-            'beef_request',
-            `fordert dich zum Beef heraus: "${beef.tldr}" 🥊`,
-            'Beef Anfrage',
-            beef.id,
-        );
+        await this.notificationsService.notifyBeefRequest(beef.target_id, beef.id, beef.tldr);
         return saved;
     }
 
@@ -249,12 +237,8 @@ export class BeefService {
                 // ── Double KO — house takes all ─────────────────────────
                 await this.badgeService.createBadge(beef.initiator_id, beefId, 'loser', badgeDurationMs);
                 await this.badgeService.createBadge(beef.target_id,   beefId, 'loser', badgeDurationMs);
-                await this.notificationsService.createNotification(
-                    beef.initiator_id, 'beef_lost', 'Unentschieden — Double KO! 💥', 'Beef beendet', beefId,
-                );
-                await this.notificationsService.createNotification(
-                    beef.target_id, 'beef_lost', 'Unentschieden — Double KO! 💥', 'Beef beendet', beefId,
-                );
+                await this.notificationsService.notifyBeefLost(beef.initiator_id, beefId, true);
+                await this.notificationsService.notifyBeefLost(beef.target_id, beefId, true);
             } else {
                 const { winnerId, loserId, coinDistribution, correctVoters } = result;
 
@@ -285,14 +269,8 @@ export class BeefService {
                 await this.badgeService.createBadge(winnerId!, beefId, 'winner', badgeDurationMs);
                 await this.badgeService.createBadge(loserId!,  beefId, 'loser',  badgeDurationMs);
                 await this.teethService.awardTooth(winnerId!, loserId!, beefId);
-                await this.notificationsService.createNotification(
-                    winnerId!, 'beef_won',
-                    `Du hast den Beef gewonnen! 🏆 +${coinDistribution.winnerShare} Coins`,
-                    'Beef gewonnen', beefId,
-                );
-                await this.notificationsService.createNotification(
-                    loserId!, 'beef_lost', `Du hast den Beef verloren. 💀`, 'Beef verloren', beefId,
-                );
+                await this.notificationsService.notifyBeefWon(winnerId!, beefId, coinDistribution.winnerShare);
+                await this.notificationsService.notifyBeefLost(loserId!, beefId);
             }
         });
 
