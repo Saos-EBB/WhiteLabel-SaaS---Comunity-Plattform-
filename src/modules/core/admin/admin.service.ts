@@ -321,9 +321,8 @@ export class AdminService {
         });
         await this.strikeRepo.save(strike);
 
-        await this.notificationsService.createNotification(
+        await this.notificationsService.notifyBan(
             userId,
-            'ban',
             ban_expires_at
                 ? `Dein Konto wurde gesperrt bis ${ban_expires_at.toISOString()}: ${dto.reason}`
                 : `Dein Konto wurde dauerhaft gesperrt: ${dto.reason}`,
@@ -364,12 +363,9 @@ export class AdminService {
             [userId],
         );
 
-        await this.notificationsService.createNotification(
+        await this.notificationsService.notifyBan(
             userId,
-            'ban',
             'Deine Sperre wurde aufgehoben. Du kannst Paarship wieder normal nutzen.',
-            'Sperre aufgehoben',
-            userId,
         );
 
         this.eventEmitter.emit('user.unbanned', { userId });
@@ -590,9 +586,8 @@ export class AdminService {
             user.ban_expires_at = dto.expires_at ?? null;
             await this.userRepo.save(user);
 
-            await this.notificationsService.createNotification(
+            await this.notificationsService.notifyBan(
                 dto.user_id,
-                'ban',
                 dto.type === StrikeType.PERMANENT
                     ? `Dein Konto wurde dauerhaft gesperrt: ${dto.reason}`
                     : `Dein Konto wurde vorübergehend gesperrt: ${dto.reason}`,
