@@ -1,16 +1,18 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export type Role = 'user' | 'admin' | 'owner'
+
 export interface User {
   id: string
   user_id?: string
   email: string
-  role: 'user' | 'admin' | 'owner'
+  role: Role
   is_banned?: boolean
   [key: string]: unknown
 }
 
-interface AuthState {
+export interface AuthState {
   accessToken: string | null
   user: User | null
   isBanned: boolean
@@ -21,7 +23,7 @@ interface AuthState {
   clearAuth: () => void
 }
 
-function decodeJwtRole(token: string): 'user' | 'admin' | 'owner' {
+function decodeJwtRole(token: string): Role {
   try {
     const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
     if (payload.role === 'admin' || payload.role === 'owner') return payload.role
@@ -55,3 +57,23 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+
+export function selectUserRole(state: AuthState): Role | null
+export function selectUserRole(): Role | null
+export function selectUserRole(state?: AuthState): Role | null {
+  const token = (state ?? useAuthStore.getState()).accessToken
+  return token ? decodeJwtRole(token) : null
+}
+
+export function selectUserId(state: AuthState): string | null
+export function selectUserId(): string | null
+export function selectUserId(state?: AuthState): string | null {
+  const token = (state ?? useAuthStore.getState()).accessToken
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return (payload.sub as string) ?? null
+  } catch {
+    return null
+  }
+}
