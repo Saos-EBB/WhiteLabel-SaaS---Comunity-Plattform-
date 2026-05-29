@@ -18,6 +18,35 @@ export class NotificationsService {
         private readonly dataSource: DataSource,
     ) { }
 
+    async notifyBeefRequest(userId: string, beefId: string, tldr: string): Promise<void> {
+        await this.createNotification(userId, 'beef_request', `fordert dich zum Beef heraus: "${tldr}" 🥊`, 'Beef Anfrage', beefId);
+    }
+
+    async notifyBeefAccepted(userId: string, beefId: string): Promise<void> {
+        await this.createNotification(userId, 'beef_accepted', 'Hat deinen Beef angenommen! Der Kampf beginnt 💪', 'Beef angenommen', beefId);
+    }
+
+    async notifyBeefWon(userId: string, beefId: string, coinShare: number): Promise<void> {
+        await this.createNotification(userId, 'beef_won', `Du hast den Beef gewonnen! 🏆 +${coinShare} Coins`, 'Beef gewonnen', beefId);
+    }
+
+    async notifyBeefLost(userId: string, beefId: string, isTie = false): Promise<void> {
+        await this.createNotification(
+            userId, 'beef_lost',
+            isTie ? 'Unentschieden — Double KO! 💥' : 'Du hast den Beef verloren. 💀',
+            isTie ? 'Beef beendet' : 'Beef verloren',
+            beefId,
+        );
+    }
+
+    async notifyNewMessage(userId: string, conversationId: string): Promise<void> {
+        await this.createNotification(userId, 'message', 'Du hast eine neue Nachricht', 'Neue Nachricht', conversationId);
+    }
+
+    async notifyBan(userId: string, reason: string): Promise<void> {
+        await this.createNotification(userId, 'ban', reason);
+    }
+
     async createNotification(userId: string, type: NotificationType, content: string, title?: string, relatedId?: string): Promise<void> {
         const [row] = await this.dataSource.query<{ role: string }[]>(
             'SELECT role FROM users WHERE id = $1 LIMIT 1',
