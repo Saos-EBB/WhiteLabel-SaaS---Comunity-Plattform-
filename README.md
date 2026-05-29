@@ -499,6 +499,14 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
+### 2026-05-29 (latest)
+- Shared: new `SharedModule` (`src/modules/shared/`) — global module exports `TypedEventBus`, `AppEvents` constants, and typed payload interfaces; all cross-module emitters and `@OnEvent` listeners now use strongly-typed keys instead of raw strings
+- Events: `TypedEventBus` wraps `EventEmitter2` with generic `emit<K>(event, payload)` / `on<K>(event, handler)` — payload shapes enforced at compile time; `BeefService`, `BeefGateway`, and `ChatService` migrated
+- Beef: `BeefStateMachineService` (`beef.statemachine.ts`) — formal state machine with `BeefEvent` enum (`APPROVE`, `ACCEPT`, `CHICKEN`, `CLOSE`) and `BadTransitionError`; `BeefService` delegates all status transitions to it, removing direct `status = X` assignments
+- Beef: `BeefResolutionService` — transactional `resolve()` handles winner/loser badge creation, tooth awards, and coin payouts in a single DB transaction; race condition on simultaneous coin spends fixed
+- Notifications: `NotificationsService` gains domain-specific helpers (`notifyBan`, `notifyUnban`, `notifyNewMessage`, etc.) — removes raw notification type-string literals from `AdminService`, `ModerationService`, `ChatService`, and `BeefService`
+- Profile: `ProfileView` and `PublicProfile` typed interfaces added; `ProfileService.getOwnProfileWithPhoto()` and `getPublicProfile()` return these types explicitly; controller methods annotated accordingly
+
 ### 2026-05-28 (latest)
 - Notifications: migration `026_notification_beef_types.sql` — adds `beef_request`, `beef_accepted`, `beef_won`, `beef_lost` values to `notification_type` enum
 - Beef: `duration_seconds INT NOT NULL DEFAULT 86400` column added to `beefs` table; migration `025_beef_duration.sql`; `Beef` entity updated; `CreateBeefDto` gains optional `duration_seconds` (int, min 900 = 15 min, max 172800 = 48 h)
