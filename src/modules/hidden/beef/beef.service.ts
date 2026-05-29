@@ -16,10 +16,10 @@ import { CreateBeefDto } from './dto/create-beef.dto';
 import { RespondBeefDto } from './dto/respond-beef.dto';
 import { VoteBeefDto } from './dto/vote-beef.dto';
 import { CommentBeefDto } from './dto/comment-beef.dto';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CoinService } from '../coin/coin.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
+import { TypedEventBus, AppEvents } from '../../shared/events/app-events';
 
 @Injectable()
 export class BeefService {
@@ -34,7 +34,7 @@ export class BeefService {
         private readonly userRepo: Repository<User>,
         private readonly coinService: CoinService,
         private readonly notificationsService: NotificationsService,
-        private readonly eventEmitter: EventEmitter2,
+        private readonly typedEventBus: TypedEventBus,
         private readonly dataSource: DataSource,
         private readonly resolutionService: BeefResolutionService,
         private readonly stateMachine: BeefStateMachineService,
@@ -252,7 +252,7 @@ export class BeefService {
         const allVotes = await this.voteRepo.find({ where: { beef_id: beefId } });
         const iC = allVotes.filter(v => v.side === 'initiator').reduce((s, v) => s + v.coins_wagered, 0);
         const tC = allVotes.filter(v => v.side === 'target').reduce((s, v) => s + v.coins_wagered, 0);
-        this.eventEmitter.emit('hidden.beef.vote', {
+        this.typedEventBus.emit(AppEvents.beefVote, {
             beefId, initiatorCoins: iC, targetCoins: tC, totalVotes: allVotes.length,
         });
         return saved;
@@ -272,7 +272,7 @@ export class BeefService {
         if (count <= 3) {
             await this.coinService.addCoins(userId, 5, 'earned_comment', beefId, `beef:${beefId}:comment:${userId}:${count}`);
         }
-        this.eventEmitter.emit('hidden.beef.comment', {
+        this.typedEventBus.emit(AppEvents.beefComment, {
             beefId,
             comment: {
                 id: saved.id, user_id: saved.user_id,
