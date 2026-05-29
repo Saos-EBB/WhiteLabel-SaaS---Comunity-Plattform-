@@ -4,6 +4,7 @@ import {
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { OnEvent } from '@nestjs/event-emitter'
+import { AppEvents } from '../../shared/events/app-events'
 
 @WebSocketGateway({
   namespace: '/hidden-beef',
@@ -26,7 +27,7 @@ export class HiddenBeefGateway {
     client.leave(`beef:${beefId}`)
   }
 
-  @OnEvent('hidden.beef.vote')
+  @OnEvent(AppEvents.beefVote)
   onVote(payload: { beefId: string; initiatorCoins: number; targetCoins: number; totalVotes: number }) {
     this.server.to(`beef:${payload.beefId}`).emit('beef:vote_update', {
       initiator_coins: payload.initiatorCoins,
@@ -35,12 +36,12 @@ export class HiddenBeefGateway {
     })
   }
 
-  @OnEvent('hidden.beef.comment')
+  @OnEvent(AppEvents.beefComment)
   onComment(payload: { beefId: string; comment: any }) {
     this.server.to(`beef:${payload.beefId}`).emit('beef:comment_new', payload.comment)
   }
 
-  @OnEvent('hidden.beef.closed')
+  @OnEvent(AppEvents.beefClosed)
   onClosed(payload: { beefId: string; winnerId: string | null }) {
     this.server.to(`beef:${payload.beefId}`).emit('beef:closed', { winner_id: payload.winnerId })
   }
