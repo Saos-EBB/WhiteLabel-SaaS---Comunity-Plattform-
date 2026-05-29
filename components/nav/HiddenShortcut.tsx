@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Coins } from 'lucide-react'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
-import { initLogoLetters, startShaking, triggerBreak } from '@/lib/physics/letterPhysics'
+import { runLogoBreak } from '@/lib/physics/letterPhysics'
 import { playHiddenAudio } from '@/hooks/useHiddenZone'
 import { fetchApi } from '@/lib/api'
 
@@ -26,14 +26,11 @@ export function HiddenLogoButton() {
       const rect = logoButtonRef.current?.getBoundingClientRect()
       const text = logoButtonRef.current?.textContent ?? ''
       if (rect && text) {
-        initLogoLetters(text, rect)
-        startShaking()
-        setTimeout(() => triggerBreak(), 700)
+        runLogoBreak(text, rect, () => {
+          playHiddenAudio()
+          openOverlay()
+        })
       }
-      setTimeout(() => {
-        playHiddenAudio()
-        openOverlay()
-      }, 900)
       resetClickCount()
     } else {
       logoResetTimerRef.current = setTimeout(() => resetClickCount(), 3000)
