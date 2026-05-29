@@ -11,12 +11,22 @@ type StatusMessage = 'available' | 'looking_for_chat' | 'looking_for_date' | 'bu
 export function StatusPicker() {
   const { t }        = useTranslation()
   const accessToken  = useAuthStore((s) => s.accessToken)
+  const user         = useAuthStore((s) => s.user)
 
-  const [statusOpen, setStatusOpen]       = useState(false)
-  const [statusVisible, setStatusVisible] = useState(true)
-  const [statusMessage, setStatusMessage] = useState<StatusMessage>(null)
-  const [statusSaving, setStatusSaving]   = useState(false)
-  const statusRef                         = useRef<HTMLDivElement>(null)
+  // Optimistic overrides — null/undefined means "use store value"
+  const [pendingVisible, setPendingVisible] = useState<boolean | null>(null)
+  const [pendingMessage, setPendingMessage] = useState<StatusMessage | 'unset'>('unset')
+  const [statusSaving, setStatusSaving]     = useState(false)
+  const [statusOpen, setStatusOpen]         = useState(false)
+  const statusRef                           = useRef<HTMLDivElement>(null)
+
+  // Derive effective values from store; pending override wins while saving
+  const statusVisible = pendingVisible !== null
+    ? pendingVisible
+    : ((user?.status_visible as boolean | undefined) ?? true)
+  const statusMessage = pendingMessage !== 'unset'
+    ? pendingMessage
+    : ((user?.status_message as StatusMessage | undefined) ?? null)
 
   const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] = [
     { value: 'available',        label: t.status.available,      color: '#4ade80' },
@@ -25,15 +35,6 @@ export function StatusPicker() {
     { value: 'busy',             label: t.status.busy,           color: '#f59e0b' },
     { value: 'do_not_disturb',   label: t.status.doNotDisturb,   color: '#f87171' },
   ]
-
-  useEffect(() => {
-    fetchApi<{ status_visible: boolean; status_message: StatusMessage }>('/profile/me')
-      .then((p) => {
-        setStatusVisible(p.status_visible)
-        setStatusMessage(p.status_message)
-      })
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (!statusOpen) return
@@ -46,22 +47,25 @@ export function StatusPicker() {
 
   async function handleSetStatus(value: StatusMessage) {
     if (statusSaving) return
-    setStatusMessage(value)
+    setPendingMessage(value)
     setStatusSaving(true)
     try {
       await fetchApi('/profile/me', {
         method: 'PUT',
         body: JSON.stringify({ status_message: value }),
       })
-    } catch {}
-    finally { setStatusSaving(false) }
+    } catch {
+      setPendingMessage('unset')
+    } finally {
+      setStatusSaving(false)
+    }
     setStatusOpen(false)
   }
 
   async function handleToggleVisible() {
     if (statusSaving) return
     const next = !statusVisible
-    setStatusVisible(next)
+    setPendingVisible(next)
     setStatusSaving(true)
     try {
       await fetchApi('/profile/me', {
@@ -69,7 +73,7 @@ export function StatusPicker() {
         body: JSON.stringify({ status_visible: next }),
       })
     } catch {
-      setStatusVisible(!next)
+      setPendingVisible(null)
     } finally {
       setStatusSaving(false)
     }

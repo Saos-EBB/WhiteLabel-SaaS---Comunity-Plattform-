@@ -49,7 +49,8 @@ type AdminTab = 'tickets' | 'media' | 'users' | 'reports' | 'strikes' | 'profani
 export default function AdminPage() {
   const { t } = useTranslation()
   const router = useRouter()
-  const { accessToken } = useAuthStore()
+  // Selector instead of full store — prevents re-render on setUser/setBanned
+  const accessToken = useAuthStore((s) => s.accessToken)
   const isHidden = useHiddenStore((s) => s.isHidden)
 
   const [activeTab, setActiveTab] = useState<AdminTab>('tickets')
@@ -73,13 +74,21 @@ export default function AdminPage() {
 
   const role = getJwtRole(accessToken)
   const isOwner = role === 'owner'
+  // Gate: tabs only mount once auth is confirmed — prevents unauthenticated API bursts
+  const tabsReady = hydrated && (role === 'admin' || role === 'owner')
+
+  const routerRef = useRef(router)
+  routerRef.current = router
 
   useEffect(() => {
     if (!hydrated) return
     if (role !== 'admin' && role !== 'owner') {
-      router.replace('/dashboard')
+      routerRef.current.replace('/dashboard')
     }
-  }, [hydrated, accessToken, role, router])
+  // router removed from deps — accessed via ref to prevent re-runs on every render
+  // accessToken removed — redundant since role already derives from it
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, role])
 
   useEffect(() => {
     return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
@@ -189,10 +198,10 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* Tab panels */}
-        {activeTab === 'tickets'    && <TicketsTab showToast={showToast} />}
-        {activeTab === 'media'      && <MediaTab showToast={showToast} />}
-        {activeTab === 'users'      && (
+        {/* Tab panels — only rendered once auth is confirmed (tabsReady) */}
+        {tabsReady && activeTab === 'tickets'    && <TicketsTab showToast={showToast} />}
+        {tabsReady && activeTab === 'media'      && <MediaTab showToast={showToast} />}
+        {tabsReady && activeTab === 'users'      && (
           <UsersTab
             showToast={showToast}
             onBanOpen={onBanOpen}
@@ -200,7 +209,7 @@ export default function AdminPage() {
             banTrigger={banTrigger}
           />
         )}
-        {activeTab === 'reports'    && (
+        {tabsReady && activeTab === 'reports'    && (
           <ReportsTab
             showToast={showToast}
             onBanOpen={onBanOpen}
@@ -208,11 +217,11 @@ export default function AdminPage() {
             banTrigger={banTrigger}
           />
         )}
-        {activeTab === 'strikes'    && <StrikesTab showToast={showToast} />}
-        {activeTab === 'profanity'  && <ProfanityTab showToast={showToast} />}
-        {activeTab === 'settings'   && <SettingsTab showToast={showToast} />}
-        {activeTab === 'verwaltung' && <VerwaltungTab showToast={showToast} isOwner={isOwner} />}
-        {activeTab === 'beef'       && (
+        {tabsReady && activeTab === 'strikes'    && <StrikesTab showToast={showToast} />}
+        {tabsReady && activeTab === 'profanity'  && <ProfanityTab showToast={showToast} />}
+        {tabsReady && activeTab === 'settings'   && <SettingsTab showToast={showToast} />}
+        {tabsReady && activeTab === 'verwaltung' && <VerwaltungTab showToast={showToast} isOwner={isOwner} />}
+        {tabsReady && activeTab === 'beef'       && (
           <BeefTab
             showToast={showToast}
             onCountChange={setPendingBeefsCount}

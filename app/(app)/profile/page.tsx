@@ -68,6 +68,8 @@ function formatGermanDate(dateStr: string): string {
 export default function ProfilePage() {
   const { t } = useTranslation()
 
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const hasFetched  = useRef(false)
   const isHidden = useHiddenStore((s) => s.isHidden)
   const [exileUntil, setExileUntil] = useState<string | null>(null)
   const [leavingExile, setLeavingExile] = useState(false)
@@ -121,6 +123,9 @@ export default function ProfilePage() {
   // ── Load ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!accessToken || hasFetched.current) return
+    hasFetched.current = true
+
     async function load() {
       try {
         const [prof, ui, ai] = await Promise.all([
@@ -152,8 +157,7 @@ export default function ProfilePage() {
       }
     }
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [accessToken])
 
   useEffect(() => {
     if (!isHidden) return

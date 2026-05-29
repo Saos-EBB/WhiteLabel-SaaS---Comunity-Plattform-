@@ -9,6 +9,7 @@ export interface User {
   email: string
   role: Role
   is_banned?: boolean
+  onboardingCompleted?: boolean
   [key: string]: unknown
 }
 

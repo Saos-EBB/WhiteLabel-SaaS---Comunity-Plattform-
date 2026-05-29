@@ -2,14 +2,20 @@
 
 import Link from 'next/link'
 import { Inbox } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNotificationStore } from '@/lib/store/notificationStore'
+import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
 
 export function AdminBadge() {
   const ticketCount = useNotificationStore((s) => s.adminTicketCount)
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const hasFetched  = useRef(false)
 
   useEffect(() => {
+    if (!accessToken || hasFetched.current) return
+    hasFetched.current = true
+
     async function loadCount() {
       try {
         const [reports, support] = await Promise.all([
@@ -20,7 +26,7 @@ export function AdminBadge() {
       } catch {}
     }
     loadCount()
-  }, [])
+  }, [accessToken])
 
   return (
     <Link

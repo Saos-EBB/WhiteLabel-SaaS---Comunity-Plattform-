@@ -626,6 +626,14 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-29 (latest)
+- Bug fix (`hooks/useBootstrap.ts`): `user.onboarding_completed` → `user.onboardingCompleted` — matches camelCase JSON from backend; was causing the onboarding redirect to never trigger
+- Bug fix (`lib/store/authStore.ts`): `onboardingCompleted?: boolean` added to `User` interface — `[key: string]: unknown` had silently allowed the misspelled snake_case access without a type error
+- Bug fix (`components/nav/NotificationBell.tsx`): missing `useAuthStore` import added — caused `useAuthStore is not defined` runtime crash
+- Bug fix (`app/layout.tsx`): `<Script strategy="beforeInteractive">` moved from `<head>` to start of `<body>` — Next.js throws a React rendering error for inline script children inside `<head>`
+- `lib/api.ts`: `tryRefresh()` now uses a singleton promise lock (`refreshPromise`) — prevents concurrent 401 responses from each firing their own refresh, which consumed the single-use token and caused a cascade of failed refreshes and redirect loops
+- Admin (`/admin`): `tabsReady` gate added — tab panels only mount after hydration and role confirmation to prevent unauthenticated API bursts; `useAuthStore()` replaced with a selector (`(s) => s.accessToken`) to suppress unnecessary re-renders; `router` accessed via ref in the redirect effect to remove it from deps
+
+### 2026-05-29
 - Hidden Zone consolidated into `hooks/useHiddenZone.ts`: absorbs audio logic (deleted `lib/hiddenAudio.ts`), CSS theme class application, and logout lock from `HiddenInitializer`; exposes `checkPassword()` used by `HiddenEntryOverlay`; `HiddenInitializer` reduced to a 3-line rendering adapter
 
 ### 2026-05-29

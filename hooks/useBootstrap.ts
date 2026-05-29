@@ -12,18 +12,12 @@ export function useBootstrap() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isReady, setIsReady] = useState(false)
-  const setBanned = useAuthStore((s) => s.setBanned)
 
   useEffect(() => {
     if (hasFetched.current) return
     hasFetched.current = true
 
-    const { accessToken, setUser } = useAuthStore.getState()
-    if (!accessToken) {
-      router.replace('/login')
-      setIsLoading(false)
-      return
-    }
+    const { setUser, setBanned } = useAuthStore.getState()
 
     fetchApi<User>('/profile/me')
       .then((user) => {
@@ -37,7 +31,7 @@ export function useBootstrap() {
           high_contrast: user.high_contrast,
           lang_simple: user.lang_simple,
         })
-        if (!user.is_banned && !user.onboarding_completed) {
+        if (!user.is_banned && !user.onboardingCompleted) {
           if (!window.location.pathname.startsWith('/onboarding')) {
             router.push('/onboarding')
           }
@@ -51,7 +45,8 @@ export function useBootstrap() {
         }
         setIsLoading(false)
       })
-  }, [router, setBanned])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return { isLoading, isReady }
 }

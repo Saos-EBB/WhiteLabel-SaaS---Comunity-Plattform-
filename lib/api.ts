@@ -6,19 +6,31 @@ export function normalise<T>(res: T[] | { data: T[] }): T[] {
   return Array.isArray(res) ? res : (res as { data: T[] }).data ?? []
 }
 
+// Ensures only one token refresh runs at a time — concurrent 401 handlers
+// reuse the same promise instead of each calling POST /auth/refresh separately.
+// Without this, a single-use refresh token gets consumed by the first caller
+// and the rest see a failed refresh, triggering logout() and a redirect loop.
+let refreshPromise: Promise<boolean> | null = null
+
 async function tryRefresh(): Promise<boolean> {
-  try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-    if (!res.ok) return false
-    const data = await res.json() as { accessToken: string }
-    useAuthStore.getState().setAccessToken(data.accessToken)
-    return true
-  } catch {
-    return false
-  }
+  if (refreshPromise) return refreshPromise
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) return false
+      const data = await res.json() as { accessToken: string }
+      useAuthStore.getState().setAccessToken(data.accessToken)
+      return true
+    } catch {
+      return false
+    } finally {
+      refreshPromise = null
+    }
+  })()
+  return refreshPromise
 }
 
 interface FetchApiOptions extends RequestInit {

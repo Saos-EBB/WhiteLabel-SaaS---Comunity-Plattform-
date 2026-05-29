@@ -6,26 +6,12 @@ import {
   Bell, ChevronRight, Compass, Crown, Heart, Loader2,
   MessageCircle, Shield, UserCheck, UserPlus,
 } from 'lucide-react'
-import { fetchApi, normalise } from '@/lib/api'
+import { fetchApi } from '@/lib/api'
 import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
+import { useNotificationStore } from '@/lib/store/notificationStore'
 import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Profile {
-  nickname: string
-  photo_id: string | null
-  onboarding_completed: boolean
-  is_published: boolean
-}
-
-interface Notification {
-  id: string
-  type: string
-  content: string
-  is_read: boolean
-  created_at: string
-}
 
 interface UserStats {
   pendingRequests: number
@@ -155,12 +141,12 @@ function StatRowSkeleton({ cols }: { cols: number }) {
 export default function DashboardPage() {
   const { t, locale } = useTranslation()
   const role = useAuthStore(selectUserRole)
+  const user = useAuthStore((s) => s.user)
   const isAdmin = role === 'admin' || role === 'owner'
   const isOwner = role === 'owner'
 
-  // Profile + notifications
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  // Notifications come from the shared store (populated by NotificationBell)
+  const notifications = useNotificationStore((s) => s.notifications)
   const [baseLoading, setBaseLoading] = useState(true)
 
   // Role-based stats
@@ -177,18 +163,13 @@ export default function DashboardPage() {
     if (role === null) return
 
     // Base data for all users
-    Promise.all([
-      fetchApi<Profile>('/profile/me'),
-      fetchApi<Notification[] | { data: Notification[] }>('/notifications'),
-      fetchApi<UserStats>('/admin/dashboard/user-stats'),
-    ]).then(([prof, notifs, stats]) => {
-      setProfile(prof)
-      setNotifications(normalise(notifs))
-      setUserStats(stats)
-    }).catch(() => {}).finally(() => {
-      setBaseLoading(false)
-      setUserStatsLoading(false)
-    })
+    fetchApi<UserStats>('/admin/dashboard/user-stats')
+      .then((stats) => setUserStats(stats))
+      .catch(() => {})
+      .finally(() => {
+        setBaseLoading(false)
+        setUserStatsLoading(false)
+      })
 
     // Admin stats
     if (role === 'admin' || role === 'owner') {
@@ -237,9 +218,9 @@ export default function DashboardPage() {
       >
         <div>
           <h1 className="text-2xl font-bold text-on-surface leading-tight flex items-center gap-2">
-            {baseLoading
+            {(baseLoading || !user)
               ? <SkeletonPulse className="h-8 w-64 inline-block" />
-              : t.dashboard.welcome.replace('{nickname}', profile?.nickname ?? '')}
+              : t.dashboard.welcome.replace('{nickname}', (user.nickname as string | undefined) ?? '')}
             {isOwner && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 ml-1">
                 <Crown className="h-3 w-3" aria-hidden="true" />

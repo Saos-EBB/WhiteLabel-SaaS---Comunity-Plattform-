@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeInitializer } from "@/components/ThemeInitializer";
 import { HiddenInitializer } from "@/components/HiddenInitializer";
@@ -21,14 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('xxx-theme');var theme=t?JSON.parse(t).state?.theme:null;document.documentElement.classList.add(theme==='light'?'light':'dark');}catch(e){document.documentElement.classList.add('dark');}})();`,
-          }}
-        />
-      </head>
+      <head />
       <body className={`${plusJakartaSans.variable} bg-background min-h-screen font-sans text-on-surface`}>
+        <Script id="theme-init" strategy="beforeInteractive">{`(function(){try{var t=localStorage.getItem('xxx-theme');var theme=t?JSON.parse(t).state?.theme:null;document.documentElement.classList.add(theme==='light'?'light':'dark');}catch(e){document.documentElement.classList.add('dark');}})();`}</Script>
         <ThemeInitializer />
         <HiddenInitializer />
         {children}

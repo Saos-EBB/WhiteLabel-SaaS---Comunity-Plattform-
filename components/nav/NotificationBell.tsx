@@ -11,6 +11,7 @@ import {
 } from '@/lib/store/notificationStore'
 import { fetchApi } from '@/lib/api'
 import { useTranslation } from '@/lib/i18n'
+import { useAuthStore } from '@/lib/store/authStore'
 
 const TYPE_ICONS: Record<NotificationType, ElementType> = {
   message:       MessageCircle,
@@ -71,9 +72,10 @@ export function NotificationBell() {
   const [activeTab, setActiveTab] = useState<'neu' | 'verlauf'>('neu')
   const bellRef = useRef<HTMLDivElement>(null)
 
-  const seenRequestIdsRef     = useRef(new Set<string>())
-  const isFirstRequestPollRef = useRef(true)
+  const seenRequestIdsRef = useRef(new Set<string>())
+  const hasFetched        = useRef(false)
 
+  const accessToken   = useAuthStore((s) => s.accessToken)
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount   = useNotificationStore((s) => s.unreadCount)
   const displayUnread = pathname.startsWith('/chat/')
@@ -81,6 +83,9 @@ export function NotificationBell() {
     : unreadCount
 
   useEffect(() => {
+    if (!accessToken || hasFetched.current) return
+    hasFetched.current = true
+
     async function load() {
       try {
         const data = await fetchApi<AppNotification[]>('/notifications')
@@ -94,8 +99,7 @@ export function NotificationBell() {
       } catch {}
     }
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [accessToken])
 
   useEffect(() => {
     if (!bellOpen) return
