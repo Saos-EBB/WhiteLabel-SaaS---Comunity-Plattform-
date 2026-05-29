@@ -276,3 +276,10 @@ export function cleanup(): void {
   letters.forEach((d) => d.el.remove())
   letters = []
 }
+
+export function runLogoBreak(text: string, rect: DOMRect, onDone?: () => void): void {
+  initLogoLetters(text, rect)
+  startShaking()
+  setTimeout(() => triggerBreak(), 700)
+  setTimeout(() => onDone?.(), 900)
+}
