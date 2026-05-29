@@ -33,6 +33,48 @@ interface NotificationState {
   incrementAdminTicketCount: () => void
 }
 
+export function mergeNotification(existing: Notification[], incoming: Notification): Notification[] {
+  if (incoming.type === 'message' && incoming.conversation_id) {
+    const idx = existing.findIndex(
+      (n) => n.type === 'message' && !n.is_read && n.conversation_id === incoming.conversation_id,
+    )
+    if (idx !== -1) {
+      const prev = existing[idx]
+      const newCount = (prev.count ?? 1) + 1
+      const next = [...existing]
+      next[idx] = { ...prev, count: newCount, content: `${newCount} neue Nachrichten`, created_at: incoming.created_at }
+      return next
+    }
+  }
+
+  if (incoming.type === 'request') {
+    const idx = existing.findIndex((n) => n.type === 'request' && !n.is_read)
+    const addCount = incoming.count ?? 1
+    if (idx !== -1) {
+      const prev = existing[idx]
+      const newCount = (prev.count ?? 1) + addCount
+      const next = [...existing]
+      next[idx] = {
+        ...prev,
+        count: newCount,
+        content: newCount === 1 ? '1 neue Kontaktanfrage' : `${newCount} neue Kontaktanfragen`,
+        created_at: incoming.created_at,
+      }
+      return next
+    }
+    const count = addCount
+    const content = count === 1 ? '1 neue Kontaktanfrage' : `${count} neue Kontaktanfragen`
+    return [{ ...incoming, count, content }, ...existing]
+  }
+
+  if (incoming.type === 'system') {
+    return [incoming, ...existing.filter((n) => n.type !== 'system')]
+  }
+
+  if (existing.some((n) => n.id === incoming.id)) return existing
+  return [{ ...incoming, count: 1 }, ...existing]
+}
+
 export const useNotificationStore = create<NotificationState>()((set) => ({
   notifications: [],
   unreadCount: 0,
@@ -53,57 +95,10 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
       const notifications = [notification, ...state.notifications]
       return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
     }),
-  addOrUpdateNotification: (notification) =>
-    set((state) => {
-      // Group message notifications by conversation
-      if (notification.type === 'message' && notification.conversation_id) {
-        const idx = state.notifications.findIndex(
-          (n) =>
-            n.type === 'message' &&
-            !n.is_read &&
-            n.conversation_id === notification.conversation_id
-        )
-        if (idx !== -1) {
-          const existing = state.notifications[idx]
-          const newCount = (existing.count ?? 1) + 1
-          const notifications = [...state.notifications]
-          notifications[idx] = {
-            ...existing,
-            count: newCount,
-            content: `${newCount} neue Nachrichten`,
-            created_at: notification.created_at,
-          }
-          return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
-        }
-      }
-
-      // Group all request notifications into a single entry; count may be batched (>1)
-      if (notification.type === 'request') {
-        const idx = state.notifications.findIndex(
-          (n) => n.type === 'request' && !n.is_read
-        )
-        const addCount = notification.count ?? 1
-        if (idx !== -1) {
-          const existing = state.notifications[idx]
-          const newCount = (existing.count ?? 1) + addCount
-          const notifications = [...state.notifications]
-          notifications[idx] = {
-            ...existing,
-            count: newCount,
-            content: newCount === 1 ? '1 neue Kontaktanfrage' : `${newCount} neue Kontaktanfragen`,
-            created_at: notification.created_at,
-          }
-          return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
-        }
-        const count = addCount
-        const content = count === 1 ? '1 neue Kontaktanfrage' : `${count} neue Kontaktanfragen`
-        const notifications = [{ ...notification, count, content }, ...state.notifications]
-        return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
-      }
-
-      if (state.notifications.some((n) => n.id === notification.id)) return state
-      const notifications = [{ ...notification, count: 1 }, ...state.notifications]
-      return { notifications, unreadCount: notifications.filter((n) => !n.is_read).length }
+  addOrUpdateNotification: (n) =>
+    set((s) => {
+      const notifications = mergeNotification(s.notifications, n)
+      return { notifications, unreadCount: notifications.filter((x) => !x.is_read).length }
     }),
   markRead: (id) =>
     set((state) => {
