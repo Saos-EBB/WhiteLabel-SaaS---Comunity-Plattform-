@@ -1,6 +1,6 @@
-import type { Translations } from './de'
+import type { Translations } from './types'
 
-export const it: Translations = {
+export const it = {
   common: {
     save: 'Salva',
     cancel: 'Annulla',
@@ -560,4 +560,4 @@ export const it: Translations = {
     profanityRemoveAriaLabel: 'Rimuovi {word}',
     autoSuspendBadge: 'Sospensione automatica',
   },
-}
+} satisfies Translations
