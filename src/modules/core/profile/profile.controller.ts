@@ -23,6 +23,7 @@ import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SearchProfileDto } from './dto/search-profile.dto';
 import { SubmitSensitiveDataDto } from './dto/submit-sensitive-data.dto';
+import { ProfileView, PublicProfile } from './profile.types';
 
 const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'];
 
@@ -37,7 +38,7 @@ export class ProfileController {
 
     @Get('me')
     @UseGuards(JwtGuard)
-    getOwnProfile(@Request() req: any) {
+    getOwnProfile(@Request() req: any): Promise<ProfileView> {
         return this.profileService.getOwnProfileWithPhoto(req.user.sub);
     }
 
@@ -167,7 +168,7 @@ export class ProfileController {
 
     @Get(':nickname')
     @UseGuards(OptionalJwtGuard)
-    getPublicProfile(@Request() req: any, @Param('nickname') nickname: string) {
+    getPublicProfile(@Request() req: any, @Param('nickname') nickname: string): Promise<PublicProfile> {
         return this.profileService.getPublicProfile(nickname, req.user?.sub ?? null);
     }
 
