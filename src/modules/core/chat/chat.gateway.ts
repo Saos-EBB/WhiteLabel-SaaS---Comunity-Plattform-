@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { OnEvent } from '@nestjs/event-emitter';
+import { AppEvents } from '../../shared/events/app-events';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -86,9 +87,12 @@ for (const conv of conversations) {
         this.emitToUser(payload.userId, 'notification', payload.notification);
     }
 
-    @OnEvent('contact_request.created')
-    handleContactRequestCreated(payload: { recipientId: string; request: any }) {
-        this.emitToUser(payload.recipientId, 'contact_request', payload.request);
+    @OnEvent(AppEvents.contactRequest)
+    handleContactRequestCreated(payload: { requestId: string; senderId: string; receiverId: string }) {
+        this.emitToUser(payload.receiverId, 'contact_request', {
+            requestId: payload.requestId,
+            senderId: payload.senderId,
+        });
     }
 
     @OnEvent('contact_request.accepted')
