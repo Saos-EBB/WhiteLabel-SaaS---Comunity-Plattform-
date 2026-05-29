@@ -285,7 +285,7 @@ export class ChatService {
     }
 
     async sendMessage(userId: string, conversationId: string, dto: SendMessageDto) {
-        await this.verifyConversationAccess(userId, conversationId);
+        const conversation = await this.verifyConversationAccess(userId, conversationId);
 
         const message = this.messageRepository.create({
             conversation_id: conversationId,
@@ -299,6 +299,9 @@ export class ChatService {
         if (dto.content && this.profanityService.check(dto.content)) {
             this.profanityService.flagUser(userId, '', 'chat').catch(() => {});
         }
+
+        const recipientId = conversation.user_a_id === userId ? conversation.user_b_id : conversation.user_a_id;
+        this.notificationsService.notifyNewMessage(recipientId, conversationId).catch(() => {});
 
         return saved;
     }

@@ -102,11 +102,7 @@ export class ModerationService {
         });
         await this.strikeRepository.save(strike);
 
-        await this.notificationsService.createNotification(
-            reportedUserId,
-            'system',
-            'Dein Konto wurde gesperrt',
-        );
+        await this.notificationsService.notifyBan(reportedUserId, 'Dein Konto wurde gesperrt');
 
         const email = decryptEmail(user.email as Buffer | null);
         if (email) {
