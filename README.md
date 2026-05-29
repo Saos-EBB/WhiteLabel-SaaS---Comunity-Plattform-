@@ -625,6 +625,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
+### 2026-05-29 (latest)
+- `TopNav` split into 4 focused sub-components: `NotificationBell` (bell dropdown + notification fetch), `StatusPicker` (status dot + dropdown + API writes), `AdminBadge` (ticket inbox icon + initial count fetch), `HiddenShortcut` (logo 13-click Easter egg + coin balance + theme toggle + shop modal via React portal); `TopNav` reduced to a thin layout shell with no local state or effects
+
 ### 2026-05-28 (latest)
 - Notifications: `notificationStore` — `NotificationType` extended with `beef_request`, `beef_accepted`, `beef_won`, `beef_lost`; `notifications/page.tsx` — `TYPE_ICONS` (Swords / Trophy) and `TYPE_LABELS` wired for all four beef notification types
 - Chat (`/chat/[id]`): beef creation modal — duration selector added to TLDR step (6 presets: 15 Min / 1 Stunde / 6 Stunden / 12 Stunden / 24 Stunden / 48 Stunden); selected `duration_seconds` sent in `POST /hidden/beef` body; resets to 86400 on modal close
