@@ -12,14 +12,14 @@ import { Beef } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
 import { BeefComment } from './entities/beef-comment.entity';
 import { User } from '../../core/auth/entities/user.entity';
+import { Badge } from '../badge/entities/badge.entity';
+import { Tooth } from '../teeth/entities/tooth.entity';
 import { CoinModule } from '../coin/coin.module';
-import { BadgeModule } from '../badge/badge.module';
-import { TeethModule } from '../teeth/teeth.module';
 import { NotificationsModule } from '../../core/notifications/notifications.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Beef, BeefVote, BeefComment, User]),
+        TypeOrmModule.forFeature([Beef, BeefVote, BeefComment, User, Badge, Tooth]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => ({
@@ -29,8 +29,6 @@ import { NotificationsModule } from '../../core/notifications/notifications.modu
             inject: [ConfigService],
         }),
         CoinModule,
-        BadgeModule,
-        TeethModule,
         NotificationsModule,
     ],
     controllers: [BeefController],

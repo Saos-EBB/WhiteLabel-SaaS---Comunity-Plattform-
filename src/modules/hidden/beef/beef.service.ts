@@ -18,8 +18,6 @@ import { VoteBeefDto } from './dto/vote-beef.dto';
 import { CommentBeefDto } from './dto/comment-beef.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CoinService } from '../coin/coin.service';
-import { BadgeService } from '../badge/badge.service';
-import { TeethService } from '../teeth/teeth.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 
 @Injectable()
@@ -34,8 +32,6 @@ export class BeefService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly coinService: CoinService,
-        private readonly badgeService: BadgeService,
-        private readonly teethService: TeethService,
         private readonly notificationsService: NotificationsService,
         private readonly eventEmitter: EventEmitter2,
         private readonly dataSource: DataSource,
@@ -216,65 +212,7 @@ export class BeefService {
     async closeBeef(beefId: string, random: () => number = Math.random): Promise<void> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         if (!beef || beef.status !== BeefStatus.ACTIVE) return;
-
-        const votes = await this.voteRepo.find({ where: { beef_id: beefId } });
-        const result = this.resolutionService.resolve(beef, votes);
-
-        const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        const badgeDurationMs = beef.duration_seconds * 4 * 1000;
-
-        await this.dataSource.transaction(async (manager) => {
-            // ── Core state change ───────────────────────────────────────
-            beef.status = BeefStatus.CLOSED;
-            beef.winner_id = result.winnerId;
-            await manager.save(beef);
-
-            // TODO: emit hidden.beef.exile event — Candidate 5 zone boundary
-            await manager.update(User, { id: beef.initiator_id }, { exile_until });
-            await manager.update(User, { id: beef.target_id },    { exile_until });
-
-            if (result.isTie) {
-                // ── Double KO — house takes all ─────────────────────────
-                await this.badgeService.createBadge(beef.initiator_id, beefId, 'loser', badgeDurationMs);
-                await this.badgeService.createBadge(beef.target_id,   beefId, 'loser', badgeDurationMs);
-                await this.notificationsService.notifyBeefLost(beef.initiator_id, beefId, true);
-                await this.notificationsService.notifyBeefLost(beef.target_id, beefId, true);
-            } else {
-                const { winnerId, loserId, coinDistribution, correctVoters } = result;
-
-                // ── Coin distribution ───────────────────────────────────
-                if (coinDistribution.totalPool > 0) {
-                    if (coinDistribution.winnerShare > 0)
-                        await this.coinService.addCoins(winnerId!, coinDistribution.winnerShare, 'earned_win', beefId, `beef:${beefId}:winner:${winnerId}`);
-
-                    if (correctVoters.length > 0 && coinDistribution.lotteryPerWinner > 0) {
-                        const tickets: string[] = [];
-                        for (const v of correctVoters) {
-                            for (let i = 0; i < v.coins_wagered; i++) tickets.push(v.voter_id);
-                        }
-                        const lotteryWinners = new Set<string>();
-                        const maxWinners = Math.min(10, correctVoters.length);
-                        let attempts = 0;
-                        while (lotteryWinners.size < maxWinners && attempts < tickets.length * 3 + 100) {
-                            lotteryWinners.add(tickets[Math.floor(random() * tickets.length)]);
-                            attempts++;
-                        }
-                        for (const voterId of lotteryWinners) {
-                            await this.coinService.addCoins(voterId, coinDistribution.lotteryPerWinner, 'lottery_win', beefId, `beef:${beefId}:lottery:${voterId}`);
-                        }
-                    }
-                }
-
-                // ── Badges, teeth, notifications ────────────────────────
-                await this.badgeService.createBadge(winnerId!, beefId, 'winner', badgeDurationMs);
-                await this.badgeService.createBadge(loserId!,  beefId, 'loser',  badgeDurationMs);
-                await this.teethService.awardTooth(winnerId!, loserId!, beefId);
-                await this.notificationsService.notifyBeefWon(winnerId!, beefId, coinDistribution.winnerShare);
-                await this.notificationsService.notifyBeefLost(loserId!, beefId);
-            }
-        });
-
-        this.eventEmitter.emit('hidden.beef.closed', { beefId, winnerId: result.winnerId });
+        await this.resolutionService.resolve(beef, random);
     }
 
     async chickenBeef(beefId: string, _reason: 'manual' | 'timeout'): Promise<void> {
