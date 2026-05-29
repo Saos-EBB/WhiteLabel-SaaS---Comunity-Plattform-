@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { Coins } from 'lucide-react'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { initLogoLetters, startShaking, triggerBreak } from '@/lib/physics/letterPhysics'
-import { playHiddenAudio } from '@/lib/hiddenAudio'
+import { playHiddenAudio } from '@/hooks/useHiddenZone'
 import { fetchApi } from '@/lib/api'
 
 // ─── Logo button with 13-click Easter egg + physics ──────────────────────────

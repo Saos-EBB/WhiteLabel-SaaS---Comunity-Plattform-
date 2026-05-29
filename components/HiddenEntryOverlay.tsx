@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
+import { useHiddenZone } from '@/hooks/useHiddenZone'
 import { spawnTextLetters, triggerExplosion, cleanup } from '@/lib/physics/letterPhysics'
-
-const CORRECT_PASSWORD = 'DoNotTalkAboutTheFightClub'
 
 // ─── Tally marks ──────────────────────────────────────────────────────────────
 
@@ -67,24 +66,24 @@ function TallyMarks({ count }: { count: number }) {
 // ─── Overlay ──────────────────────────────────────────────────────────────────
 
 export function HiddenEntryOverlay() {
-  const showPWOverlay          = useHiddenStore((s) => s.showPWOverlay)
-  const passwordAttempts       = useHiddenStore((s) => s.passwordAttempts)
-  const unlock                 = useHiddenStore((s) => s.unlock)
-  const closeOverlay           = useHiddenStore((s) => s.closeOverlay)
+  const { unlock, checkPassword } = useHiddenZone()
+  const showPWOverlay             = useHiddenStore((s) => s.showPWOverlay)
+  const passwordAttempts          = useHiddenStore((s) => s.passwordAttempts)
+  const closeOverlay              = useHiddenStore((s) => s.closeOverlay)
   const incrementPasswordAttempts = useHiddenStore((s) => s.incrementPasswordAttempts)
 
   const [value, setValue] = useState('')
   const [shaking, setShaking] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Cleanup any dangling physics elements when this overlay unmounts
+  // Cleanup dangling physics elements on unmount
   useEffect(() => () => { cleanup() }, [])
 
   if (!showPWOverlay) return null
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return
-    if (value === CORRECT_PASSWORD) {
+    if (checkPassword(value)) {
       setValue('')
       triggerExplosion(() => { unlock(); closeOverlay() })
     } else {

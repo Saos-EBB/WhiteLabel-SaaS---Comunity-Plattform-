@@ -626,6 +626,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-29 (latest)
+- Hidden Zone consolidated into `hooks/useHiddenZone.ts`: absorbs audio logic (deleted `lib/hiddenAudio.ts`), CSS theme class application, and logout lock from `HiddenInitializer`; exposes `checkPassword()` used by `HiddenEntryOverlay`; `HiddenInitializer` reduced to a 3-line rendering adapter
+
+### 2026-05-29
 - `TopNav` split into 4 focused sub-components: `NotificationBell` (bell dropdown + notification fetch), `StatusPicker` (status dot + dropdown + API writes), `AdminBadge` (ticket inbox icon + initial count fetch), `HiddenShortcut` (logo 13-click Easter egg + coin balance + theme toggle + shop modal via React portal); `TopNav` reduced to a thin layout shell with no local state or effects
 
 ### 2026-05-28 (latest)
