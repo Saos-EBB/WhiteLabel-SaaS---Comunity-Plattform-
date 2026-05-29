@@ -25,6 +25,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitSensitiveDataDto } from './dto/submit-sensitive-data.dto';
 import { ProfanityService } from '../moderation/profanity.service';
 import { encryptField } from '../../../common/crypto/crypto.helper';
+import { ProfileView, PublicProfile, ConnectionStatus } from './profile.types';
 
 @Injectable()
 export class ProfileService {
@@ -64,29 +65,29 @@ export class ProfileService {
         return profile;
     }
 
-    async getOwnProfileWithPhoto(userId: string): Promise<Profile & { photo_url: string | null; photo_needs_review: boolean; audio_url: string | null; audio_moderation_status: string | null; subscription: { plan: string; status: string; current_period_end: string | null } | null; is_banned: boolean; public_id: string | null }> {
+    async getOwnProfileWithPhoto(userId: string): Promise<ProfileView> {
         const profile = await this.getOwnProfile(userId);
 
-        let photo_url: string | null = null;
-        let photo_needs_review = false;
+        let photoUrl: string | null = null;
+        let photoNeedsReview = false;
         if (profile.photo_id) {
             const rows = await this.profileRepo.manager.query<{ file_url: string; needs_review: boolean }[]>(
                 'SELECT file_url, needs_review FROM media_uploads WHERE id = $1',
                 [profile.photo_id],
             );
-            photo_url = rows[0]?.file_url ?? null;
-            photo_needs_review = rows[0]?.needs_review ?? false;
+            photoUrl = rows[0]?.file_url ?? null;
+            photoNeedsReview = rows[0]?.needs_review ?? false;
         }
 
-        let audio_url: string | null = null;
-        let audio_moderation_status: string | null = null;
+        let audioUrl: string | null = null;
+        let audioModerationStatus: string | null = null;
         if (profile.audio_id) {
             const rows = await this.profileRepo.manager.query<{ file_url: string; moderation_status: string }[]>(
                 'SELECT file_url, moderation_status FROM media_uploads WHERE id = $1',
                 [profile.audio_id],
             );
-            audio_url = rows[0]?.file_url ?? null;
-            audio_moderation_status = rows[0]?.moderation_status ?? null;
+            audioUrl = rows[0]?.file_url ?? null;
+            audioModerationStatus = rows[0]?.moderation_status ?? null;
         }
 
         const subRows = await this.profileRepo.manager.query<{ plan: string; status: string; expires_at: Date | null }[]>(
@@ -95,18 +96,49 @@ export class ProfileService {
              ORDER BY started_at DESC LIMIT 1`,
             [userId],
         );
-        const subscription = subRows[0]
-            ? { plan: subRows[0].plan, status: subRows[0].status, current_period_end: subRows[0].expires_at ? new Date(subRows[0].expires_at).toISOString() : null }
-            : null;
+        const sub = subRows[0] ?? null;
 
         const userRows = await this.profileRepo.manager.query<{ is_banned: boolean; public_id: string | null }[]>(
             'SELECT is_banned, public_id FROM users WHERE id = $1',
             [userId],
         );
-        const is_banned = userRows[0]?.is_banned ?? false;
-        const public_id = userRows[0]?.public_id ?? null;
 
-        return { ...profile, photo_url, photo_needs_review, audio_url, audio_moderation_status, subscription, is_banned, public_id };
+        return {
+            id: profile.id,
+            userId: profile.user_id,
+            nickname: profile.nickname,
+            bio: profile.bio,
+            city: profile.city,
+            birthdate: profile.birthdate,
+            gender: profile.gender,
+            lookingFor: profile.looking_for,
+            isPublished: profile.is_published,
+            onboardingCompleted: profile.onboarding_completed,
+            langSimple: profile.lang_simple,
+            fontSize: profile.font_size,
+            highContrast: profile.high_contrast,
+            searchRadiusKm: profile.search_radius_km,
+            profanityFilter: profile.profanity_filter,
+            statusVisible: profile.status_visible,
+            statusMessage: profile.status_message,
+            showBio: profile.show_bio,
+            showCity: profile.show_city,
+            showAge: profile.show_age,
+            showGender: profile.show_gender,
+            showInterests: profile.show_interests,
+            showAudio: profile.show_audio,
+            lastActiveAt: profile.last_active_at,
+            updatedAt: profile.updated_at,
+            photoUrl,
+            photoNeedsReview,
+            audioUrl,
+            audioModerationStatus,
+            subscriptionPlan: sub?.plan ?? null,
+            subscriptionStatus: sub?.status ?? null,
+            subscriptionCurrentPeriodEnd: sub?.expires_at ? new Date(sub.expires_at).toISOString() : null,
+            isBanned: userRows[0]?.is_banned ?? false,
+            publicId: userRows[0]?.public_id ?? null,
+        };
     }
 
     async updateOwnProfile(userId: string, dto: UpdateProfileDto): Promise<Profile> {
@@ -260,7 +292,7 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
-    async getPublicProfile(nickname: string, viewerId: string | null = null): Promise<Partial<Profile> & { photo_url: string | null; is_online: boolean; photo_needs_review: boolean; audio_url: string | null; connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED' | 'BLOCKED'; request_id: string | null; conversation_id: string | null; public_id: string | null }> {
+    async getPublicProfile(nickname: string, viewerId: string | null = null): Promise<PublicProfile> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -301,12 +333,12 @@ export class ProfileService {
         }
 
         const onlineThreshold = new Date(Date.now() - 3 * 60 * 1000);
-        const is_online = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
+        const isOnline = profile.status_visible && profile.last_active_at !== null && profile.last_active_at > onlineThreshold;
 
         type ConnRow = { connection_status: string; conversation_id: string | null; request_id: string | null };
-        let connection_status: 'NONE' | 'SENT' | 'RECEIVED' | 'CONNECTED' | 'BLOCKED' = 'NONE';
-        let request_id: string | null = null;
-        let conversation_id: string | null = null;
+        let connectionStatus: ConnectionStatus = 'NONE';
+        let requestId: string | null = null;
+        let conversationId: string | null = null;
 
         if (viewerId && viewerId !== profile.user_id) {
             const rows = await this.profileRepo.manager.query<ConnRow[]>(
@@ -346,9 +378,9 @@ export class ProfileService {
                    ) AS request_id`,
                 [viewerId, profile.user_id],
             );
-            connection_status = (rows[0]?.connection_status ?? 'NONE') as typeof connection_status;
-            request_id = rows[0]?.request_id ?? null;
-            conversation_id = rows[0]?.conversation_id ?? null;
+            connectionStatus = (rows[0]?.connection_status ?? 'NONE') as ConnectionStatus;
+            requestId = rows[0]?.request_id ?? null;
+            conversationId = rows[0]?.conversation_id ?? null;
         }
 
         const [publicIdRow] = await this.profileRepo.manager.query<{ public_id: string | null }[]>(
@@ -357,22 +389,26 @@ export class ProfileService {
         );
 
         return {
-            ...profile,
-            bio:        profile.show_bio      ? profile.bio        : null,
-            city:       profile.show_city     ? profile.city       : null,
-            birthdate:  profile.show_age      ? profile.birthdate  : (null as any),
-            gender:     profile.show_gender   ? profile.gender     : null,
+            id: profile.id,
+            userId: profile.user_id,
+            nickname: profile.nickname,
+            bio: profile.show_bio ? profile.bio : null,
+            city: profile.show_city ? profile.city : null,
+            birthdate: profile.show_age ? profile.birthdate : null,
+            gender: profile.show_gender ? profile.gender : null,
             // looking_for is intentionally gated behind show_gender —
             // hiding gender also hides looking_for to prevent reverse inference.
-            looking_for: profile.show_gender  ? profile.looking_for : null,
-            photo_url,
-            is_online,
-            photo_needs_review,
-            audio_url,
-            connection_status,
-            request_id,
-            conversation_id,
-            public_id: publicIdRow?.public_id ?? null,
+            lookingFor: profile.show_gender ? profile.looking_for : null,
+            statusVisible: profile.status_visible,
+            statusMessage: profile.status_message,
+            photoUrl: photo_url,
+            photoNeedsReview: photo_needs_review,
+            audioUrl: audio_url,
+            isOnline,
+            connectionStatus,
+            requestId,
+            conversationId,
+            publicId: publicIdRow?.public_id ?? null,
         };
     }
 
