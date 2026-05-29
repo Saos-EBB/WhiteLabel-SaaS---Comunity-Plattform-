@@ -24,6 +24,7 @@ import { BeefModule } from './modules/hidden/beef/beef.module';
 import { CoinModule } from './modules/hidden/coin/coin.module';
 import { TeethModule } from './modules/hidden/teeth/teeth.module';
 import { BadgeModule } from './modules/hidden/badge/badge.module';
+import { SharedModule } from './modules/shared/shared.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -57,6 +58,7 @@ import databaseConfig from './config/database.config';
       }),
       inject: [ConfigService],
     }),
+    SharedModule,
     CommonModule,
     AuthModule,
     MailModule,
