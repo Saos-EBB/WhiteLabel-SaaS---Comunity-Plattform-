@@ -4,17 +4,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MessageCircle, User } from 'lucide-react'
-import { fetchApi } from '@/lib/api'
+import { fetchApi, normalise } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useConversationStore, type Conversation } from '@/lib/store/conversationStore'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 import { useTranslation } from '@/lib/i18n'
-
-type ConvEnvelope = Conversation[] | { data: Conversation[] }
-
-function normalise<T>(res: T[] | { data: T[] }): T[] {
-  return Array.isArray(res) ? res : ((res as { data: T[] })?.data ?? [])
-}
 
 function SkeletonItem() {
   return (
@@ -56,7 +50,7 @@ export default function ChatPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetchApi<ConvEnvelope>('/chat/conversations')
+        const res = await fetchApi<Conversation[] | { data: Conversation[] }>('/chat/conversations')
         const convs = normalise(res)
         useConversationStore.getState().setConversations(convs)
 

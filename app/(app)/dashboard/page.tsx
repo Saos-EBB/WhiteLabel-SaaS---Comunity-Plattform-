@@ -6,7 +6,7 @@ import {
   Bell, ChevronRight, Compass, Crown, Heart, Loader2,
   MessageCircle, Shield, UserCheck, UserPlus,
 } from 'lucide-react'
-import { fetchApi } from '@/lib/api'
+import { fetchApi, normalise } from '@/lib/api'
 import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
 import { useTranslation } from '@/lib/i18n'
 
@@ -25,10 +25,6 @@ interface Notification {
   content: string
   is_read: boolean
   created_at: string
-}
-
-interface NotificationsResponse {
-  data: Notification[]
 }
 
 interface UserStats {
@@ -158,19 +154,7 @@ function StatRowSkeleton({ cols }: { cols: number }) {
 
 export default function DashboardPage() {
   const { t, locale } = useTranslation()
-  const rawRole = useAuthStore(selectUserRole)
-  const [hydrated, setHydrated] = useState(false)
-
-  useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true)
-    } else {
-      const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
-      return unsub
-    }
-  }, [])
-
-  const role = hydrated ? rawRole : null
+  const role = useAuthStore(selectUserRole)
   const isAdmin = role === 'admin' || role === 'owner'
   const isOwner = role === 'owner'
 
@@ -190,17 +174,16 @@ export default function DashboardPage() {
   const [ownerStatsLoading, setOwnerStatsLoading] = useState(false)
 
   useEffect(() => {
-    if (!hydrated) return
-    const r = selectUserRole()
+    if (role === null) return
 
     // Base data for all users
     Promise.all([
       fetchApi<Profile>('/profile/me'),
-      fetchApi<NotificationsResponse>('/notifications'),
+      fetchApi<Notification[] | { data: Notification[] }>('/notifications'),
       fetchApi<UserStats>('/admin/dashboard/user-stats'),
     ]).then(([prof, notifs, stats]) => {
       setProfile(prof)
-      setNotifications(notifs?.data ?? [])
+      setNotifications(normalise(notifs))
       setUserStats(stats)
     }).catch(() => {}).finally(() => {
       setBaseLoading(false)
@@ -208,7 +191,7 @@ export default function DashboardPage() {
     })
 
     // Admin stats
-    if (r === 'admin' || r === 'owner') {
+    if (role === 'admin' || role === 'owner') {
       setAdminStatsLoading(true)
       fetchApi<AdminStats>('/admin/dashboard/admin-stats')
         .then(setAdminStats)
@@ -217,7 +200,7 @@ export default function DashboardPage() {
     }
 
     // Owner stats
-    if (r === 'owner') {
+    if (role === 'owner') {
       setOwnerStatsLoading(true)
       fetchApi<OwnerStats>('/admin/dashboard/stats')
         .then(setOwnerStats)
@@ -225,7 +208,7 @@ export default function DashboardPage() {
         .finally(() => setOwnerStatsLoading(false))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated])
+  }, [role])
 
   function relativeTime(dateStr: string): string {
     const diff = Date.now() - new Date(dateStr).getTime()

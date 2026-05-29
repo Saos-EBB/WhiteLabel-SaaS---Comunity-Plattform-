@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { MapPin, Loader2, AlertCircle, Camera, ChevronDown, Mic, Square, Upload, Clock, CheckCircle2, XCircle, Trash2, LogOut } from 'lucide-react'
-import { fetchApi } from '@/lib/api'
+import { fetchApi, normalise } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
@@ -53,13 +53,6 @@ interface UserInterest {
   user_id: string
   interest_id: string
   interest: Interest
-}
-
-type UIEnvelope = UserInterest[] | { data: UserInterest[] }
-type IEnvelope  = Interest[]     | { data: Interest[] }
-
-function normalise<T>(res: T[] | { data: T[] }): T[] {
-  return Array.isArray(res) ? res : ((res as { data: T[] })?.data ?? [])
 }
 
 function calcAge(birthdate: string): number {
@@ -132,8 +125,8 @@ export default function ProfilePage() {
       try {
         const [prof, ui, ai] = await Promise.all([
           fetchApi<Profile>('/profile/me'),
-          fetchApi<UIEnvelope>('/profile/me/interests'),
-          fetchApi<IEnvelope>('/profile/interests'),
+          fetchApi<UserInterest[] | { data: UserInterest[] }>('/profile/me/interests'),
+          fetchApi<Interest[] | { data: Interest[] }>('/profile/interests'),
         ])
         setProfile(prof)
         if (prof.photo_url) {
@@ -259,20 +252,10 @@ export default function ProfilePage() {
         try {
           const formData = new FormData()
           formData.append('file', pendingPhotoFile)
-          const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
-          useAuthStore.getState().setAccessToken(freshToken)
-          const uploadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/media/upload/profile-photo`
-          const res = await fetch(uploadUrl, {
+          const data = await fetchApi<{ file_url: string; id: string }>('/media/upload/profile-photo', {
             method: 'POST',
-            credentials: 'include',
-            headers: { Authorization: `Bearer ${freshToken}` },
             body: formData,
           })
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({})) as { message?: string }
-            throw new Error(body.message ?? t.onboarding.photoUploadFailed)
-          }
-          const data = await res.json() as { file_url: string; id: string }
           URL.revokeObjectURL(pendingPhotoPreview!)
           setPendingPhotoFile(null)
           setPendingPhotoPreview(null)
@@ -323,10 +306,10 @@ export default function ProfilePage() {
     const isSelected = userInterests.some((ui) => ui.interest_id === interestId)
     try {
       if (isSelected) {
-        const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${interestId}`, { method: 'DELETE' })
+        const updated = await fetchApi<UserInterest[] | { data: UserInterest[] }>(`/profile/me/interests/${interestId}`, { method: 'DELETE' })
         setUserInterests(normalise(updated))
       } else {
-        const updated = await fetchApi<UIEnvelope>(`/profile/me/interests/${interestId}`, { method: 'POST' })
+        const updated = await fetchApi<UserInterest[] | { data: UserInterest[] }>(`/profile/me/interests/${interestId}`, { method: 'POST' })
         setUserInterests(normalise(updated))
         const refreshed = await fetchApi<Profile>('/profile/me')
         setProfile(refreshed)
@@ -439,19 +422,7 @@ export default function ProfilePage() {
     try {
       const formData = new FormData()
       formData.append('audio', audioBlob, `recording${ext}`)
-      const { accessToken: freshToken } = await fetchApi<{ accessToken: string }>('/auth/refresh', { method: 'POST' })
-      useAuthStore.getState().setAccessToken(freshToken)
-      const uploadUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'}/profile/audio`
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { Authorization: `Bearer ${freshToken}` },
-        body: formData,
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string }
-        throw new Error(body.message ?? t.common.error)
-      }
+      await fetchApi<void>('/profile/audio', { method: 'POST', body: formData })
       if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl)
       setAudioBlob(null)
       setAudioUrl(null)
