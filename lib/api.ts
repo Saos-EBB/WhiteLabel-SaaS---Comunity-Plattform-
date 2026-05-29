@@ -2,6 +2,10 @@ import { useAuthStore } from './store/authStore'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
+export function normalise<T>(res: T[] | { data: T[] }): T[] {
+  return Array.isArray(res) ? res : (res as { data: T[] }).data ?? []
+}
+
 async function tryRefresh(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE_URL}/auth/refresh`, {
@@ -34,7 +38,8 @@ export async function fetchApi<T>(
 ): Promise<T> {
   const { rawBody, ...fetchOptions } = options
   const { accessToken } = useAuthStore.getState()
-  const headers = buildHeaders(accessToken, fetchOptions.headers, rawBody)
+  const skipContentType = rawBody || fetchOptions.body instanceof FormData
+  const headers = buildHeaders(accessToken, fetchOptions.headers, skipContentType)
 
   let res = await fetch(`${BASE_URL}${path}`, {
     ...fetchOptions,
@@ -49,7 +54,7 @@ export async function fetchApi<T>(
       throw new Error('Session expired')
     }
     const newToken = useAuthStore.getState().accessToken
-    const retryHeaders = buildHeaders(newToken, fetchOptions.headers, rawBody)
+    const retryHeaders = buildHeaders(newToken, fetchOptions.headers, skipContentType)
     res = await fetch(`${BASE_URL}${path}`, {
       ...fetchOptions,
       credentials: 'include',
