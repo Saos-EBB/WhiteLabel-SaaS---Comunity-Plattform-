@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Settings, User } from 'lucide-react'
-import { useAuthStore } from '@/lib/store/authStore'
+import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useTranslation } from '@/lib/i18n'
 import { HiddenLogoButton, HiddenZoneControls } from './HiddenShortcut'
@@ -11,24 +11,11 @@ import { StatusPicker } from './StatusPicker'
 import { AdminBadge } from './AdminBadge'
 import { NotificationBell } from './NotificationBell'
 
-function getJwtRole(token: string | null): string | null {
-  if (!token) return null
-  try {
-    const part = token.split('.')[1]
-    if (!part) return null
-    const decoded = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string }
-    return decoded.role ?? null
-  } catch {
-    return null
-  }
-}
-
 export default function TopNav() {
   const pathname = usePathname()
   const { t }    = useTranslation()
 
-  const accessToken = useAuthStore((s) => s.accessToken)
-  const role        = getJwtRole(accessToken)
+  const role = useAuthStore(selectUserRole)
   const isAdmin     = role === 'admin' || role === 'owner'
   const isHidden    = useHiddenStore((s) => s.isHidden)
 

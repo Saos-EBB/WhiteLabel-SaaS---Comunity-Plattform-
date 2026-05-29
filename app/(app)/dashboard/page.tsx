@@ -7,7 +7,7 @@ import {
   MessageCircle, Shield, UserCheck, UserPlus,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
-import { useAuthStore } from '@/lib/store/authStore'
+import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
 import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -64,20 +64,6 @@ interface OwnerStats {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getJwtRole(token: string | null): 'user' | 'admin' | 'owner' | null {
-  if (!token) return null
-  try {
-    const part = token.split('.')[1]
-    if (!part) return null
-    const decoded = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string }
-    const r = decoded.role
-    if (r === 'admin' || r === 'owner') return r
-    return 'user'
-  } catch {
-    return null
-  }
-}
 
 function fmtExpiry(iso: string | null): string {
   if (!iso) return '—'
@@ -172,7 +158,7 @@ function StatRowSkeleton({ cols }: { cols: number }) {
 
 export default function DashboardPage() {
   const { t, locale } = useTranslation()
-  const { accessToken } = useAuthStore()
+  const rawRole = useAuthStore(selectUserRole)
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
@@ -184,7 +170,7 @@ export default function DashboardPage() {
     }
   }, [])
 
-  const role = hydrated ? getJwtRole(accessToken) : null
+  const role = hydrated ? rawRole : null
   const isAdmin = role === 'admin' || role === 'owner'
   const isOwner = role === 'owner'
 
@@ -205,7 +191,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!hydrated) return
-    const r = getJwtRole(accessToken)
+    const r = selectUserRole()
 
     // Base data for all users
     Promise.all([
