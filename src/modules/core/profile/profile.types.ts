@@ -28,6 +28,8 @@ export interface ProfileView {
     updatedAt: Date;
     photoUrl: string | null;
     photoNeedsReview: boolean;
+    nicknameChangedAt: string | null;
+    genderChangedAt: string | null;
     audioUrl: string | null;
     audioModerationStatus: string | null;
     subscriptionPlan: string | null;

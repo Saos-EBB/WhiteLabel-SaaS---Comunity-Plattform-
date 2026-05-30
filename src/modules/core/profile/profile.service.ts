@@ -131,6 +131,8 @@ export class ProfileService {
             updatedAt: profile.updated_at,
             photoUrl,
             photoNeedsReview,
+            nicknameChangedAt: profile.nickname_changed_at ? new Date(profile.nickname_changed_at).toISOString() : null,
+            genderChangedAt: profile.gender_changed_at ? new Date(profile.gender_changed_at).toISOString() : null,
             audioUrl,
             audioModerationStatus,
             subscriptionPlan: sub?.plan ?? null,
