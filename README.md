@@ -499,7 +499,10 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
-### 2026-05-30 (latest)
+### 2026-05-31 (latest)
+- Fix (`profanity.service.ts`): `check()` erkennt jetzt Leet-Speak (1→i, 3→e, 0→o, …) und mit Leerzeichen/Punkten/Strichen aufgeteilte Wörter (z.B. „n 1 g g 3 r") — normalisierter Text wird intern geprüft, nie gespeichert
+
+### 2026-05-30
 - Fix (`coin.service.ts`): `confirmCoinPurchase` — idempotency check was querying `beef_id` (UUID column) with a Stripe session ID string, causing a Postgres type error and 500; now uses `idempotency_key` (text) for both the duplicate check and the saved record
 - Fix (`coin.service.ts`): balance update and transaction insert in `confirmCoinPurchase` now run inside a single DB transaction — prevents partial credit if either write fails
 

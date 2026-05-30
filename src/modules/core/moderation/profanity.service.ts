@@ -34,8 +34,21 @@ export class ProfanityService implements OnModuleInit {
         }
     }
 
+    // Leet-speak map + collapse spaced-out single chars so "n 1 g g 3 r" is caught.
+    private normalize(text: string): string {
+        const leet: Record<string, string> = {
+            '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's',
+            '6': 'b', '7': 't', '8': 'b', '9': 'g',
+            '@': 'a', '$': 's', '!': 'i',
+        };
+        let s = text.replace(/[013456789@$!]/g, (c) => leet[c] ?? c);
+        // collapse sequences of single chars separated by spaces/dots/dashes: "n i g g e r" → "nigger"
+        s = s.replace(/(?<!\S)\S(?:[.\-_* ]+\S){2,}(?!\S)/g, (m) => m.replace(/[.\-_* ]+/g, ''));
+        return s;
+    }
+
     check(text: string): boolean {
-        return leoProfanity.check(text);
+        return leoProfanity.check(text) || leoProfanity.check(this.normalize(text));
     }
 
     blur(text: string): string {
