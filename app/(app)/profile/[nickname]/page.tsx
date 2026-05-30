@@ -16,23 +16,23 @@ import { useTranslation } from '@/lib/i18n'
 
 interface PublicProfile {
   id: string
-  user_id: string
+  userId: string
   nickname: string
   birthdate: string | null
   bio: string | null
   city: string | null
   gender: string | null
-  looking_for: string | null
-  photo_id: string | null
-  photo_url: string | null
-  photo_needs_review: boolean
-  audio_url: string | null
-  is_online: boolean
-  status_message: string | null
-  connection_status?: ConnectionStatus
-  request_id?: string | null
-  conversation_id?: string | null
-  public_id?: string | null
+  lookingFor: string | null
+  photoUrl: string | null
+  photoNeedsReview: boolean
+  audioUrl: string | null
+  isOnline: boolean
+  statusVisible: boolean
+  statusMessage: string | null
+  connectionStatus?: ConnectionStatus
+  requestId?: string | null
+  conversationId?: string | null
+  publicId?: string | null
 }
 
 interface Interest {
@@ -93,10 +93,10 @@ export default function PublicProfilePage() {
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
   const [adminChatLoading, setAdminChatLoading] = useState(false)
   const conn = useConnectionAction(
-    profile?.user_id ?? '',
-    profile?.connection_status ?? 'NONE',
-    profile?.request_id ?? null,
-    profile?.conversation_id ?? null,
+    profile?.userId ?? '',
+    profile?.connectionStatus ?? 'NONE',
+    profile?.requestId ?? null,
+    profile?.conversationId ?? null,
   )
 
   const GENDER_LABELS: Record<string, string> = {
@@ -137,11 +137,11 @@ export default function PublicProfilePage() {
 
         const prof = pubResult.value
         setProfile(prof)
-        if (prof.photo_url) {
-          try { setPhotoUrl(new URL(prof.photo_url).pathname) } catch { setPhotoUrl(prof.photo_url) }
+        if (prof.photoUrl) {
+          try { setPhotoUrl(new URL(prof.photoUrl).pathname) } catch { setPhotoUrl(prof.photoUrl) }
         }
-        if (prof.audio_url) {
-          try { setAudioUrl(new URL(prof.audio_url).pathname) } catch { setAudioUrl(prof.audio_url) }
+        if (prof.audioUrl) {
+          try { setAudioUrl(new URL(prof.audioUrl).pathname) } catch { setAudioUrl(prof.audioUrl) }
         }
 
         if (ownResult.status === 'fulfilled') {
@@ -204,7 +204,7 @@ export default function PublicProfilePage() {
     try {
       const result = await fetchApi<{ conversation_id: string }>('/admin/conversations', {
         method: 'POST',
-        body: JSON.stringify({ target_user_id: profile.user_id }),
+        body: JSON.stringify({ target_user_id: profile.userId }),
       })
       router.push(`/chat/${result.conversation_id}`)
     } catch (err) {
@@ -227,7 +227,7 @@ export default function PublicProfilePage() {
               <img
                 src={photoUrl}
                 alt={t.profile.profilePhoto}
-                className={`w-full h-full object-cover rounded-3xl${profile.photo_needs_review ? ' blur-sm ring-2 ring-error' : ''}`}
+                className={`w-full h-full object-cover rounded-3xl${profile.photoNeedsReview ? ' blur-sm ring-2 ring-error' : ''}`}
               />
             ) : (
               <div className="w-full h-full rounded-3xl bg-surface-container-high flex items-center justify-center">
@@ -237,7 +237,7 @@ export default function PublicProfilePage() {
               </div>
             )}
 
-            {profile.photo_needs_review && (
+            {profile.photoNeedsReview && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-error/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
                 {t.publicProfile.underReview}
               </div>
@@ -249,8 +249,8 @@ export default function PublicProfilePage() {
               {profile.birthdate && (
                 <p className="text-sm text-white/70 mt-0.5">{calcAge(profile.birthdate)} {t.publicProfile.years}</p>
               )}
-              {profile.public_id && (
-                <p className="text-xs text-white/50 mt-0.5 font-mono">#ID-{profile.public_id}</p>
+              {profile.publicId && (
+                <p className="text-xs text-white/50 mt-0.5 font-mono">#ID-{profile.publicId}</p>
               )}
             </div>
 
@@ -263,24 +263,24 @@ export default function PublicProfilePage() {
                 </div>
               )}
               <OnlineIndicator
-                is_online={profile.is_online}
-                status_message={profanityFilter && profile.status_message ? blurText(profile.status_message) : profile.status_message}
+                is_online={profile.isOnline}
+                status_message={profanityFilter && profile.statusMessage ? blurText(profile.statusMessage) : profile.statusMessage}
                 size="sm"
               />
             </div>
           </div>
 
           {/* ── Gender / Looking for ───────────────────────────────────────── */}
-          {(profile.gender && profile.gender !== 'not_specified' || profile.looking_for) && (
+          {(profile.gender && profile.gender !== 'not_specified' || profile.lookingFor) && (
             <div className="w-full flex flex-wrap gap-2 mb-5">
               {profile.gender && profile.gender !== 'not_specified' && GENDER_LABELS[profile.gender] && (
                 <span className="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm">
                   {GENDER_LABELS[profile.gender]}
                 </span>
               )}
-              {profile.looking_for && LOOKING_FOR_LABELS[profile.looking_for] && (
+              {profile.lookingFor && LOOKING_FOR_LABELS[profile.lookingFor] && (
                 <span className="px-4 py-2 rounded-full bg-surface-container text-on-surface text-sm">
-                  {LOOKING_FOR_LABELS[profile.looking_for]}
+                  {LOOKING_FOR_LABELS[profile.lookingFor]}
                 </span>
               )}
             </div>
@@ -531,7 +531,7 @@ export default function PublicProfilePage() {
           {/* Report modal */}
           {reportOpen && (
             <ReportModal
-              reportedUserId={profile.user_id}
+              reportedUserId={profile.userId}
               onClose={() => setReportOpen(false)}
             />
           )}
