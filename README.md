@@ -625,6 +625,11 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
+### 2026-05-31 (latest)
+- Feat (`HiddenEntryOverlay`): Hidden-Zone Eingabe-Screen komplett neu — 5 Filme rotieren zufällig, jeder Film hat eigenen Soundtrack und 10 Quotes mit Typewriter-Effekt; Passwort = normalisierter Filmtitel; Master-Key weiterhin gültig
+- Fix (`HiddenEntryOverlay`): Musik startet erst wenn der Passwort-Screen erscheint (nicht beim Seitenaufruf); kein Filmtitel sichtbar; leeres Eingabefeld
+- Fix (`admin/page.tsx`): Tab-Bar Buttons verteilen sich gleichmäßig über die volle Breite
+
 ### 2026-05-30 (latest)
 - Fix (`layout.tsx`): Footer klebt nicht mehr direkt unter dem Content — `flex flex-col min-h-screen` + `flex-1` auf `<main>` drückt ihn auf allen Screens ans untere Ende
 - Fix (`HiddenShortcut.tsx`): Hidden-Zone Easter Egg triggert jetzt nach 6 Logo-Klicks statt 13

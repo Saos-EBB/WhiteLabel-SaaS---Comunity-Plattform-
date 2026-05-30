@@ -21,7 +21,7 @@ const FILMS: FilmEntry[] = [
     id: 'reservoir-dogs',
     title: 'Reservoir Dogs (1992)',
     password: 'reservoirdogs',
-    audio: '/sounds/hidden/reservoir-dogs.mp3',
+    audio: '/sounds/reservoir-dogs.mp3',
     quotes: [
       'Are you gonna bark all day, little doggie, or are you gonna bite?',
       'Stuck in the middle with you.',
@@ -39,7 +39,7 @@ const FILMS: FilmEntry[] = [
     id: 'fight-club',
     title: 'Fight Club (1999)',
     password: 'fightclub',
-    audio: '/sounds/hidden/fight-club.mp3',
+    audio: '/sounds/where_is_my_mind.mp3',
     quotes: [
       'The first rule of Fight Club is: You do not talk about Fight Club.',
       'The second rule of Fight Club is: You do not talk about Fight Club.',
@@ -57,7 +57,7 @@ const FILMS: FilmEntry[] = [
     id: 'clockwork-orange',
     title: 'A Clockwork Orange (1971)',
     password: 'aclockworkorange',
-    audio: '/sounds/hidden/clockwork-orange.mp3',
+    audio: '/sounds/clockwork-orange.mp3',
     quotes: [
       "What's it going to be then, eh?",
       'There was me, that is Alex, and my three droogs.',
@@ -75,7 +75,7 @@ const FILMS: FilmEntry[] = [
     id: 'american-psycho',
     title: 'American Psycho (2000)',
     password: 'americanpsycho',
-    audio: '/sounds/hidden/american-psycho.mp3',
+    audio: '/sounds/american-psycho.mp3',
     quotes: [
       'I have to return some videotapes.',
       'Do you like Huey Lewis and the News?',
@@ -93,7 +93,7 @@ const FILMS: FilmEntry[] = [
     id: 'trainspotting',
     title: 'Trainspotting (1996)',
     password: 'trainspotting',
-    audio: '/sounds/hidden/trainspotting.mp3',
+    audio: '/sounds/trainspotting.mp3',
     quotes: [
       'Choose life.',
       'Choose a job.',
@@ -147,11 +147,13 @@ export function HiddenEntryOverlay() {
   const [shaking, setShaking]   = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Start film audio on mount, clean up physics on unmount
+  // Start film audio when overlay opens, clean up physics on unmount
   useEffect(() => {
+    if (!showPWOverlay) return
     playHiddenAudio(film.audio)
-    return () => { cleanup() }
-  }, [film.audio])
+  }, [showPWOverlay, film.audio])
+
+  useEffect(() => () => { cleanup() }, [])
 
   // Typewriter — advance one character every 40 ms
   useEffect(() => {
@@ -210,11 +212,6 @@ export function HiddenEntryOverlay() {
       aria-modal="true"
       aria-label="Hidden area entry"
     >
-      {/* Film title — top center, small + muted */}
-      <p className="absolute top-6 inset-x-0 text-center text-xs tracking-widest uppercase text-white/25 select-none pointer-events-none">
-        {film.title}
-      </p>
-
       {/* Quote — centered in upper 60% */}
       <div className="absolute inset-x-0 top-0 h-[60%] flex items-center justify-center px-12 pt-16">
         <p
@@ -234,7 +231,7 @@ export function HiddenEntryOverlay() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={film.title}
+          placeholder=""
           autoFocus
           autoComplete="off"
           className={`w-[40%] min-w-[260px] rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/20 px-4 py-3 text-sm outline-none focus:border-white/30 transition-colors${shaking ? ' shake-wrong' : ''}`}

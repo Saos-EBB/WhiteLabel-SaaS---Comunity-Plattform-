@@ -162,13 +162,13 @@ export default function AdminPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="rounded-2xl bg-surface-container border border-outline-variant p-1 flex gap-1 overflow-x-auto">
+        <div className="w-full rounded-2xl bg-surface-container border border-outline-variant p-1 flex gap-1 overflow-x-auto">
           {TABS.map(({ key, label, icon }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               aria-pressed={activeTab === key}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+              className={`flex-1 justify-center flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
                 activeTab === key
                   ? 'bg-primary-fixed-dim text-on-primary-container'
                   : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -181,7 +181,7 @@ export default function AdminPage() {
           {(isHidden || role === 'admin' || role === 'owner') && (
             <button
               onClick={() => setActiveTab('beef')}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+              className={`flex-1 justify-center flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
                 activeTab === 'beef'
                   ? 'bg-primary-fixed-dim text-on-primary-container'
                   : 'text-on-surface-variant hover:bg-surface-container-high'
