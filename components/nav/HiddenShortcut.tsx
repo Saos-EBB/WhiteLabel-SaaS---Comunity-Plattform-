@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { Coins } from 'lucide-react'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { runLogoBreak } from '@/lib/physics/letterPhysics'
-import { playHiddenAudio } from '@/hooks/useHiddenZone'
+
 import { fetchApi } from '@/lib/api'
 
 // ─── Logo button with 13-click Easter egg + physics ──────────────────────────
@@ -27,7 +27,6 @@ export function HiddenLogoButton() {
       const text = logoButtonRef.current?.textContent ?? ''
       if (rect && text) {
         runLogoBreak(text, rect, () => {
-          playHiddenAudio()
           openOverlay()
         })
       }
