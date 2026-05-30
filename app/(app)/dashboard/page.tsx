@@ -9,6 +9,7 @@ import {
 import { fetchApi } from '@/lib/api'
 import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
 import { useNotificationStore } from '@/lib/store/notificationStore'
+import { useUnreadMessageCount } from '@/hooks/useUnreadMessageCount'
 import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -147,6 +148,7 @@ export default function DashboardPage() {
 
   // Notifications come from the shared store (populated by NotificationBell)
   const notifications = useNotificationStore((s) => s.notifications)
+  const unreadMessageCount = useUnreadMessageCount()
   const [baseLoading, setBaseLoading] = useState(true)
 
   // Role-based stats
@@ -256,9 +258,9 @@ export default function DashboardPage() {
           >
             <MessageCircle className="h-4 w-4" aria-hidden="true" />
             {t.dashboard.messages}
-            {unreadCount > 0 && (
+            {unreadMessageCount > 0 && (
               <span className="ml-0.5 inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-primary-fixed-dim text-on-primary-container text-[10px] font-bold" aria-hidden="true">
-                {unreadCount > 9 ? '9+' : unreadCount}
+                {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
               </span>
             )}
           </Link>
@@ -427,9 +429,9 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container-high group-hover:bg-surface-container-highest transition-colors">
                 <MessageCircle className="h-5 w-5 text-primary-fixed-dim" aria-hidden="true" />
-                {unreadCount > 0 && (
+                {unreadMessageCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1 rounded-full bg-primary-fixed-dim text-on-primary-container text-[10px] font-bold flex items-center justify-center" aria-hidden="true">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                   </span>
                 )}
               </div>
@@ -438,9 +440,9 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-on-surface text-sm">{t.dashboard.messages}</p>
-                {unreadCount > 0 && (
+                {unreadMessageCount > 0 && (
                   <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary-fixed-dim text-on-primary-container text-[9px] font-bold" aria-hidden="true">
-                    {unreadCount}
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                   </span>
                 )}
               </div>
@@ -453,13 +455,25 @@ export default function DashboardPage() {
             className="group rounded-2xl bg-surface-container border border-outline-variant p-5 flex flex-col gap-3 hover:bg-surface-container-high active:scale-[0.98] transition-all"
           >
             <div className="flex items-start justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container-high group-hover:bg-surface-container-highest transition-colors">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container-high group-hover:bg-surface-container-highest transition-colors">
                 <UserPlus className="h-5 w-5 text-primary-fixed-dim" aria-hidden="true" />
+                {(userStats?.pendingRequests ?? 0) > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1 rounded-full bg-error text-on-error text-[10px] font-bold flex items-center justify-center" aria-hidden="true">
+                    {(userStats!.pendingRequests) > 9 ? '9+' : userStats!.pendingRequests}
+                  </span>
+                )}
               </div>
               <ChevronRight className="h-4 w-4 text-on-surface-variant opacity-40 group-hover:opacity-100 mt-0.5 transition-opacity" aria-hidden="true" />
             </div>
             <div>
-              <p className="font-semibold text-on-surface text-sm">{t.dashboard.requests}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-on-surface text-sm">{t.dashboard.requests}</p>
+                {(userStats?.pendingRequests ?? 0) > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-error text-on-error text-[9px] font-bold" aria-hidden="true">
+                    {(userStats!.pendingRequests) > 9 ? '9+' : userStats!.pendingRequests}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">{t.dashboard.requestsDesc}</p>
             </div>
           </Link>
