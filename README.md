@@ -626,6 +626,10 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-30 (latest)
+- Fix (`layout.tsx`): Footer klebt nicht mehr direkt unter dem Content — `flex flex-col min-h-screen` + `flex-1` auf `<main>` drückt ihn auf allen Screens ans untere Ende
+- Fix (`HiddenShortcut.tsx`): Hidden-Zone Easter Egg triggert jetzt nach 6 Logo-Klicks statt 13
+
+### 2026-05-30
 - Fix (`chat/[id]/page.tsx`): alle Nachrichten wurden links angezeigt, weil `currentUserId` immer `null` war — Auth-Store persistiert `user` nicht; jetzt `selectUserId` (liest `sub` aus JWT) an allen drei Stellen
 - Fix (`beef/page.tsx`): Coin-Kauf-Bestätigung nach Stripe-Redirect schluckte Fehler lautlos; jetzt Erfolgs-Banner mit Coin-Anzahl, automatische Weiterleitung zurück zur vorherigen Seite
 - Fix (`HiddenShortcut.tsx`): aktuelle URL wird vor Stripe-Redirect in `localStorage` gespeichert, nach erfolgreichem Kauf wiederhergestellt

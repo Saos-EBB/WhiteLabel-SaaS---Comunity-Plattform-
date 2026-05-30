@@ -22,7 +22,7 @@ export function HiddenLogoButton() {
   function handleLogoClick() {
     if (logoResetTimerRef.current) clearTimeout(logoResetTimerRef.current)
     incrementClick()
-    if (clickCount + 1 >= 13) {
+    if (clickCount + 1 >= 6) {
       const rect = logoButtonRef.current?.getBoundingClientRect()
       const text = logoButtonRef.current?.textContent ?? ''
       if (rect && text) {
