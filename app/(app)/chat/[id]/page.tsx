@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronDown, Send, User, Loader2, AlertCircle, Trash2, MoreVertical, Flag, Ban, Swords } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
-import { useAuthStore } from '@/lib/store/authStore'
+import { useAuthStore, selectUserId } from '@/lib/store/authStore'
 import { blurText } from '@/lib/profanity'
 import { useNotificationStore } from '@/lib/store/notificationStore'
 import { connect, getSocket } from '@/lib/socket'
@@ -143,7 +143,7 @@ export default function ConversationPage() {
   const router = useRouter()
   const { t } = useTranslation()
 
-  const currentUserId   = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
+  const currentUserId   = useAuthStore(selectUserId)
   const accessToken     = useAuthStore((s) => s.accessToken)
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
 
@@ -228,7 +228,7 @@ export default function ConversationPage() {
     const msgs = pendingMessages.filter((m) => m.conversation_id === conversationId)
     useConversationStore.getState().clearPendingMessages()
     if (msgs.length === 0) return
-    const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+    const myId = selectUserId(useAuthStore.getState())
     setMessages((prev) => {
       let next = [...prev]
       for (const msg of msgs) {
@@ -260,7 +260,7 @@ export default function ConversationPage() {
         setMessages(normalise(msgRes))
         setIsBlocked(conv.is_blocked)
         setBlockedBy(conv.blocked_by)
-        const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+        const myId = selectUserId(useAuthStore.getState())
         const pid = conv.user_a_id === myId ? conv.user_b_id : conv.user_a_id
         setPartnerUserId(pid)
         fetchApi<{ nickname: string }>(`/profile/user/${pid}`)

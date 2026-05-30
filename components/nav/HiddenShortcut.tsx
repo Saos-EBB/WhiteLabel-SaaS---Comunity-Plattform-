@@ -129,6 +129,7 @@ export function HiddenZoneControls() {
                       method: 'POST',
                       body: JSON.stringify({ package: item.pkg }),
                     })
+                    localStorage.setItem('coin_return_url', window.location.pathname)
                     window.location.href = res.url
                   } catch { alert('Fehler beim Öffnen des Shops') }
                 }}

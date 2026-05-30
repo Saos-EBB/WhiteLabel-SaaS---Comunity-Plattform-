@@ -36,6 +36,8 @@ export default function BeefPage() {
   const [publicBeefs, setPublicBeefs]   = useState<Beef[]>([])
   const [loading, setLoading]           = useState(true)
   const [responding, setResponding]     = useState<string | null>(null)
+  const [coinError, setCoinError]       = useState<string | null>(null)
+  const [coinSuccess, setCoinSuccess]   = useState<number | null>(null)
   const [highscore, setHighscore]       = useState<{
     user_id: string; nickname: string; wins: string
   }[]>([])
@@ -78,13 +80,19 @@ export default function BeefPage() {
     const uid       = params.get('uid')
     if (!sessionId || !uid) return
 
-    fetchApi('/hidden/coin/confirm', {
+    fetchApi<{ coins: number }>('/hidden/coin/confirm', {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId }),
-    }).then(() => {
+    }).then((res) => {
       window.history.replaceState({}, '', '/beef')
       window.dispatchEvent(new Event('coin-balance-refresh'))
-    }).catch(() => {})
+      setCoinSuccess(res.coins)
+      const returnUrl = localStorage.getItem('coin_return_url') ?? '/beef'
+      localStorage.removeItem('coin_return_url')
+      setTimeout(() => router.push(returnUrl), 2500)
+    }).catch(() => {
+      setCoinError('Coin-Kauf konnte nicht gutgeschrieben werden. Bitte Support kontaktieren.')
+    })
   }, [])
 
   async function respond(beefId: string, response: 'fight' | 'chicken') {
@@ -111,6 +119,21 @@ export default function BeefPage() {
 
   return (
     <div className="max-w-screen-sm mx-auto px-4 py-6 pb-24">
+
+      {/* Coin purchase success */}
+      {coinSuccess !== null && (
+        <div className="mb-4 rounded-lg bg-tertiary-container text-on-tertiary-container text-sm px-4 py-3 flex items-center gap-2">
+          <span className="text-base">🪙</span>
+          <span><strong>{coinSuccess} Coins</strong> wurden gutgeschrieben! Du wirst gleich weitergeleitet…</span>
+        </div>
+      )}
+
+      {/* Coin purchase error */}
+      {coinError && (
+        <div className="mb-4 rounded-lg bg-error-container text-on-error-container text-sm px-4 py-3">
+          {coinError}
+        </div>
+      )}
 
       {/* Page title */}
       <div className="flex items-center gap-3 mb-6">

@@ -625,6 +625,11 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
+### 2026-05-30 (latest)
+- Fix (`chat/[id]/page.tsx`): alle Nachrichten wurden links angezeigt, weil `currentUserId` immer `null` war — Auth-Store persistiert `user` nicht; jetzt `selectUserId` (liest `sub` aus JWT) an allen drei Stellen
+- Fix (`beef/page.tsx`): Coin-Kauf-Bestätigung nach Stripe-Redirect schluckte Fehler lautlos; jetzt Erfolgs-Banner mit Coin-Anzahl, automatische Weiterleitung zurück zur vorherigen Seite
+- Fix (`HiddenShortcut.tsx`): aktuelle URL wird vor Stripe-Redirect in `localStorage` gespeichert, nach erfolgreichem Kauf wiederhergestellt
+
 ### 2026-05-29 (latest)
 - Bug fix (`hooks/useBootstrap.ts`): `user.onboarding_completed` → `user.onboardingCompleted` — matches camelCase JSON from backend; was causing the onboarding redirect to never trigger
 - Bug fix (`lib/store/authStore.ts`): `onboardingCompleted?: boolean` added to `User` interface — `[key: string]: unknown` had silently allowed the misspelled snake_case access without a type error
