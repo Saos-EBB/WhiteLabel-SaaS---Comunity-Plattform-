@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
@@ -23,6 +24,7 @@ export class MediaService {
         private readonly userRepository: Repository<User>,
         private readonly profanityService: ProfanityService,
         private readonly systemSettingsService: SystemSettingsService,
+        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     private buildWatermarkSvg(text: string, imgWidth: number, imgHeight: number): Buffer {
@@ -131,6 +133,13 @@ export class MediaService {
             await this.profileRepository.update({ user_id: userId }, { photo_id: saved.id });
 
             this.profanityService.createImageTicket(userId, saved.id).catch(() => {});
+
+            this.eventEmitter.emit('media.pending_review', {
+                mediaId: saved.id,
+                fileType: FileType.IMAGE,
+                uploadedAt: saved.uploaded_at,
+                uploadedBy: userId,
+            });
 
             return { file_url: fileUrl, id: saved.id };
         } catch (err) {
