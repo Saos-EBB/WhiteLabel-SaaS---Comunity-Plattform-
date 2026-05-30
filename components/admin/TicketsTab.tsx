@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CheckCircle2, ChevronDown } from 'lucide-react'
+import { CheckCircle2, ChevronDown, Image as ImageIcon, Music } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useTranslation } from '@/lib/i18n'
+import { useNotificationStore } from '@/lib/store/notificationStore'
 import { Divider } from './shared/Divider'
 import { Spinner } from './shared/Spinner'
 import { fmtDate } from './shared/utils'
-import type { AdminReport, AdminTicket, Paginated } from './shared/types'
+import type { AdminReport, AdminTicket, Paginated, PendingMedia } from './shared/types'
 
 interface Props {
   showToast: (msg: string, ok?: boolean) => void
@@ -23,6 +24,13 @@ export function TicketsTab({ showToast }: Props) {
   const [supportTickets, setSupportTickets] = useState<AdminTicket[]>([])
   const [supportTicketsLoading, setSupportTicketsLoading] = useState(false)
   const [supportExpanded, setSupportExpanded] = useState(false)
+
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([])
+  const [mediaLoading, setMediaLoading] = useState(false)
+  const [mediaExpanded, setMediaExpanded] = useState(false)
+
+  const adminMediaCount = useNotificationStore((s) => s.adminMediaCount)
+  const setAdminMediaCount = useNotificationStore((s) => s.setAdminMediaCount)
 
   async function loadTickets() {
     setTicketsLoading(true)
@@ -53,9 +61,49 @@ export function TicketsTab({ showToast }: Props) {
     }
   }
 
+  async function loadPendingMedia() {
+    setMediaLoading(true)
+    try {
+      const data = await fetchApi<PendingMedia[]>('/admin/media/pending')
+      setPendingMedia(data)
+      setAdminMediaCount(data.length)
+      if (data.length > 0) setMediaExpanded(true)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t.admin.loadError, false)
+    } finally {
+      setMediaLoading(false)
+    }
+  }
+
+  async function approveMediaItem(id: string) {
+    try {
+      await fetchApi<void>(`/admin/media/${id}/approve`, { method: 'PATCH' })
+      setPendingMedia((prev) => prev.filter((m) => m.id !== id))
+      setAdminMediaCount(Math.max(0, adminMediaCount - 1))
+      showToast(t.admin.toastMediaApproved)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t.common.error, false)
+    }
+  }
+
+  async function rejectMediaItem(id: string) {
+    try {
+      await fetchApi<void>(`/admin/media/${id}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason: 'Abgelehnt' }),
+      })
+      setPendingMedia((prev) => prev.filter((m) => m.id !== id))
+      setAdminMediaCount(Math.max(0, adminMediaCount - 1))
+      showToast(t.admin.toastMediaRejected)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t.common.error, false)
+    }
+  }
+
   useEffect(() => {
     void loadTickets()
     void loadSupportTickets()
+    void loadPendingMedia()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -185,6 +233,97 @@ export function TicketsTab({ showToast }: Props) {
                         </span>
                       </div>
                       <p className="text-sm text-on-surface whitespace-pre-wrap break-words">{stk.context.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Divider />
+
+      {/* Accordion: Medien */}
+      <div>
+        <div
+          role="button"
+          aria-expanded={mediaExpanded}
+          onClick={() => setMediaExpanded((v) => !v)}
+          className="w-full flex items-center justify-between py-2 cursor-pointer select-none"
+        >
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+              Medien
+            </p>
+            {adminMediaCount > 0 && (
+              <span className="h-4 min-w-4 px-1 rounded-full bg-error text-on-error text-[9px] font-bold flex items-center justify-center">
+                {adminMediaCount > 99 ? '99+' : adminMediaCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); void loadPendingMedia() }}
+              className="text-xs text-on-surface-variant hover:text-on-surface underline"
+            >
+              {t.admin.ticketsRefresh}
+            </button>
+            <ChevronDown
+              className={`h-4 w-4 text-on-surface-variant transition-transform duration-300 ${mediaExpanded ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+
+        <div className={`grid transition-all duration-300 ease-in-out ${mediaExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+          <div className="overflow-hidden">
+            <div className="pt-2 pb-1 space-y-3">
+              <Divider />
+              {mediaLoading ? (
+                <div className="flex justify-center py-6"><Spinner size={6} /></div>
+              ) : pendingMedia.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-on-surface-variant">
+                  <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+                  <p className="text-sm">{t.admin.mediaNoMedia}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pendingMedia.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-surface-container flex items-center justify-center">
+                          {m.file_type === 'audio'
+                            ? <Music className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />
+                            : <ImageIcon className="h-4 w-4 text-on-surface-variant" aria-hidden="true" />}
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="text-sm font-medium text-on-surface truncate">
+                            {m.nickname ?? m.uploaded_by.slice(0, 8)}
+                          </p>
+                          <p className="text-xs text-on-surface-variant/60">{fmtDate(m.uploaded_at)}</p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void approveMediaItem(m.id)}
+                          className="px-3 py-1.5 rounded-lg bg-primary-fixed-dim text-on-primary-container text-xs font-medium hover:opacity-90 transition-opacity"
+                        >
+                          Freigeben
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void rejectMediaItem(m.id)}
+                          className="px-3 py-1.5 rounded-lg bg-error-container text-error text-xs font-medium hover:opacity-90 transition-opacity"
+                        >
+                          Ablehnen
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
