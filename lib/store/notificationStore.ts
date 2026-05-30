@@ -31,6 +31,9 @@ interface NotificationState {
   adminTicketCount: number
   setAdminTicketCount: (n: number) => void
   incrementAdminTicketCount: () => void
+  adminMediaCount: number
+  setAdminMediaCount: (n: number) => void
+  incrementAdminMediaCount: () => void
 }
 
 export function mergeNotification(existing: Notification[], incoming: Notification): Notification[] {
@@ -122,4 +125,7 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
   adminTicketCount: 0,
   setAdminTicketCount: (n) => set({ adminTicketCount: n }),
   incrementAdminTicketCount: () => set((s) => ({ adminTicketCount: s.adminTicketCount + 1 })),
+  adminMediaCount: 0,
+  setAdminMediaCount: (n) => set({ adminMediaCount: n }),
+  incrementAdminMediaCount: () => set((s) => ({ adminMediaCount: s.adminMediaCount + 1 })),
 }))
