@@ -94,6 +94,12 @@ export function useSocketBus(isReady: boolean) {
       'ticket.new': () => {
         useNotificationStore.getState().incrementAdminTicketCount()
       },
+
+      'media:pending_review': () => {
+        useNotificationStore.getState().incrementAdminTicketCount()
+        const audio = new Audio('/sounds/workwork.mp3')
+        audio.play().catch(() => {})
+      },
     }
 
     for (const [event, handler] of Object.entries(handlers)) {
