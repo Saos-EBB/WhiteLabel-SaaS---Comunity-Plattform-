@@ -39,6 +39,7 @@ interface ConversationState {
   conversations: Conversation[]
   setConversations: (convs: Conversation[]) => void
   applyMessage: (msg: MessageUpdate) => void
+  markConversationRead: (conversationId: string) => void
   // Incoming socket messages for the open chat page to consume
   pendingMessages: Message[]
   pushPendingMessage: (msg: Message) => void
@@ -51,6 +52,12 @@ interface ConversationState {
 export const useConversationStore = create<ConversationState>()((set) => ({
   conversations: [],
   setConversations: (convs) => set({ conversations: convs }),
+  markConversationRead: (conversationId) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conversationId ? { ...c, read_at: new Date().toISOString() } : c
+      ),
+    })),
   applyMessage: (msg) =>
     set((state) => {
       const idx = state.conversations.findIndex((c) => c.id === msg.conversation_id)
