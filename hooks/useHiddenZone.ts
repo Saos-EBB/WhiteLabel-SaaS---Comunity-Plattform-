@@ -8,14 +8,15 @@ import { useHiddenStore } from '@/lib/store/hiddenStore'
 
 let _audio: HTMLAudioElement | null = null
 
-export function playHiddenAudio(): void {
+export function playHiddenAudio(path: string): void {
   if (typeof window === 'undefined') return
-  if (!_audio) {
-    _audio = new Audio('/sounds/where_is_my_mind.mp3')
-    _audio.loop = true
-    _audio.volume = 0.5
+  if (_audio) {
+    _audio.pause()
+    _audio = null
   }
-  _audio.currentTime = 0
+  _audio = new Audio(path)
+  _audio.loop = true
+  _audio.volume = 0.5
   _audio.play().catch(() => {})
 }
 
@@ -27,7 +28,7 @@ export function stopHiddenAudio(): void {
 
 // ─── Password ─────────────────────────────────────────────────────────────────
 
-const CORRECT_PASSWORD = 'DoNotTalkAboutTheFightClub'
+export const MASTER_KEY = 'DoNotTalkAboutTheFightClub'
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,6 @@ export function useHiddenZone() {
     toggleTheme,
     unlock,
     lock,
-    checkPassword: (pw: string) => pw === CORRECT_PASSWORD,
+    checkPassword: (pw: string) => pw === MASTER_KEY,
   }
 }
