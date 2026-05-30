@@ -250,11 +250,12 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
             <span className="text-on-surface">{totalCoins} total</span>
             <span>{beef.target_coins} Coins</span>
           </div>
-          <div className="h-3 bg-surface-container-high rounded-full overflow-hidden">
+          <div className="h-3 rounded-full overflow-hidden flex">
             <div
-              className="h-full bg-primary-fixed-dim rounded-full transition-all duration-500"
+              className="h-full bg-rose-500 transition-all duration-500"
               style={{ width: `${initPct}%` }}
             />
+            <div className="h-full bg-sky-500 flex-1 transition-all duration-500" />
           </div>
           <div className="flex justify-between text-xs text-on-surface-variant mt-1">
             <span>{initPct}%</span>

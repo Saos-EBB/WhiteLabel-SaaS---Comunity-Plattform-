@@ -626,6 +626,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Fix (`beef/[id]/page.tsx`): Vote-Balken zeigt jetzt zwei deutliche Farben — Rot für Initiator, Blau für Target; vorher war nur eine Seite eingefärbt
+
+###  2026-05-31
 - Feat (`HiddenEntryOverlay`): Hidden-Zone Eingabe-Screen komplett neu — 5 Filme rotieren zufällig, jeder Film hat eigenen Soundtrack und 10 Quotes mit Typewriter-Effekt; Passwort = normalisierter Filmtitel; Master-Key weiterhin gültig
 - Fix (`HiddenEntryOverlay`): Musik startet erst wenn der Passwort-Screen erscheint (nicht beim Seitenaufruf); kein Filmtitel sichtbar; leeres Eingabefeld
 - Fix (`admin/page.tsx`): Tab-Bar Buttons verteilen sich gleichmäßig über die volle Breite
