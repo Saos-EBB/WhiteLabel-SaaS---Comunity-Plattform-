@@ -118,6 +118,16 @@ for (const conv of conversations) {
         this.server.to('admin').emit('ticket.new', {});
     }
 
+    @OnEvent('media.pending_review')
+    handleMediaPendingReview(payload: { mediaId: string; fileType: string; uploadedAt: Date; uploadedBy: string }): void {
+        this.server.to('admin').emit('media:pending_review', {
+            mediaId: payload.mediaId,
+            fileType: payload.fileType,
+            uploadedAt: payload.uploadedAt,
+            uploadedBy: payload.uploadedBy,
+        });
+    }
+
     @SubscribeMessage('join_conversation')
     async handleJoinConversation(
         @ConnectedSocket() client: Socket,
