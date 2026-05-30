@@ -293,6 +293,7 @@ export default function ConversationPage() {
     const sock = connect()
     sock.emit('join_conversation', conversationId)
     sock.emit('read_messages', conversationId)
+    useConversationStore.getState().markConversationRead(conversationId)
   }, [conversationId, accessToken])
 
   // ── Scroll button visibility (IntersectionObserver on bottom sentinel) ─────
