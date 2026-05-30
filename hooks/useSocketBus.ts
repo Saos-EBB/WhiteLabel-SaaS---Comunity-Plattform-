@@ -97,6 +97,7 @@ export function useSocketBus(isReady: boolean) {
 
       'media:pending_review': () => {
         useNotificationStore.getState().incrementAdminTicketCount()
+        useNotificationStore.getState().incrementAdminMediaCount()
         const audio = new Audio('/sounds/workwork.mp3')
         audio.play().catch(() => {})
       },
