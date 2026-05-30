@@ -3,139 +3,242 @@
 import { useEffect, useRef, useState } from 'react'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useHiddenZone } from '@/hooks/useHiddenZone'
-import { spawnTextLetters, triggerExplosion, cleanup } from '@/lib/physics/letterPhysics'
+import { playHiddenAudio, MASTER_KEY } from '@/hooks/useHiddenZone'
+import { triggerExplosion, cleanup } from '@/lib/physics/letterPhysics'
 
-// ─── Tally marks ──────────────────────────────────────────────────────────────
+// ─── Film data ────────────────────────────────────────────────────────────────
 
-function TallyGroup() {
-  return (
-    <svg
-      viewBox="0 0 34 24"
-      width="34"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      {/* 4 vertical lines */}
-      <line x1="5"  y1="2" x2="5"  y2="22" />
-      <line x1="12" y1="2" x2="12" y2="22" />
-      <line x1="19" y1="2" x2="19" y2="22" />
-      <line x1="26" y1="2" x2="26" y2="22" />
-      {/* diagonal crossing all four */}
-      <line x1="1" y1="21" x2="32" y2="3" />
-    </svg>
-  )
+interface FilmEntry {
+  id: string
+  title: string
+  password: string
+  audio: string
+  quotes: string[]
 }
 
-function TallyRemainder({ count }: { count: number }) {
-  if (count === 0) return null
-  const xs = [5, 12, 19, 26]
-  return (
-    <svg
-      viewBox="0 0 34 24"
-      width="34"
-      height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      {xs.slice(0, count).map((x) => (
-        <line key={x} x1={x} y1="2" x2={x} y2="22" />
-      ))}
-    </svg>
-  )
+const FILMS: FilmEntry[] = [
+  {
+    id: 'reservoir-dogs',
+    title: 'Reservoir Dogs (1992)',
+    password: 'reservoirdogs',
+    audio: '/sounds/hidden/reservoir-dogs.mp3',
+    quotes: [
+      'Are you gonna bark all day, little doggie, or are you gonna bite?',
+      'Stuck in the middle with you.',
+      'Why am I Mr. Pink?',
+      "Because you're a f***ot, all right?",
+      "I don't tip.",
+      'You shoot me in a dream, you better wake up and apologize.',
+      "Let's go to work.",
+      "I'm hungry. Let's get a taco.",
+      'You kill anybody?',
+      "You're acting like a first-year thief.",
+    ],
+  },
+  {
+    id: 'fight-club',
+    title: 'Fight Club (1999)',
+    password: 'fightclub',
+    audio: '/sounds/hidden/fight-club.mp3',
+    quotes: [
+      'The first rule of Fight Club is: You do not talk about Fight Club.',
+      'The second rule of Fight Club is: You do not talk about Fight Club.',
+      "It's only after we've lost everything that we're free to do anything.",
+      'I want you to hit me as hard as you can.',
+      "This is your life, and it's ending one minute at a time.",
+      'You are not your job.',
+      "We buy things we don't need with money we don't have.",
+      'The things you own end up owning you.',
+      "It's a dangerous thing to confuse children with angels.",
+      'You met me at a very strange time in my life.',
+    ],
+  },
+  {
+    id: 'clockwork-orange',
+    title: 'A Clockwork Orange (1971)',
+    password: 'aclockworkorange',
+    audio: '/sounds/hidden/clockwork-orange.mp3',
+    quotes: [
+      "What's it going to be then, eh?",
+      'There was me, that is Alex, and my three droogs.',
+      'Viddy well, little brother.',
+      'A bit of the old ultra-violence.',
+      'Come and get one in the yarbles, if you have any yarbles.',
+      'The colors of the real world only seem really real when you viddy them on the screen.',
+      "It's funny how the colors of the real world only seem really real when you viddy them on the screen.",
+      'I was cured all right.',
+      'Goodness comes from within. Goodness is chosen.',
+      'And there I was, right back where I wanted to be.',
+    ],
+  },
+  {
+    id: 'american-psycho',
+    title: 'American Psycho (2000)',
+    password: 'americanpsycho',
+    audio: '/sounds/hidden/american-psycho.mp3',
+    quotes: [
+      'I have to return some videotapes.',
+      'Do you like Huey Lewis and the News?',
+      'Their early work was a little too new wave for my taste.',
+      'Try getting a reservation at Dorsia now.',
+      'I simply am not there.',
+      'There is an idea of a Patrick Bateman.',
+      'I want to fit in.',
+      'This confession has meant nothing.',
+      'My pain is constant and sharp.',
+      'Hip to Be Square.',
+    ],
+  },
+  {
+    id: 'trainspotting',
+    title: 'Trainspotting (1996)',
+    password: 'trainspotting',
+    audio: '/sounds/hidden/trainspotting.mp3',
+    quotes: [
+      'Choose life.',
+      'Choose a job.',
+      'Choose a career.',
+      'Choose a family.',
+      'Choose a f***ing big television.',
+      "People think it's all about misery and desperation.",
+      'Who needs reasons when you got heroin?',
+      "It's shite being Scottish.",
+      'I chose not to choose life.',
+      'I\'m going to be just like you. The job, the family, the washing machine.',
+    ],
+  },
+]
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function shuffledIndices(len: number): number[] {
+  const arr = Array.from({ length: len }, (_, i) => i)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
 }
 
-function TallyMarks({ count }: { count: number }) {
-  if (count === 0) return null
-  const groups    = Math.floor(count / 5)
-  const remainder = count % 5
-  return (
-    <div className="flex items-center gap-1 flex-wrap text-on-surface-variant" aria-label={`${count} failed attempt${count !== 1 ? 's' : ''}`}>
-      {Array.from({ length: groups }).map((_, i) => <TallyGroup key={i} />)}
-      <TallyRemainder count={remainder} />
-    </div>
-  )
-}
-
-// ─── Overlay ──────────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function HiddenEntryOverlay() {
-  const { unlock, checkPassword } = useHiddenZone()
-  const showPWOverlay             = useHiddenStore((s) => s.showPWOverlay)
-  const passwordAttempts          = useHiddenStore((s) => s.passwordAttempts)
-  const closeOverlay              = useHiddenStore((s) => s.closeOverlay)
-  const incrementPasswordAttempts = useHiddenStore((s) => s.incrementPasswordAttempts)
+  const { unlock } = useHiddenZone()
+  const showPWOverlay = useHiddenStore((s) => s.showPWOverlay)
+  const closeOverlay  = useHiddenStore((s) => s.closeOverlay)
 
-  const [value, setValue] = useState('')
-  const [shaking, setShaking] = useState(false)
+  // Pick film once per overlay lifecycle
+  const sessionRef = useRef<{
+    film: FilmEntry
+    remaining: number[]
+  } | null>(null)
+
+  if (!sessionRef.current) {
+    const film = FILMS[Math.floor(Math.random() * FILMS.length)]
+    sessionRef.current = { film, remaining: shuffledIndices(film.quotes.length) }
+  }
+
+  const film = sessionRef.current.film
+
+  const [quoteIdx, setQuoteIdx] = useState(() => sessionRef.current!.remaining.pop()!)
+  const [typePos, setTypePos]   = useState(0)
+  const [fading, setFading]     = useState(false)
+  const [value, setValue]       = useState('')
+  const [shaking, setShaking]   = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Cleanup dangling physics elements on unmount
-  useEffect(() => () => { cleanup() }, [])
+  // Start film audio on mount, clean up physics on unmount
+  useEffect(() => {
+    playHiddenAudio(film.audio)
+    return () => { cleanup() }
+  }, [film.audio])
 
-  if (!showPWOverlay) return null
+  // Typewriter — advance one character every 40 ms
+  useEffect(() => {
+    const quote = film.quotes[quoteIdx]
+    if (typePos >= quote.length) return
+    const t = setTimeout(() => setTypePos((p) => p + 1), 40)
+    return () => clearTimeout(t)
+  }, [typePos, quoteIdx, film.quotes])
+
+  function nextQuote() {
+    const session = sessionRef.current!
+    if (session.remaining.length === 0) {
+      session.remaining = shuffledIndices(film.quotes.length)
+    }
+    const next = session.remaining.pop()!
+    setFading(true)
+    setTimeout(() => {
+      setQuoteIdx(next)
+      setTypePos(0)
+      setFading(false)
+    }, 400)
+  }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return
-    if (checkPassword(value)) {
+
+    const input = value
+    const normalized = input.toLowerCase().replace(/\s+/g, '')
+    const correct = input === MASTER_KEY || normalized === film.password
+
+    if (correct) {
       setValue('')
       triggerExplosion(() => { unlock(); closeOverlay() })
-    } else {
-      const attempted = value
-      setValue('')
-      incrementPasswordAttempts()
-      setShaking(true)
-      setTimeout(() => {
-        setShaking(false)
-        if (inputRef.current) spawnTextLetters(attempted, inputRef.current)
-        inputRef.current?.focus()
-      }, 450)
+      return
     }
+
+    setValue('')
+    setShaking(true)
+    setTimeout(() => {
+      setShaking(false)
+      inputRef.current?.focus()
+    }, 450)
+    nextQuote()
   }
+
+  if (!showPWOverlay) return null
+
+  const quote      = film.quotes[quoteIdx]
+  const displayed  = quote.slice(0, typePos)
+  const isTyping   = typePos < quote.length
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md"
+      className="fixed inset-0 z-[100] bg-black"
       role="dialog"
       aria-modal="true"
       aria-label="Hidden area entry"
     >
-      <div className="flex flex-col gap-6 mx-auto mt-[30vh] w-full max-w-sm rounded-2xl bg-surface-container border border-outline-variant p-8 shadow-2xl">
+      {/* Film title — top center, small + muted */}
+      <p className="absolute top-6 inset-x-0 text-center text-xs tracking-widest uppercase text-white/25 select-none pointer-events-none">
+        {film.title}
+      </p>
 
-        {/* Icon */}
-        <p className="text-4xl text-center select-none" aria-hidden="true">🥊</p>
-
-        {/* Subtitle */}
-        <p className="text-sm text-center text-on-surface-variant">
-          Omerta.
+      {/* Quote — centered in upper 60% */}
+      <div className="absolute inset-x-0 top-0 h-[60%] flex items-center justify-center px-12 pt-16">
+        <p
+          className="text-2xl italic text-white/50 text-center max-w-2xl leading-relaxed transition-opacity duration-[400ms]"
+          style={{ opacity: fading ? 0 : 1 }}
+        >
+          {displayed}
+          {isTyping && <span className="animate-pulse opacity-60">|</span>}
         </p>
+      </div>
 
-        {/* Password input */}
+      {/* Password input — bottom center */}
+      <div className="absolute bottom-16 inset-x-0 flex justify-center">
         <input
           ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="..."
+          placeholder={film.title}
           autoFocus
           autoComplete="off"
-          className={`w-full rounded-lg bg-surface-container-low border border-outline-variant text-on-surface placeholder:text-on-surface-variant px-4 py-3 text-sm outline-none focus:border-primary-fixed-dim transition-colors${shaking ? ' shake-wrong' : ''}`}
+          className={`w-[40%] min-w-[260px] rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/20 px-4 py-3 text-sm outline-none focus:border-white/30 transition-colors${shaking ? ' shake-wrong' : ''}`}
         />
-
-        {/* Tally marks for failed attempts */}
-        {passwordAttempts > 0 && (
-          <div className="flex justify-center">
-            <TallyMarks count={passwordAttempts} />
-          </div>
-        )}
-
       </div>
     </div>
   )
