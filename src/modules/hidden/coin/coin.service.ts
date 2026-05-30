@@ -134,24 +134,26 @@ export class CoinService {
 
         // Idempotency: abort if already credited
         const alreadyDone = await this.txRepo.findOne({
-            where: { beef_id: sessionId, type: 'purchase' as any },
+            where: { idempotency_key: sessionId },
         });
         if (alreadyDone) return { coins: 0 };
 
         const coins = parseInt(session.metadata?.coins ?? '0');
         if (coins <= 0) throw new BadRequestException();
 
-        await this.balanceRepo.query(
-            `INSERT INTO user_coin_balance (user_id, balance) VALUES ($1, $2)
-             ON CONFLICT (user_id) DO UPDATE SET balance = user_coin_balance.balance + $2`,
-            [userId, coins]
-        );
-        await this.txRepo.save(this.txRepo.create({
-            user_id: userId,
-            amount: coins,
-            type: 'purchase' as any,
-            beef_id: sessionId,  // reuse field as idempotency key
-        }));
+        await this.dataSource.transaction(async (manager) => {
+            await manager.query(
+                `INSERT INTO user_coin_balance (user_id, balance) VALUES ($1, $2)
+                 ON CONFLICT (user_id) DO UPDATE SET balance = user_coin_balance.balance + $2`,
+                [userId, coins]
+            );
+            await manager.save(manager.create(CoinTransaction, {
+                user_id: userId,
+                amount: coins,
+                type: 'purchase' as any,
+                idempotency_key: sessionId,
+            }));
+        });
         return { coins };
     }
 }

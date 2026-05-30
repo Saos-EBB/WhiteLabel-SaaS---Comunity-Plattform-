@@ -499,6 +499,10 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
+### 2026-05-30 (latest)
+- Fix (`coin.service.ts`): `confirmCoinPurchase` — idempotency check was querying `beef_id` (UUID column) with a Stripe session ID string, causing a Postgres type error and 500; now uses `idempotency_key` (text) for both the duplicate check and the saved record
+- Fix (`coin.service.ts`): balance update and transaction insert in `confirmCoinPurchase` now run inside a single DB transaction — prevents partial credit if either write fails
+
 ### 2026-05-29 (latest)
 - Shared: new `SharedModule` (`src/modules/shared/`) — global module exports `TypedEventBus`, `AppEvents` constants, and typed payload interfaces; all cross-module emitters and `@OnEvent` listeners now use strongly-typed keys instead of raw strings
 - Events: `TypedEventBus` wraps `EventEmitter2` with generic `emit<K>(event, payload)` / `on<K>(event, handler)` — payload shapes enforced at compile time; `BeefService`, `BeefGateway`, and `ChatService` migrated
