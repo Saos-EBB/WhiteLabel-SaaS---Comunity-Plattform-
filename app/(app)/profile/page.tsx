@@ -14,25 +14,23 @@ import { useHiddenStore } from '@/lib/store/hiddenStore'
 
 interface Profile {
   id: string
-  user_id: string
+  userId: string
   nickname: string
   birthdate: string | null
   city: string | null
   bio: string | null
-  photo_id: string | null
-  photo_url: string | null
-  photo_needs_review: boolean
-  audio_id: string | null
-  audio_url: string | null
-  audio_moderation_status: string | null
+  photoUrl: string | null
+  photoNeedsReview: boolean
+  audioUrl: string | null
+  audioModerationStatus: string | null
   gender: string | null
-  looking_for: string | null
-  onboarding_completed: boolean
-  is_published: boolean
-  status_visible: boolean
-  status_message: string | null
-  nickname_changed_at: string | null
-  gender_changed_at: string | null
+  lookingFor: string | null
+  onboardingCompleted: boolean
+  isPublished: boolean
+  statusVisible: boolean
+  statusMessage: string | null
+  nicknameChangedAt?: string | null
+  genderChangedAt?: string | null
 }
 
 type AudioStatus = 'none' | 'recording' | 'preview' | 'uploading' | 'pending' | 'approved' | 'rejected'
@@ -134,16 +132,16 @@ export default function ProfilePage() {
           fetchApi<Interest[] | { data: Interest[] }>('/profile/interests'),
         ])
         setProfile(prof)
-        if (prof.photo_url) {
-          try { setPhotoUrl(new URL(prof.photo_url).pathname) } catch { setPhotoUrl(prof.photo_url) }
+        if (prof.photoUrl) {
+          try { setPhotoUrl(new URL(prof.photoUrl).pathname) } catch { setPhotoUrl(prof.photoUrl) }
         }
-        if (prof.audio_url) {
-          if (prof.audio_moderation_status === 'approved') {
+        if (prof.audioUrl) {
+          if (prof.audioModerationStatus === 'approved') {
             setAudioStatus('approved')
-            try { setAudioUrl(new URL(prof.audio_url).pathname) } catch { setAudioUrl(prof.audio_url) }
-          } else if (prof.audio_moderation_status === 'pending') {
+            try { setAudioUrl(new URL(prof.audioUrl).pathname) } catch { setAudioUrl(prof.audioUrl) }
+          } else if (prof.audioModerationStatus === 'pending') {
             setAudioStatus('pending')
-          } else if (prof.audio_moderation_status === 'rejected') {
+          } else if (prof.audioModerationStatus === 'rejected') {
             setAudioStatus('rejected')
           }
         }
@@ -205,8 +203,8 @@ export default function ProfilePage() {
       bio:          profile.bio         ?? '',
       city:         profile.city        ?? '',
       gender:       profile.gender      ?? '',
-      looking_for:  profile.looking_for ?? '',
-      is_published: profile.is_published,
+      looking_for:  profile.lookingFor ?? '',
+      is_published: profile.isPublished,
     })
     setSaveError(null)
     setPhotoPickError(null)
@@ -286,8 +284,8 @@ export default function ProfilePage() {
       })
       const refreshed = await fetchApi<Profile>('/profile/me')
       setProfile(refreshed)
-      if (refreshed.photo_url) {
-        try { setPhotoUrl(new URL(refreshed.photo_url).pathname) } catch { setPhotoUrl(refreshed.photo_url) }
+      if (refreshed.photoUrl) {
+        try { setPhotoUrl(new URL(refreshed.photoUrl).pathname) } catch { setPhotoUrl(refreshed.photoUrl) }
       }
       setEditMode(false)
     } catch (err) {
@@ -468,13 +466,13 @@ export default function ProfilePage() {
 
   const selectedIds = new Set(userInterests.map((ui) => ui.interest_id))
 
-  const nicknameChangedAt = profile?.nickname_changed_at ?? null
+  const nicknameChangedAt = profile?.nicknameChangedAt ?? null
   const nicknameChangedWithinYear = nicknameChangedAt
     ? Date.now() - new Date(nicknameChangedAt).getTime() < 365 * 24 * 60 * 60 * 1000
     : false
   const nicknameChangesRemaining = nicknameChangedWithinYear ? 0 : 1
 
-  const genderChangedAt = profile?.gender_changed_at ?? null
+  const genderChangedAt = profile?.genderChangedAt ?? null
   const genderChangedWithinYear = genderChangedAt
     ? Date.now() - new Date(genderChangedAt).getTime() < 365 * 24 * 60 * 60 * 1000
     : false
@@ -521,7 +519,7 @@ export default function ProfilePage() {
               <img
                 src={displayPhoto}
                 alt={t.profile.profilePhoto}
-                className={`w-full h-full object-cover rounded-3xl${profile.photo_needs_review && !pendingPhotoPreview ? ' ring-2 ring-error' : ''}`}
+                className={`w-full h-full object-cover rounded-3xl${profile.photoNeedsReview && !pendingPhotoPreview ? ' ring-2 ring-error' : ''}`}
               />
             ) : (
               <div className="w-full h-full rounded-3xl bg-surface-container-high flex items-center justify-center">
@@ -531,7 +529,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {profile.photo_needs_review && !pendingPhotoPreview && photoUrl && (
+            {profile.photoNeedsReview && !pendingPhotoPreview && photoUrl && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-error/80 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
                 {t.profile.underReview}
               </div>
@@ -593,8 +591,8 @@ export default function ProfilePage() {
                 )}
               </div>
               <OnlineIndicator
-                is_online={profile.status_visible}
-                status_message={profile.status_message}
+                is_online={profile.statusVisible}
+                status_message={profile.statusMessage}
                 size="sm"
               />
             </div>
@@ -983,7 +981,7 @@ export default function ProfilePage() {
                 role="switch"
                 aria-checked={draft.is_published}
                 onClick={() => setDraft((d) => ({ ...d, is_published: !d.is_published }))}
-                disabled={!profile.onboarding_completed && !draft.is_published}
+                disabled={!profile.onboardingCompleted && !draft.is_published}
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
                   draft.is_published ? 'bg-primary-fixed-dim' : 'bg-surface-container-high'
                 }`}
