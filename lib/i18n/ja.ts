@@ -156,7 +156,7 @@ export const ja = {
     next: '次へ',
     finish: '終了',
     back: '戻る',
-    welcomeTitle: 'XXXへようこそ！',
+    welcomeTitle: 'YourBrandへようこそ！',
     welcomeBody: '他のユーザーが見つけられるようにプロフィールを設定しましょう。',
     start: '始める',
     photoSubtitle: '（任意ですが、おすすめします）',

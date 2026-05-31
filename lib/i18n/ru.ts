@@ -156,7 +156,7 @@ export const ru = {
     next: 'Далее',
     finish: 'Завершить',
     back: 'Назад',
-    welcomeTitle: 'Добро пожаловать в XXX!',
+    welcomeTitle: 'Добро пожаловать в YourBrand!',
     welcomeBody: 'Настройте свой профиль, чтобы другие могли вас найти.',
     start: 'Поехали',
     photoSubtitle: '(необязательно, но рекомендуется)',

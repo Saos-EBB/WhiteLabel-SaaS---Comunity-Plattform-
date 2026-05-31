@@ -11,7 +11,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "XXX",
+  title: "YourBrand",
   description: "Barrierefreie Dating-App",
 };
 

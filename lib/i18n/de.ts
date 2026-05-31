@@ -158,7 +158,7 @@ export const de = {
     next: 'Weiter',
     finish: 'Abschließen',
     back: 'Zurück',
-    welcomeTitle: 'Willkommen bei XXX!',
+    welcomeTitle: 'Willkommen bei YourBrand!',
     welcomeBody: 'Richte dein Profil ein damit andere dich finden können.',
     start: "Los geht's",
     photoSubtitle: '(optional, aber empfohlen)',

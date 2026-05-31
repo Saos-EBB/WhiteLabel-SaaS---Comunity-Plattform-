@@ -156,7 +156,7 @@ export const deEasy = {
     next: 'Weiter',
     finish: 'Fertig machen',
     back: 'Zurück',
-    welcomeTitle: 'Willkommen bei XXX!',
+    welcomeTitle: 'Willkommen bei YourBrand!',
     welcomeBody: 'Mach dein Profil fertig. Dann können andere dich finden.',
     start: 'Los geht es',
     photoSubtitle: '(Das ist freiwillig, aber gut)',
