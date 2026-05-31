@@ -500,6 +500,10 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Feat (`media.service.ts`): nach jedem Profilbild-Upload wird Event `media.pending_review` emitted
+- Feat (`chat.gateway.ts`): `@OnEvent('media.pending_review')` leitet Event als `media:pending_review` an den WebSocket-Adminraum weiter
+
+### 2026-05-31
 - Fix (`profanity.service.ts`): `check()` erkennt jetzt Leet-Speak (1→i, 3→e, 0→o, …) und mit Leerzeichen/Punkten/Strichen aufgeteilte Wörter (z.B. „n 1 g g 3 r") — normalisierter Text wird intern geprüft, nie gespeichert
 
 ### 2026-05-30
