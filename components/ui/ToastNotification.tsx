@@ -57,7 +57,7 @@ export default function ToastNotification() {
   return (
     <div
       aria-label="Benachrichtigungen"
-      className="fixed top-4 right-4 md:top-auto md:bottom-4 md:right-4 z-50 flex flex-col gap-2"
+      className="fixed top-20 right-4 md:top-auto md:bottom-4 md:right-4 z-50 flex flex-col gap-2"
     >
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />

@@ -157,7 +157,7 @@ export function NotificationBell() {
         <div
           role="dialog"
           aria-label={t.notifications.label}
-          className="absolute right-0 top-full mt-2 w-80 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
+          className="fixed top-16 left-2 right-2 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-80 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
             <span className="text-sm font-semibold text-on-surface">{t.notifications.label}</span>
