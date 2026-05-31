@@ -93,9 +93,16 @@ export function TicketsTab({ showToast }: Props) {
           onClick={() => setTicketsExpanded((v) => !v)}
           className="w-full flex items-center justify-between py-2 cursor-pointer select-none"
         >
-          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-            {t.admin.ticketsReports.replace('{count}', String(tickets.length))}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+              {t.admin.ticketsReports.replace(/\s*\(\{count\}\)/, '')}
+            </p>
+            {tickets.length > 0 && (
+              <span className="h-4 min-w-4 px-1 rounded-full bg-error text-on-error text-[9px] font-bold flex items-center justify-center">
+                {tickets.length > 99 ? '99+' : tickets.length}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -160,9 +167,16 @@ export function TicketsTab({ showToast }: Props) {
           onClick={() => setSupportExpanded((v) => !v)}
           className="w-full flex items-center justify-between py-2 cursor-pointer select-none"
         >
-          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-            {t.admin.ticketsSupportRequests.replace('{count}', String(supportTickets.length))}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+              {t.admin.ticketsSupportRequests.replace(/\s*\(\{count\}\)/, '')}
+            </p>
+            {supportTickets.length > 0 && (
+              <span className="h-4 min-w-4 px-1 rounded-full bg-error text-on-error text-[9px] font-bold flex items-center justify-center">
+                {supportTickets.length > 99 ? '99+' : supportTickets.length}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
