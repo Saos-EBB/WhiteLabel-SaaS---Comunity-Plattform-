@@ -629,6 +629,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 - Fix (`TopNav`): Boxhandschuh-Emoji vom „Beef"-Nav-Link entfernt
 - Fix (`mobile`): Toast-Benachrichtigungen erscheinen jetzt unterhalb der TopNav statt dahinter; Bell- und StatusPicker-Dropdown werden auf Mobile als volle Breite unter der TopNav fixiert statt seitlich aus dem Viewport zu fliegen; Admin-Modal-Overlay liegt nun über der BottomNav; Beef-Bottom-Sheet hat mehr Bottom-Padding für den iOS Home Indicator
 - Fix (`notifications`): Migration 028 ausgeführt — `content_vars JSONB`-Spalte in der `notifications`-Tabelle nachgezogen; `/notifications` lieferte vorher 500
+- Fix (Settings): Sichtbarkeits-Toggles (Bio, Stadt, Alter etc.) waren fälschlicherweise disabled wenn Profil nicht published; jetzt immer bedienbar
+- Admin (Meldungen): Tab lädt beim Öffnen nur `open`-Reports; Status-Dropdown entfernt; neuer „History"-Button lädt `reviewed` + `closed` parallel; „← Zurück" kehrt zur Hauptansicht zurück; Suche (Nickname, Gegner, Grund) client-seitig für beide Ansichten
+- Admin (Coin & Cash): neuer Owner-only Tab mit zwei Sub-Tabs — Coin Transactions (inkl. House-Cut-Sektion für System-User) und Cash Transactions; client-seitige Suche nach Nickname/Grund bzw. Nickname/Status; Daten kommen von zwei neuen Backend-Endpoints (`GET /admin/owner/coin-transactions`, `GET /admin/owner/cash-transactions`)
 
 ### 2026-05-31
 - Feat (`settings`, `i18n`): Leetspeak (`1337 5p34k`) als Sprachoption im Language-Picker hinzugefügt
@@ -830,7 +833,7 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 - Own profile (`/profile`): `photo_needs_review` field added to `Profile` type; photo gets an error ring + "Wird überprüft" badge when `photo_needs_review = true` (hidden during a fresh upload preview)
 - `package.json`: added `leo-profanity ^1.9.0`
 
-### 2026-05-31 (latest)
+### 2026-05-31
 - Branding: replaced all visible "XXX" UI text with "YourBrand" — covers JSX renders (onboarding layout, auth layout, nav logo button), browser tab title, and all i18n locale files (`de`, `de_easy`, `en`, `es`, `fr`, `it`, `ja`, `leet`, `ru`); aria-labels and non-rendered strings unchanged
 - B2B page (`/b2b`): removed copyright footer (`© 2025 YourBrand · White-Label SaaS für Organisationen`)
 

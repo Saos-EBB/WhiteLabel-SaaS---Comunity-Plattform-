@@ -623,8 +623,6 @@ export default function SettingsPage() {
     xl:     'text-lg',
   }
 
-  const visFieldsDisabled = !profile.is_published
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -855,7 +853,7 @@ export default function SettingsPage() {
           <Divider />
 
           {/* Field visibility toggles */}
-          <div className={`space-y-3 transition-opacity duration-200 ${visFieldsDisabled ? 'opacity-50' : ''}`}>
+          <div className="space-y-3">
             {([
               { field: 'status_visible',  label: t.settings.visibilityOnlineStatus },
               { field: 'show_bio',        label: t.settings.visibilityBio },
@@ -872,7 +870,6 @@ export default function SettingsPage() {
                 checked={profile[field] as boolean}
                 onChange={(v) => saveVisibility(field, v)}
                 saving={visSaving.has(field)}
-                disabled={visFieldsDisabled}
               />
             ))}
           </div>
