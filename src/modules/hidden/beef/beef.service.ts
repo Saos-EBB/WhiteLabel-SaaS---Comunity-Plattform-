@@ -119,7 +119,11 @@ export class BeefService {
         }
         this.stateMachine.transition(beef, BeefEvent.ACCEPT);
         beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
-        await this.notificationsService.notifyBeefAccepted(beef.initiator_id, beef.id);
+        const [acceptorProfile] = await this.dataSource.query<{ nickname: string }[]>(
+            'SELECT nickname FROM profiles WHERE user_id = $1 LIMIT 1',
+            [beef.target_id],
+        );
+        await this.notificationsService.notifyBeefAccepted(beef.initiator_id, beef.id, acceptorProfile?.nickname ?? '');
         return this.beefRepo.save(beef);
     }
 
@@ -131,7 +135,11 @@ export class BeefService {
         beef.admin_approved = true;
         this.stateMachine.transition(beef, BeefEvent.APPROVE);
         const saved = await this.beefRepo.save(beef);
-        await this.notificationsService.notifyBeefRequest(beef.target_id, beef.id, beef.tldr);
+        const [initiatorProfile] = await this.dataSource.query<{ nickname: string }[]>(
+            'SELECT nickname FROM profiles WHERE user_id = $1 LIMIT 1',
+            [beef.initiator_id],
+        );
+        await this.notificationsService.notifyBeefRequest(beef.target_id, beef.id, beef.tldr, initiatorProfile?.nickname ?? '');
         return saved;
     }
 

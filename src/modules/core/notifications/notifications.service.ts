@@ -18,12 +18,12 @@ export class NotificationsService {
         private readonly dataSource: DataSource,
     ) { }
 
-    async notifyBeefRequest(userId: string, beefId: string, tldr: string): Promise<void> {
-        await this.createNotification(userId, 'beef_request', 'notifications.beef_request', 'Beef Anfrage', beefId, { tldr });
+    async notifyBeefRequest(userId: string, beefId: string, tldr: string, initiatorNickname: string): Promise<void> {
+        await this.createNotification(userId, 'beef_request', 'notifications.beef_request', 'Beef Anfrage', beefId, { nickname: initiatorNickname, tldr });
     }
 
-    async notifyBeefAccepted(userId: string, beefId: string): Promise<void> {
-        await this.createNotification(userId, 'beef_accepted', 'notifications.beef_accepted', 'Beef angenommen', beefId, {});
+    async notifyBeefAccepted(userId: string, beefId: string, acceptorNickname: string): Promise<void> {
+        await this.createNotification(userId, 'beef_accepted', 'notifications.beef_accepted', 'Beef angenommen', beefId, { nickname: acceptorNickname });
     }
 
     async notifyBeefWon(userId: string, beefId: string, coinShare: number): Promise<void> {
