@@ -827,4 +827,37 @@ export class AdminService {
             pendingMedia:    parseInt(pendingMediaRow.count, 10),
         };
     }
+
+    // ── Owner: coin & cash transactions ───────────────────────────────────────
+
+    async getCoinTransactions(): Promise<unknown[]> {
+        return this.dataSource.query(`
+            SELECT
+                ct.id,
+                ct.user_id,
+                p.nickname,
+                ct.amount,
+                ct.type  AS reason,
+                ct.created_at
+            FROM coin_transactions ct
+            LEFT JOIN profiles p ON p.user_id = ct.user_id
+            ORDER BY ct.created_at DESC
+        `);
+    }
+
+    async getCashTransactions(): Promise<unknown[]> {
+        return this.dataSource.query(`
+            SELECT
+                pl.id,
+                pl.user_id,
+                p.nickname,
+                pl.amount,
+                pl.currency,
+                pl.status,
+                pl.created_at
+            FROM payment_logs pl
+            LEFT JOIN profiles p ON p.user_id = pl.user_id
+            ORDER BY pl.created_at DESC
+        `);
+    }
 }

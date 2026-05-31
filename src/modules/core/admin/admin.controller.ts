@@ -248,6 +248,20 @@ export class AdminController {
         });
     }
 
+    // ── Owner: coin & cash transactions ──────────────────────────────────────
+
+    @Get('owner/coin-transactions')
+    @UseGuards(OwnerGuard)
+    getCoinTransactions() {
+        return this.adminService.getCoinTransactions();
+    }
+
+    @Get('owner/cash-transactions')
+    @UseGuards(OwnerGuard)
+    getCashTransactions() {
+        return this.adminService.getCashTransactions();
+    }
+
     // ── System settings (owner only) ──────────────────────────────────────────
 
     @Get('settings')
