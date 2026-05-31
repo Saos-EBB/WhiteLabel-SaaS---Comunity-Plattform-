@@ -213,19 +213,6 @@ const TECH_ROWS = {
   ],
 }
 
-// ─── Feature row groups ──────────────────────────────────────────────────────
-
-const LIGHT_ROWS: FeatureDef[][] = [
-  LIGHT_FEATURES.slice(0, 3),
-  LIGHT_FEATURES.slice(3, 6),
-  LIGHT_FEATURES.slice(6, 10),
-]
-
-const DARK_ROWS: FeatureDef[][] = [
-  DARK_FEATURES.slice(0, 4),
-  DARK_FEATURES.slice(4, 8),
-]
-
 // ─── Tier helpers ─────────────────────────────────────────────────────────────
 
 const TIER_CARD_CLASS: Record<TierKey, string> = {
@@ -302,7 +289,7 @@ function DetailPanel({
 }) {
   const Icon = feat.icon
   return (
-    <div className="mt-4 rounded-2xl border border-primary-fixed-dim bg-surface-container p-6">
+    <div className="rounded-2xl border border-primary-fixed-dim bg-surface-container p-6">
       <div className="flex items-start justify-between gap-4 mb-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-surface-container-high">
@@ -346,12 +333,9 @@ export default function B2BPage() {
 
   const techRows  = isEn ? TECH_ROWS.en : TECH_ROWS.de
 
-  const activeRows     = isDark ? DARK_ROWS : LIGHT_ROWS
-  const selectedRowIdx = selectedFeature !== null
-    ? activeRows.findIndex(row => row.some(f => f.id === selectedFeature))
-    : -1
-  const selectedFeatDef     = selectedRowIdx >= 0
-    ? activeRows[selectedRowIdx].find(f => f.id === selectedFeature) ?? null
+  const features            = isDark ? DARK_FEATURES : LIGHT_FEATURES
+  const selectedFeatDef     = selectedFeature !== null
+    ? features.find(f => f.id === selectedFeature) ?? null
     : null
   const selectedFeatContent = selectedFeatDef
     ? (isEn ? selectedFeatDef.en : selectedFeatDef.de)
@@ -458,66 +442,33 @@ export default function B2BPage() {
           <h2 className="text-2xl sm:text-3xl font-bold text-on-surface">{t.b2b.features.label}</h2>
         </div>
 
-        {isDark ? (
-          // Dark: 8 features in 2 rows of 4
-          <div className="flex flex-col gap-4">
-            {DARK_ROWS.map((row, rowIdx) => (
-              <div key={rowIdx}>
-                <div className="grid grid-cols-12 gap-4">
-                  {row.map((feat) => (
-                    <div key={feat.id} className="col-span-12 sm:col-span-6 lg:col-span-3">
-                      <FeatureCard
-                        feat={feat}
-                        content={isEn ? feat.en : feat.de}
-                        selected={selectedFeature === feat.id}
-                        onToggle={() => handleFeatureToggle(feat.id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {rowIdx === selectedRowIdx && selectedFeatDef && selectedFeatContent && (
+        <div className={`grid gap-4 ${isDark ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+          {features.flatMap((feat) => {
+            const card = (
+              <div key={feat.id}>
+                <FeatureCard
+                  feat={feat}
+                  content={isEn ? feat.en : feat.de}
+                  selected={selectedFeature === feat.id}
+                  onToggle={() => handleFeatureToggle(feat.id)}
+                />
+              </div>
+            )
+            if (feat.id === selectedFeature && selectedFeatDef && selectedFeatContent) {
+              return [
+                card,
+                <div key={`panel-${feat.id}`} className="col-span-full">
                   <DetailPanel
                     feat={selectedFeatDef}
                     content={selectedFeatContent}
                     onClose={() => setSelectedFeature(null)}
                   />
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          // Light: 10 features in 3 rows (3/3/4)
-          <div className="flex flex-col gap-4">
-            {LIGHT_ROWS.map((row, rowIdx) => {
-              const colClass = rowIdx < 2
-                ? 'col-span-12 sm:col-span-6 lg:col-span-4'
-                : 'col-span-12 sm:col-span-6 lg:col-span-3'
-              return (
-                <div key={rowIdx}>
-                  <div className="grid grid-cols-12 gap-4">
-                    {row.map((feat) => (
-                      <div key={feat.id} className={colClass}>
-                        <FeatureCard
-                          feat={feat}
-                          content={isEn ? feat.en : feat.de}
-                          selected={selectedFeature === feat.id}
-                          onToggle={() => handleFeatureToggle(feat.id)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {rowIdx === selectedRowIdx && selectedFeatDef && selectedFeatContent && (
-                    <DetailPanel
-                      feat={selectedFeatDef}
-                      content={selectedFeatContent}
-                      onClose={() => setSelectedFeature(null)}
-                    />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+                </div>,
+              ]
+            }
+            return [card]
+          })}
+        </div>
       </section>
 
       {/* ── License tiers ─────────────────────────────────────────────── */}
