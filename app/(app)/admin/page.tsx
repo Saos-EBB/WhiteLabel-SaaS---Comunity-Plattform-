@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
-  AlertCircle, BookOpen, Check, Crown, FileText,
+  AlertCircle, BookOpen, Check, Coins, Crown, FileText,
   Image as ImageIcon, Inbox, Shield, Swords, Users, Zap,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
@@ -25,6 +25,7 @@ const ProfanityTab = dynamic(() => import('@/components/admin/ProfanityTab').the
 const SettingsTab  = dynamic(() => import('@/components/admin/SettingsTab').then((m) => m.SettingsTab), { ssr: false })
 const VerwaltungTab = dynamic(() => import('@/components/admin/VerwaltungTab').then((m) => m.VerwaltungTab), { ssr: false })
 const BeefTab      = dynamic(() => import('@/components/admin/BeefTab').then((m) => m.BeefTab),         { ssr: false })
+const CoinCashTab  = dynamic(() => import('@/components/admin/CoinCashTab').then((m) => m.CoinCashTab), { ssr: false })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ function getJwtRole(token: string | null): string | null {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AdminTab = 'tickets' | 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings' | 'verwaltung' | 'beef'
+type AdminTab = 'tickets' | 'media' | 'users' | 'reports' | 'strikes' | 'profanity' | 'settings' | 'verwaltung' | 'beef' | 'coin-cash'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -123,7 +124,10 @@ export default function AdminPage() {
     { key: 'strikes',   label: t.admin.tabStrikes,   icon: <Zap className="h-4 w-4" /> },
     { key: 'profanity', label: t.admin.tabProfanity, icon: <BookOpen className="h-4 w-4" /> },
     ...(isOwner
-      ? [{ key: 'verwaltung' as AdminTab, label: t.admin.tabManagement, icon: <Crown className="h-4 w-4" /> }]
+      ? [
+          { key: 'verwaltung' as AdminTab, label: t.admin.tabManagement, icon: <Crown className="h-4 w-4" /> },
+          { key: 'coin-cash'  as AdminTab, label: 'Coin & Cash',         icon: <Coins className="h-4 w-4" /> },
+        ]
       : []
     ),
   ]
@@ -227,6 +231,7 @@ export default function AdminPage() {
             onCountChange={setPendingBeefsCount}
           />
         )}
+        {tabsReady && activeTab === 'coin-cash'  && <CoinCashTab showToast={showToast} />}
 
       </div>
 

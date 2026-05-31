@@ -110,3 +110,22 @@ export interface Paginated<T> {
 }
 
 export type BanInfo = { userId: string; nickname: string; reportId?: string }
+
+export interface AdminCoinTransaction {
+  id: string
+  user_id: string
+  nickname: string | null
+  amount: number
+  reason: string
+  created_at: string
+}
+
+export interface AdminCashTransaction {
+  id: string
+  user_id: string
+  nickname: string | null
+  amount: string
+  currency: string
+  status: string
+  created_at: string
+}
