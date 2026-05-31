@@ -284,7 +284,7 @@ export function TicketsTab({ showToast }: Props) {
                         </div>
                       </div>
                       <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-error-container text-error">
-                        pending
+                        open
                       </span>
                     </div>
                   ))}
