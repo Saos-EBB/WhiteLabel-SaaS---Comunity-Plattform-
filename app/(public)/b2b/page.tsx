@@ -213,6 +213,19 @@ const TECH_ROWS = {
   ],
 }
 
+// ─── Feature row groups ──────────────────────────────────────────────────────
+
+const LIGHT_ROWS: FeatureDef[][] = [
+  LIGHT_FEATURES.slice(0, 3),
+  LIGHT_FEATURES.slice(3, 6),
+  LIGHT_FEATURES.slice(6, 10),
+]
+
+const DARK_ROWS: FeatureDef[][] = [
+  DARK_FEATURES.slice(0, 4),
+  DARK_FEATURES.slice(4, 8),
+]
+
 // ─── Tier helpers ─────────────────────────────────────────────────────────────
 
 const TIER_CARD_CLASS: Record<TierKey, string> = {
@@ -278,6 +291,46 @@ function FeatureCard({
   )
 }
 
+// ─── Detail panel (inline below each feature row) ────────────────────────────
+
+function DetailPanel({
+  feat, content, onClose,
+}: {
+  feat: FeatureDef
+  content: FeatureDef['de']
+  onClose: () => void
+}) {
+  const Icon = feat.icon
+  return (
+    <div className="mt-4 rounded-2xl border border-primary-fixed-dim bg-surface-container p-6">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-surface-container-high">
+            <Icon size={20} className="text-primary-fixed-dim" aria-hidden />
+          </div>
+          <div>
+            <h3 className="font-semibold text-on-surface">{content.title}</h3>
+            <p className="text-sm text-on-surface-variant mt-0.5">{content.desc}</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close detail"
+          className="flex-shrink-0 p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
+        >
+          <X size={16} aria-hidden />
+        </button>
+      </div>
+      <div className="rounded-xl bg-surface-container-low border border-outline-variant flex flex-col items-center justify-center gap-3 py-14">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container border border-outline-variant">
+          <Play size={20} className="text-on-surface-variant" aria-hidden />
+        </div>
+        <p className="text-sm text-on-surface-variant">Demo video — {content.videoLabel}</p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function B2BPage() {
@@ -291,12 +344,7 @@ export default function B2BPage() {
   const isDark = theme === 'dark'
   const isEn   = uiLang === 'en'
 
-  const features  = isDark ? DARK_FEATURES : LIGHT_FEATURES
   const techRows  = isEn ? TECH_ROWS.en : TECH_ROWS.de
-
-  const selectedDef     = features.find(f => f.id === selectedFeature) ?? null
-  const selectedContent = selectedDef ? (isEn ? selectedDef.en : selectedDef.de) : null
-  const SelectedIcon    = selectedDef?.icon ?? null
 
   function getTierContent(tier: TierDef): TierContent {
     const side = isDark ? tier.dark : tier.light
@@ -400,76 +448,69 @@ export default function B2BPage() {
         </div>
 
         {isDark ? (
-          // Dark: 8 features — 4/4 layout (4-col grid)
-          <div className="grid grid-cols-12 gap-4">
-            {DARK_FEATURES.map((feat) => {
-              const content = isEn ? feat.en : feat.de
+          // Dark: 8 features in 2 rows of 4
+          <div className="flex flex-col gap-4">
+            {DARK_ROWS.map((row, rowIdx) => {
+              const rowSelected = row.find(f => f.id === selectedFeature) ?? null
+              const rowContent  = rowSelected ? (isEn ? rowSelected.en : rowSelected.de) : null
               return (
-                <div key={feat.id} className="col-span-12 sm:col-span-6 lg:col-span-3">
-                  <FeatureCard
-                    feat={feat}
-                    content={content}
-                    selected={selectedFeature === feat.id}
-                    onToggle={() => handleFeatureToggle(feat.id)}
-                  />
+                <div key={rowIdx}>
+                  <div className="grid grid-cols-12 gap-4">
+                    {row.map((feat) => (
+                      <div key={feat.id} className="col-span-12 sm:col-span-6 lg:col-span-3">
+                        <FeatureCard
+                          feat={feat}
+                          content={isEn ? feat.en : feat.de}
+                          selected={selectedFeature === feat.id}
+                          onToggle={() => handleFeatureToggle(feat.id)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {rowSelected && rowContent && (
+                    <DetailPanel
+                      feat={rowSelected}
+                      content={rowContent}
+                      onClose={() => setSelectedFeature(null)}
+                    />
+                  )}
                 </div>
               )
             })}
           </div>
         ) : (
-          // Light: 10 features — 3/3/4 layout (12-col grid)
-          // Features 0–5: col-span-4 (3 per row), features 6–9: col-span-3 (4 per row)
-          <div className="grid grid-cols-12 gap-4">
-            {LIGHT_FEATURES.map((feat, i) => {
-              const content  = isEn ? feat.en : feat.de
-              const colClass = i < 6
+          // Light: 10 features in 3 rows (3/3/4)
+          <div className="flex flex-col gap-4">
+            {LIGHT_ROWS.map((row, rowIdx) => {
+              const colClass    = rowIdx < 2
                 ? 'col-span-12 sm:col-span-6 lg:col-span-4'
                 : 'col-span-12 sm:col-span-6 lg:col-span-3'
+              const rowSelected = row.find(f => f.id === selectedFeature) ?? null
+              const rowContent  = rowSelected ? (isEn ? rowSelected.en : rowSelected.de) : null
               return (
-                <div key={feat.id} className={colClass}>
-                  <FeatureCard
-                    feat={feat}
-                    content={content}
-                    selected={selectedFeature === feat.id}
-                    onToggle={() => handleFeatureToggle(feat.id)}
-                  />
+                <div key={rowIdx}>
+                  <div className="grid grid-cols-12 gap-4">
+                    {row.map((feat) => (
+                      <div key={feat.id} className={colClass}>
+                        <FeatureCard
+                          feat={feat}
+                          content={isEn ? feat.en : feat.de}
+                          selected={selectedFeature === feat.id}
+                          onToggle={() => handleFeatureToggle(feat.id)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {rowSelected && rowContent && (
+                    <DetailPanel
+                      feat={rowSelected}
+                      content={rowContent}
+                      onClose={() => setSelectedFeature(null)}
+                    />
+                  )}
                 </div>
               )
             })}
-          </div>
-        )}
-
-        {/* Detail panel — shown below grid when a card is selected */}
-        {selectedDef && selectedContent && SelectedIcon && (
-          <div className="mt-6 rounded-2xl border border-primary-fixed-dim bg-surface-container p-6">
-            <div className="flex items-start justify-between gap-4 mb-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-surface-container-high">
-                  <SelectedIcon size={20} className="text-primary-fixed-dim" aria-hidden />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-on-surface">{selectedContent.title}</h3>
-                  <p className="text-sm text-on-surface-variant mt-0.5">{selectedContent.desc}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedFeature(null)}
-                aria-label="Close detail"
-                className="flex-shrink-0 p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
-              >
-                <X size={16} aria-hidden />
-              </button>
-            </div>
-
-            {/* Video placeholder */}
-            <div className="rounded-xl bg-surface-container-low border border-outline-variant flex flex-col items-center justify-center gap-3 py-14">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-container border border-outline-variant">
-                <Play size={20} className="text-on-surface-variant" aria-hidden />
-              </div>
-              <p className="text-sm text-on-surface-variant">
-                Demo video — {selectedContent.videoLabel}
-              </p>
-            </div>
           </div>
         )}
       </section>
