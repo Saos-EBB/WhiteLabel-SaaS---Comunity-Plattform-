@@ -830,7 +830,11 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 - Own profile (`/profile`): `photo_needs_review` field added to `Profile` type; photo gets an error ring + "Wird überprüft" badge when `photo_needs_review = true` (hidden during a fresh upload preview)
 - `package.json`: added `leo-profanity ^1.9.0`
 
-### 2026-05-19 (latest)
+### 2026-05-31 (latest)
+- Branding: replaced all visible "XXX" UI text with "YourBrand" — covers JSX renders (onboarding layout, auth layout, nav logo button), browser tab title, and all i18n locale files (`de`, `de_easy`, `en`, `es`, `fr`, `it`, `ja`, `leet`, `ru`); aria-labels and non-rendered strings unchanged
+- B2B page (`/b2b`): removed copyright footer (`© 2025 YourBrand · White-Label SaaS für Organisationen`)
+
+### 2026-05-19
 - New `OnlineIndicator` component (`components/ui/OnlineIndicator.tsx`) — green/gray dot + translated status label, accessible `aria-label`, sizes `sm`/`md`
 - Chat list (`/chat`): green/gray ring dot overlaid on avatar; status_message label shown below message preview via `OnlineIndicator`; both driven by new `partner_is_online` / `partner_status_message` fields from the conversations API
 - Chat header (`/chat/[id]`): `OnlineIndicator` shown below partner nickname; partner public profile fetched after nickname resolves to get `is_online` and `status_message`

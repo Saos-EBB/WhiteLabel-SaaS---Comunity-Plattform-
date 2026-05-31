@@ -593,11 +593,6 @@ export default function B2BPage() {
         </div>
       </section>
 
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <footer className="mx-auto max-w-screen-lg px-6 pb-10 text-center">
-        <p className="text-xs text-on-surface-variant">{t.b2b.footer.text}</p>
-      </footer>
-
     </div>
   )
 }
