@@ -500,6 +500,9 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Fix (`admin.service.ts`): „Aktive Chats" auf dem User-Dashboard zählte auch Gespräche, die der User bereits gelöscht hatte — Query filtert jetzt korrekt nach `deleted_at_a`/`deleted_at_b`
+
+### 2026-05-31
 - Feat (`media.service.ts`): nach jedem Profilbild-Upload wird Event `media.pending_review` emitted
 - Feat (`chat.gateway.ts`): `@OnEvent('media.pending_review')` leitet Event als `media:pending_review` an den WebSocket-Adminraum weiter
 
