@@ -500,6 +500,9 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Feat (`admin.controller.ts`, `admin.service.ts`): zwei neue Owner-only Endpoints — `GET /admin/owner/coin-transactions` und `GET /admin/owner/cash-transactions`; beide joinen `profiles.nickname` per Raw-SQL und sind durch `OwnerGuard` geschützt
+
+### 2026-05-31
 - Fix (`beef.service.ts`, `notifications.service.ts`): Beef-Benachrichtigungen (`notifyBeefRequest`, `notifyBeefAccepted`) enthielten keine Nicknamen — beide Methoden holen jetzt das Profil per gezielter SQL-Query und übergeben den Nickname als `content_vars`
 - Feat (`notifications.service.ts`): alle `notify*`-Domain-Methoden speichern jetzt strukturierte i18n-Keys + `content_vars` statt interpolierter deutscher Strings; Migration `028` fügt `content_vars JSONB` zur `notifications`-Tabelle hinzu; Ban-Methode aufgeteilt in `notifyBanTemp` / `notifyBanPermanent` / `notifyBanRevoked`; `admin.service`, `chat.service`, `moderation.service`, `payment.service` angepasst
 
