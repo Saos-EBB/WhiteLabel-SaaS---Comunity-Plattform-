@@ -123,11 +123,7 @@ export class PaymentService {
                 });
                 await this.paymentLogRepository.save(paymentLog);
 
-                await this.notificationsService.createNotification(
-                    userId,
-                    'system',
-                    'Dein Premium-Abo ist jetzt aktiv! Du hast Zugriff auf alle Features.',
-                );
+                await this.notificationsService.createNotification(userId, 'system', 'notifications.payment_success', undefined, undefined, {});
                 break;
             }
 
@@ -139,11 +135,7 @@ export class PaymentService {
                     where: { provider_subscription_id: invoice.subscription as string },
                 });
                 if (sub) {
-                    await this.notificationsService.createNotification(
-                        sub.user_id,
-                        'system',
-                        'Deine Zahlung konnte nicht verarbeitet werden. Bitte prüfe deine Zahlungsmethode.',
-                    );
+                    await this.notificationsService.createNotification(sub.user_id, 'system', 'notifications.payment_failed', undefined, undefined, {});
                 }
                 break;
             }
@@ -172,11 +164,7 @@ export class PaymentService {
         });
 
         for (const sub of expiringSoon) {
-            await this.notificationsService.createNotification(
-                sub.user_id,
-                'system',
-                'Dein Abo endet in 3 Tagen. Jetzt verlängern?',
-            );
+            await this.notificationsService.createNotification(sub.user_id, 'system', 'notifications.subscription_expiring', undefined, undefined, {});
         }
 
         const expired = await this.subscriptionRepository.find({
@@ -186,11 +174,7 @@ export class PaymentService {
         for (const sub of expired) {
             sub.status = 'expired';
             await this.subscriptionRepository.save(sub);
-            await this.notificationsService.createNotification(
-                sub.user_id,
-                'system',
-                'Dein Abo ist abgelaufen. Premium-Features sind deaktiviert.',
-            );
+            await this.notificationsService.createNotification(sub.user_id, 'system', 'notifications.subscription_expired', undefined, undefined, {});
         }
     }
 }

@@ -210,8 +210,11 @@ export class AdminService {
             media.uploaded_by,
             'system',
             media.file_type === FileType.AUDIO
-                ? 'Deine Vorstellung wurde genehmigt'
-                : 'Dein Profilbild wurde genehmigt',
+                ? 'notifications.media_approved_audio'
+                : 'notifications.media_approved_photo',
+            undefined,
+            undefined,
+            {},
         );
     }
 
@@ -241,8 +244,11 @@ export class AdminService {
             media.uploaded_by,
             'system',
             media.file_type === FileType.AUDIO
-                ? `Deine Vorstellung wurde abgelehnt: ${reason}`
-                : `Dein Profilbild wurde abgelehnt: ${reason}`,
+                ? 'notifications.media_rejected_audio'
+                : 'notifications.media_rejected_photo',
+            undefined,
+            undefined,
+            { reason },
         );
     }
 
@@ -321,12 +327,11 @@ export class AdminService {
         });
         await this.strikeRepo.save(strike);
 
-        await this.notificationsService.notifyBan(
-            userId,
-            ban_expires_at
-                ? `Dein Konto wurde gesperrt bis ${ban_expires_at.toISOString()}: ${dto.reason}`
-                : `Dein Konto wurde dauerhaft gesperrt: ${dto.reason}`,
-        );
+        if (ban_expires_at) {
+            await this.notificationsService.notifyBanTemp(userId, dto.reason, ban_expires_at);
+        } else {
+            await this.notificationsService.notifyBanPermanent(userId, dto.reason);
+        }
 
         const email = decryptEmail(user.email as Buffer | null);
         if (email) {
@@ -363,10 +368,7 @@ export class AdminService {
             [userId],
         );
 
-        await this.notificationsService.notifyBan(
-            userId,
-            'Deine Sperre wurde aufgehoben. Du kannst Paarship wieder normal nutzen.',
-        );
+        await this.notificationsService.notifyBanRevoked(userId);
 
         this.eventEmitter.emit('user.unbanned', { userId });
     }
@@ -586,12 +588,11 @@ export class AdminService {
             user.ban_expires_at = dto.expires_at ?? null;
             await this.userRepo.save(user);
 
-            await this.notificationsService.notifyBan(
-                dto.user_id,
-                dto.type === StrikeType.PERMANENT
-                    ? `Dein Konto wurde dauerhaft gesperrt: ${dto.reason}`
-                    : `Dein Konto wurde vorübergehend gesperrt: ${dto.reason}`,
-            );
+            if (dto.type === StrikeType.PERMANENT) {
+                await this.notificationsService.notifyBanPermanent(dto.user_id, dto.reason);
+            } else {
+                await this.notificationsService.notifyBanTemp(dto.user_id, dto.reason, dto.expires_at!);
+            }
         }
 
         return strike;

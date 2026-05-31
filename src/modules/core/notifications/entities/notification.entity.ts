@@ -24,6 +24,9 @@ export class Notification {
     @Column({ type: 'text', nullable: true })
     related_id!: string | null;
 
+    @Column({ type: 'jsonb', nullable: true })
+    content_vars!: Record<string, unknown> | null;
+
     @Column({ default: false })
     is_read!: boolean;
 

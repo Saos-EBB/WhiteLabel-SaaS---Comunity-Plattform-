@@ -4,7 +4,7 @@ import { Repository, DataSource } from 'typeorm';
 import { Report } from './entities/report.entity';
 import { Strike } from './entities/strike.entity';
 import { User } from '../auth/entities/user.entity';
-import { MediaUpload } from '../media/entities/media-upload.entity';
+import { FileType, MediaUpload } from '../media/entities/media-upload.entity';
 import { Profile } from '../profile/entities/profile.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -102,7 +102,7 @@ export class ModerationService {
         });
         await this.strikeRepository.save(strike);
 
-        await this.notificationsService.notifyBan(reportedUserId, 'Dein Konto wurde gesperrt');
+        await this.notificationsService.notifyBanPermanent(reportedUserId, 'Auto-Suspend');
 
         const email = decryptEmail(user.email as Buffer | null);
         if (email) {
@@ -212,7 +212,12 @@ export class ModerationService {
         await this.notificationsService.createNotification(
             media.uploaded_by,
             'system',
-            'Dein Profilbild wurde genehmigt',
+            media.file_type === FileType.AUDIO
+                ? 'notifications.media_approved_audio'
+                : 'notifications.media_approved_photo',
+            undefined,
+            undefined,
+            {},
         );
     }
 
@@ -234,7 +239,12 @@ export class ModerationService {
         await this.notificationsService.createNotification(
             media.uploaded_by,
             'system',
-            `Dein Profilbild wurde abgelehnt: ${reason}`,
+            media.file_type === FileType.AUDIO
+                ? 'notifications.media_rejected_audio'
+                : 'notifications.media_rejected_photo',
+            undefined,
+            undefined,
+            { reason },
         );
 
         await this.profileRepository.update(

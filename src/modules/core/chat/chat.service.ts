@@ -143,9 +143,10 @@ export class ChatService {
         this.notificationsService.createNotification(
             request.sender_id,
             'match',
-            `${acceptorProfile?.nickname ?? 'Jemand'} hat deine Anfrage angenommen.`,
+            'notifications.request_accepted',
             'Kontaktanfrage angenommen',
             savedConversation.id,
+            { nickname: acceptorProfile?.nickname ?? '' },
         ).catch(() => {});
 
         return savedConversation;
