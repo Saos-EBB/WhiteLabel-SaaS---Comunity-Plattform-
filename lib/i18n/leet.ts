@@ -667,4 +667,42 @@ export const leetspeak = {
     profanityRemoveAriaLabel: 'R3m0v3 {word}',
     autoSuspendBadge: '4u70m471c 5u5p3n510n',
   },
+
+  b2b: {
+    nav: {
+      features: 'F347ur35',
+      licensing: 'L1c3n51n6',
+      contact: 'C0n74c7',
+      cta: 'R3qu357 D3m0',
+    },
+    hero: {
+      badge: 'Wh173-L4b31 S44S · Y0ur Pl47f0rm.',
+      line1: 'Th3 50c141 pl47f0rm',
+      line2_light: 'f0r r35p0n51bl3 0r64n1z4710n5.',
+      line2_dark: 'w17h 4 h1dd3n 51d3.',
+      sub_light: 'Y0urBr4nd 15 4 l1c3n54bl3 S44S 50lu710n — GDPR-c0mpl14n7, 4cc3551bl3, 4nd 54f3 f0r vuln3r4bl3 u53r 6r0up5.',
+      sub_dark: 'Y0urBr4nd 1nclud35 4 H1dd3n Z0n3 w17h B33f b4771l35, C01n 3c0n0my, 4nd 4 m0n371z4710n l00p.',
+      cta: 'R3qu357 D3m0',
+      video: 'W47ch Pr0duc7 V1d30',
+    },
+    features: {
+      label: 'Wh47 Y0urBr4nd 1nclud35',
+    },
+    tiers: {
+      label: 'L1c3n53 T13r5',
+      popular: 'M057 p0pul4r',
+      cta: 'R3qu357 4 qu073',
+    },
+    contact: {
+      heading: 'G37 1n 70uch',
+      sub: '4v41l4bl3 f0r d3m05, qu073s, 4nd 73chn1c4l 1nqu1r135.',
+    },
+    tech: {
+      toggle: '73chn1c4l D3741l5',
+      heading: 'F0r d3c1510n-m4k3r5 w17h 4 73chn1c4l b4ckgr0und',
+    },
+    footer: {
+      text: '© 2025 Y0urBr4nd · Wh173-L4b31 S44S f0r 0r64n1z4710n5',
+    },
+  },
 }

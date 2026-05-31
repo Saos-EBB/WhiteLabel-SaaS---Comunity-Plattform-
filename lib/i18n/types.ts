@@ -662,4 +662,41 @@ export interface Translations {
     profanityRemoveAriaLabel: string
     autoSuspendBadge: string
   }
+  b2b: {
+    nav: {
+      features: string
+      licensing: string
+      contact: string
+      cta: string
+    }
+    hero: {
+      badge: string
+      line1: string
+      line2_light: string
+      line2_dark: string
+      sub_light: string
+      sub_dark: string
+      cta: string
+      video: string
+    }
+    features: {
+      label: string
+    }
+    tiers: {
+      label: string
+      popular: string
+      cta: string
+    }
+    contact: {
+      heading: string
+      sub: string
+    }
+    tech: {
+      toggle: string
+      heading: string
+    }
+    footer: {
+      text: string
+    }
+  }
 }
