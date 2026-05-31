@@ -778,7 +778,7 @@ export class AdminService {
                 [userId],
             ),
             this.dataSource.query<{ count: string }[]>(
-                `SELECT COUNT(*) AS count FROM conversations WHERE (user_a_id = $1 OR user_b_id = $1) AND purged_at IS NULL`,
+                `SELECT COUNT(*) AS count FROM conversations WHERE ((user_a_id = $1 AND deleted_at_a IS NULL) OR (user_b_id = $1 AND deleted_at_b IS NULL)) AND purged_at IS NULL`,
                 [userId],
             ),
             this.dataSource.query<{ plan: string; status: string; expires_at: string | null }[]>(
