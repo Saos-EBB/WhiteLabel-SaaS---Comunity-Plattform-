@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Ban, Check } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useTranslation } from '@/lib/i18n'
+import { useSearch } from '@/hooks/useSearch'
 import { Divider } from './shared/Divider'
 import { Spinner } from './shared/Spinner'
 import { Pagination } from './shared/Pagination'
@@ -29,6 +30,16 @@ export function ReportsTab({ showToast, onBanOpen, usersBanMap, banTrigger }: Pr
   const [historyMode, setHistoryMode] = useState(false)
   const [historyReports, setHistoryReports] = useState<AdminReport[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  const reportFilterFn = (r: AdminReport, q: string) =>
+    (r.reporter_nickname ?? '').toLowerCase().includes(q) ||
+    (r.reported_nickname ?? '').toLowerCase().includes(q) ||
+    r.reason.toLowerCase().includes(q)
+
+  const { query: mainSearch, handleChange: handleMainSearch, filtered: filteredReports } =
+    useSearch(reports?.data ?? [], reportFilterFn)
+  const { query: histSearch, handleChange: handleHistSearch, filtered: filteredHistory } =
+    useSearch(historyReports, reportFilterFn)
 
   async function loadReports(page = reportPage) {
     setReportsLoading(true)
@@ -134,6 +145,14 @@ export function ReportsTab({ showToast, onBanOpen, usersBanMap, banTrigger }: Pr
         )}
       </div>
 
+      <input
+        type="search"
+        placeholder="Suche nach Nickname oder Grund…"
+        value={historyMode ? histSearch : mainSearch}
+        onChange={historyMode ? handleHistSearch : handleMainSearch}
+        className="w-full px-3 py-2 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[40px]"
+      />
+
       <Divider />
 
       {!historyMode ? (
@@ -144,7 +163,7 @@ export function ReportsTab({ showToast, onBanOpen, usersBanMap, banTrigger }: Pr
         ) : (
           <>
             <div className="space-y-3">
-              {reports.data.map((r) => {
+              {filteredReports.map((r) => {
               const edit = reportEdits[r.id] ?? { status: r.status, note: r.note ?? '' }
               const saving = reportSaving.has(r.id)
               const closed = r.status === 'closed'
@@ -228,7 +247,7 @@ export function ReportsTab({ showToast, onBanOpen, usersBanMap, banTrigger }: Pr
           <p className="text-sm text-on-surface-variant text-center py-8">{t.admin.reportsNone}</p>
         ) : (
           <div className="space-y-3">
-            {historyReports.map((r) => {
+            {filteredHistory.map((r) => {
               const edit = reportEdits[r.id] ?? { status: r.status, note: r.note ?? '' }
               const saving = reportSaving.has(r.id)
               const closed = r.status === 'closed'

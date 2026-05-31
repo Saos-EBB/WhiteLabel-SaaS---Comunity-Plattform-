@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { fetchApi } from '@/lib/api'
+import { useSearch } from '@/hooks/useSearch'
 import { Divider } from './shared/Divider'
 import { Spinner } from './shared/Spinner'
 import { fmtDate } from './shared/utils'
@@ -45,6 +46,12 @@ function CoinSection({ showToast }: Props) {
   const [rows, setRows] = useState<AdminCoinTransaction[] | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const { query: coinSearch, handleChange: handleCoinSearch, filtered: filteredCoin } =
+    useSearch(rows ?? [], (r, q) =>
+      (r.nickname ?? '').toLowerCase().includes(q) ||
+      r.reason.toLowerCase().includes(q),
+    )
+
   useEffect(() => {
     setLoading(true)
     fetchApi<AdminCoinTransaction[]>('/admin/owner/coin-transactions')
@@ -56,8 +63,8 @@ function CoinSection({ showToast }: Props) {
   if (loading) return <div className="flex justify-center py-8"><Spinner size={6} /></div>
   if (!rows) return null
 
-  const economy = rows.filter((r) => r.user_id !== SYSTEM_USER)
-  const houseCut = rows.filter((r) => r.user_id === SYSTEM_USER)
+  const economy = filteredCoin.filter((r) => r.user_id !== SYSTEM_USER)
+  const houseCut = filteredCoin.filter((r) => r.user_id === SYSTEM_USER)
 
   function CoinTable({ data }: { data: AdminCoinTransaction[] }) {
     if (data.length === 0) return <p className="text-sm text-on-surface-variant py-4 text-center">Keine Einträge</p>
@@ -93,6 +100,14 @@ function CoinSection({ showToast }: Props) {
 
   return (
     <div className="space-y-6">
+      <input
+        type="search"
+        placeholder="Suche nach Nickname oder Grund…"
+        value={coinSearch}
+        onChange={handleCoinSearch}
+        className="w-full px-3 py-2 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[40px]"
+      />
+
       <div>
         <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-3">
           Coin Transactions ({economy.length})
@@ -121,6 +136,12 @@ function CashSection({ showToast }: Props) {
   const [rows, setRows] = useState<AdminCashTransaction[] | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const { query: cashSearch, handleChange: handleCashSearch, filtered: filteredCash } =
+    useSearch(rows ?? [], (r, q) =>
+      (r.nickname ?? '').toLowerCase().includes(q) ||
+      r.status.toLowerCase().includes(q),
+    )
+
   useEffect(() => {
     setLoading(true)
     fetchApi<AdminCashTransaction[]>('/admin/owner/cash-transactions')
@@ -132,13 +153,22 @@ function CashSection({ showToast }: Props) {
   if (loading) return <div className="flex justify-center py-8"><Spinner size={6} /></div>
   if (!rows) return null
 
-  if (rows.length === 0)
-    return <p className="text-sm text-on-surface-variant py-8 text-center">Keine Zahlungen</p>
-
   return (
-    <div>
+    <div className="space-y-4">
+      <input
+        type="search"
+        placeholder="Suche nach Nickname oder Status…"
+        value={cashSearch}
+        onChange={handleCashSearch}
+        className="w-full px-3 py-2 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[40px]"
+      />
+
+      {filteredCash.length === 0 ? (
+        <p className="text-sm text-on-surface-variant py-8 text-center">Keine Zahlungen</p>
+      ) : (
+      <div>
       <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-3">
-        Cash Transactions ({rows.length})
+        Cash Transactions ({filteredCash.length})
       </p>
       <TableWrapper>
         <thead>
@@ -150,7 +180,7 @@ function CashSection({ showToast }: Props) {
           </tr>
         </thead>
         <tbody className="divide-y divide-outline-variant">
-          {rows.map((r) => (
+          {filteredCash.map((r) => (
             <tr key={r.id} className="hover:bg-surface-container-high/50">
               <td className="px-4 py-3 text-sm text-on-surface font-medium">
                 {r.nickname ?? r.user_id.slice(0, 8)}
@@ -172,6 +202,8 @@ function CashSection({ showToast }: Props) {
           ))}
         </tbody>
       </TableWrapper>
+      </div>
+      )}
     </div>
   )
 }
