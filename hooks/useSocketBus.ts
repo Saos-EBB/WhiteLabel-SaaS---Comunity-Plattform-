@@ -10,6 +10,12 @@ import { useToastStore } from '@/lib/store/toastStore'
 export function useSocketBus(isReady: boolean) {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const adminSoundTick = useNotificationStore((s) => s.adminSoundTick)
+  useEffect(() => {
+    if (adminSoundTick === 0) return
+    new Audio('/sounds/workwork.mp3').play().catch((e) => console.warn('[sound] autoplay blocked:', e))
+  }, [adminSoundTick])
+
   useEffect(() => {
     if (!isReady) return
 
@@ -93,13 +99,13 @@ export function useSocketBus(isReady: boolean) {
 
       'ticket.new': () => {
         useNotificationStore.getState().incrementAdminTicketCount()
+        useNotificationStore.getState().bumpAdminSoundTick()
       },
 
       'media:pending_review': () => {
         useNotificationStore.getState().incrementAdminTicketCount()
         useNotificationStore.getState().incrementAdminMediaCount()
-        const audio = new Audio('/sounds/workwork.mp3')
-        audio.play().catch(() => {})
+        useNotificationStore.getState().bumpAdminSoundTick()
       },
     }
 

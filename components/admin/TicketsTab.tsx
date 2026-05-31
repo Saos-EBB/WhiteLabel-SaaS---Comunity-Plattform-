@@ -31,6 +31,7 @@ export function TicketsTab({ showToast }: Props) {
 
   const adminMediaCount = useNotificationStore((s) => s.adminMediaCount)
   const setAdminMediaCount = useNotificationStore((s) => s.setAdminMediaCount)
+  const adminSoundTick = useNotificationStore((s) => s.adminSoundTick)
 
   async function loadTickets() {
     setTicketsLoading(true)
@@ -81,6 +82,15 @@ export function TicketsTab({ showToast }: Props) {
     void loadPendingMedia()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Re-fetch all lists when a real-time admin notification arrives
+  useEffect(() => {
+    if (adminSoundTick === 0) return
+    void loadTickets()
+    void loadSupportTickets()
+    void loadPendingMedia()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminSoundTick])
 
   return (
     <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 sm:p-5 space-y-2">

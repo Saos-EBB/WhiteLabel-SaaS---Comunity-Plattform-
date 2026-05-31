@@ -34,6 +34,8 @@ interface NotificationState {
   adminMediaCount: number
   setAdminMediaCount: (n: number) => void
   incrementAdminMediaCount: () => void
+  adminSoundTick: number
+  bumpAdminSoundTick: () => void
 }
 
 export function mergeNotification(existing: Notification[], incoming: Notification): Notification[] {
@@ -128,4 +130,6 @@ export const useNotificationStore = create<NotificationState>()((set) => ({
   adminMediaCount: 0,
   setAdminMediaCount: (n) => set({ adminMediaCount: n }),
   incrementAdminMediaCount: () => set((s) => ({ adminMediaCount: s.adminMediaCount + 1 })),
+  adminSoundTick: 0,
+  bumpAdminSoundTick: () => set((s) => ({ adminSoundTick: s.adminSoundTick + 1 })),
 }))

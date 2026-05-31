@@ -626,6 +626,10 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Feat (`notificationStore`, `useSocketBus`): Admin-Benachrichtigungs-Sound event-driven via `adminSoundTick`-Zähler — beide Events (`ticket.new`, `media:pending_review`) triggern den Sound über einen zentralen `useEffect`
+- Fix (`TicketsTab`): alle drei Listen (Meldungen, Support, Medien) aktualisieren sich jetzt in Echtzeit wenn ein Admin-Event eintrifft — kein manuelles Refresh mehr nötig
+
+### 2026-05-31
 - Feat (`TicketsTab`): neuer „Medien"-Accordion im Admin-Ticket-Board — zeigt pending Medien-Uploads (Bild/Audio-Icon, Nutzer, Datum, open-Badge); Counter-Badge im Header aktualisiert sich per WebSocket in Echtzeit
 - Feat (`TicketsTab`): rote Zahl-Badges auch bei Meldungen und Support-Anfragen im Accordion-Header
 - Feat (`useSocketBus`): `media:pending_review` spielt WORK WORK Sound und erhöht Admin-Zähler
