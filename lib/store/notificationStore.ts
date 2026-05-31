@@ -8,6 +8,7 @@ export interface Notification {
   id: string
   type: NotificationType
   content: string
+  content_vars?: Record<string, unknown> | null
   is_read: boolean
   created_at: string
   count?: number

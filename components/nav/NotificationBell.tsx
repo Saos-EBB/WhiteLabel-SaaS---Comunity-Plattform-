@@ -11,6 +11,7 @@ import {
 } from '@/lib/store/notificationStore'
 import { fetchApi } from '@/lib/api'
 import { useTranslation } from '@/lib/i18n'
+import { resolveNotificationContent } from '@/lib/notification-resolver'
 import { useAuthStore } from '@/lib/store/authStore'
 
 const TYPE_ICONS: Record<NotificationType, ElementType> = {
@@ -218,7 +219,7 @@ export function NotificationBell() {
                         <p className={`text-sm leading-snug truncate ${
                           !n.is_read ? 'text-on-surface font-medium' : 'text-on-surface-variant'
                         }`}>
-                          {n.content}
+                          {resolveNotificationContent(n, t)}
                         </p>
                         <p className="text-xs text-on-surface-variant mt-0.5">
                           {relativeTime(n.created_at, t.relativeTime)}

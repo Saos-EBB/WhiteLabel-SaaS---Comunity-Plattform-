@@ -12,6 +12,7 @@ import {
   type NotificationType,
 } from '@/lib/store/notificationStore'
 import { useTranslation } from '@/lib/i18n'
+import { resolveNotificationContent } from '@/lib/notification-resolver'
 
 type Tab = 'neu' | 'verlauf'
 
@@ -267,7 +268,7 @@ export default function NotificationsPage() {
                       <p className={`text-sm leading-snug ${
                         !n.is_read ? 'text-on-surface font-medium' : 'text-on-surface-variant'
                       }`}>
-                        {n.content}
+                        {resolveNotificationContent(n, t)}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-on-surface-variant">

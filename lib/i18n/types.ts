@@ -67,6 +67,33 @@ export interface Translations {
     typeSystem: string
     typeBan: string
     typeRequest: string
+    new_message: string
+    new_message_title: string
+    request_accepted: string
+    beef_request: string
+    beef_request_title: string
+    beef_accepted: string
+    beef_accepted_title: string
+    beef_won: string
+    beef_won_title: string
+    beef_tie: string
+    beef_tie_title: string
+    beef_lost: string
+    beef_lost_title: string
+    ban_temp: string
+    ban_temp_title: string
+    ban_permanent: string
+    ban_permanent_title: string
+    ban_revoked: string
+    ban_revoked_title: string
+    media_approved_photo: string
+    media_approved_audio: string
+    media_rejected_photo: string
+    media_rejected_audio: string
+    payment_success: string
+    payment_failed: string
+    subscription_expiring: string
+    subscription_expired: string
   }
   login: {
     title: string
