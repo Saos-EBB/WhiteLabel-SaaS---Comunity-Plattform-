@@ -268,6 +268,62 @@ export interface Translations {
     years: string
     chatOpenError: string
   }
+  discover: {
+    title: string
+    disconnectLabel: string
+    requestSent: string
+    acceptRequest: string
+    disconnectDesc: string
+    cityPlaceholder: string
+    cityAriaLabel: string
+    filterAll: string
+    radiusWithCity: string
+    radiusNoCity: string
+    ageFrom: string
+    ageTo: string
+    connectionAll: string
+    connectedFilter: string
+    requestReceived: string
+    noConnection: string
+    onlineNow: string
+    reset: string
+    applyFilter: string
+    chatWithAriaLabel: string
+    connectAriaLabel: string
+    acceptAriaLabel: string
+    disconnectAriaLabel: string
+    profileAriaLabel: string
+    profileAriaLabelNoAge: string
+  }
+  requests: {
+    title: string
+    tabIncoming: string
+    tabOutgoing: string
+    noIncoming: string
+    noOutgoing: string
+  }
+  beef: {
+    title: string
+    tabRequests: string
+    tabMine: string
+    tabPublic: string
+    tabHighscore: string
+    noRequests: string
+    noMine: string
+    noPublic: string
+    noHighscore: string
+    inProgress: string
+    running: string
+    slainEnemies: string
+    wins: string
+    passageLabel: string
+    beefRequest: string
+    coinsCredited: string
+  }
+  footer: {
+    impressum: string
+    datenschutz: string
+  }
   dashboard: {
     loadError: string
     error: string
@@ -290,6 +346,29 @@ export interface Translations {
     recentNotificationsArea: string
     notificationList: string
     unreadAriaLabel: string
+    myOverview: string
+    openRequests: string
+    activeChats: string
+    subscriptionStatus: string
+    validUntil: string
+    noSubscription: string
+    moderationOverview: string
+    openReports: string
+    openTickets: string
+    unverifiedMedia: string
+    strikesThisWeek: string
+    platformOverview: string
+    totalUsers: string
+    activeUsers: string
+    bannedUsers: string
+    newToday: string
+    onlineNow: string
+    messagesToday: string
+    requestsToday: string
+    newThisWeek: string
+    activeSubscriptions: string
+    totalRevenue: string
+    newSubscriptionsThisWeek: string
   }
   settings: {
     title: string
