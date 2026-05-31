@@ -1,10 +1,6 @@
-const STATUS_LABELS: Record<string, string> = {
-  available:        'Verfügbar',
-  looking_for_chat: 'Suche Gespräch',
-  looking_for_date: 'Suche Date',
-  busy:             'Beschäftigt',
-  do_not_disturb:   'Nicht stören',
-}
+'use client'
+
+import { useTranslation } from '@/lib/i18n'
 
 export function getStatusColor(is_online: boolean, status_message?: string | null): string {
   if (!is_online) return '#52525b'
@@ -27,6 +23,14 @@ export function OnlineIndicator({
   status_message?: string | null
   size?: 'sm' | 'md'
 }) {
+  const { t } = useTranslation()
+  const STATUS_LABELS: Record<string, string> = {
+    available:        t.status.available,
+    looking_for_chat: t.status.lookingToTalk,
+    looking_for_date: t.status.lookingForDate,
+    busy:             t.status.busy,
+    do_not_disturb:   t.status.doNotDisturb,
+  }
   const dotClass = size === 'sm' ? 'h-2 w-2' : 'h-3 w-3'
   const label = status_message ? (STATUS_LABELS[status_message] ?? null) : null
   const ariaLabel = is_online

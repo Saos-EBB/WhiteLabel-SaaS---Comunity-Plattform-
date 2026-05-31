@@ -711,7 +711,7 @@ export default function SettingsPage() {
           <ToggleRow
             id="high-contrast"
             label={t.settings.highContrast}
-            description="Erhöht den Farbkontrast für bessere Lesbarkeit"
+            description={t.settings.highContrastDesc}
             checked={profile.high_contrast}
             onChange={(v) => saveAccessibility({ high_contrast: v })}
             saving={accessSaving}
@@ -720,7 +720,7 @@ export default function SettingsPage() {
           <ToggleRow
             id="lang-simple"
             label={t.settings.easyLanguage}
-            description="Inhalte werden in leicht verständlicher Sprache angezeigt"
+            description={t.settings.easyLanguageDesc}
             checked={profile.lang_simple}
             onChange={(v) => saveAccessibility({ lang_simple: v })}
             saving={accessSaving}

@@ -389,7 +389,9 @@ export interface Translations {
     fontSizeLarge: string
     fontSizeXL: string
     highContrast: string
+    highContrastDesc: string
     easyLanguage: string
+    easyLanguageDesc: string
     uiLanguage: string
     preview: string
     previewText: string
