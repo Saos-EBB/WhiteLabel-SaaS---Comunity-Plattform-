@@ -626,6 +626,13 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Feat (`TicketsTab`): neuer „Medien"-Accordion im Admin-Ticket-Board — zeigt pending Medien-Uploads (Bild/Audio-Icon, Nutzer, Datum, open-Badge); Counter-Badge im Header aktualisiert sich per WebSocket in Echtzeit
+- Feat (`TicketsTab`): rote Zahl-Badges auch bei Meldungen und Support-Anfragen im Accordion-Header
+- Feat (`useSocketBus`): `media:pending_review` spielt WORK WORK Sound und erhöht Admin-Zähler
+- Feat (`dashboard`): Nachrichten-Button und Nachrichten-Karte zeigen korrekte Anzahl ungelesener Chats statt Bell-Notifikations-Count; Anfragen-Karte hat jetzt ebenfalls Badge
+- Fix (`dashboard badge`): unread count basiert jetzt auf Conversations-Store statt Notification-Store
+
+### 2026-05-31
 - Fix (`beef/[id]/page.tsx`): Vote-Balken zeigt jetzt zwei deutliche Farben — Rot für Initiator, Blau für Target; vorher war nur eine Seite eingefärbt
 
 ###  2026-05-31
