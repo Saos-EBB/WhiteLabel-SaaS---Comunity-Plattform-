@@ -346,6 +346,17 @@ export default function B2BPage() {
 
   const techRows  = isEn ? TECH_ROWS.en : TECH_ROWS.de
 
+  const activeRows     = isDark ? DARK_ROWS : LIGHT_ROWS
+  const selectedRowIdx = selectedFeature !== null
+    ? activeRows.findIndex(row => row.some(f => f.id === selectedFeature))
+    : -1
+  const selectedFeatDef     = selectedRowIdx >= 0
+    ? activeRows[selectedRowIdx].find(f => f.id === selectedFeature) ?? null
+    : null
+  const selectedFeatContent = selectedFeatDef
+    ? (isEn ? selectedFeatDef.en : selectedFeatDef.de)
+    : null
+
   function getTierContent(tier: TierDef): TierContent {
     const side = isDark ? tier.dark : tier.light
     return isEn ? side.en : side.de
@@ -450,43 +461,37 @@ export default function B2BPage() {
         {isDark ? (
           // Dark: 8 features in 2 rows of 4
           <div className="flex flex-col gap-4">
-            {DARK_ROWS.map((row, rowIdx) => {
-              const rowSelected = row.find(f => f.id === selectedFeature) ?? null
-              const rowContent  = rowSelected ? (isEn ? rowSelected.en : rowSelected.de) : null
-              return (
-                <div key={rowIdx}>
-                  <div className="grid grid-cols-12 gap-4">
-                    {row.map((feat) => (
-                      <div key={feat.id} className="col-span-12 sm:col-span-6 lg:col-span-3">
-                        <FeatureCard
-                          feat={feat}
-                          content={isEn ? feat.en : feat.de}
-                          selected={selectedFeature === feat.id}
-                          onToggle={() => handleFeatureToggle(feat.id)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {rowSelected && rowContent && (
-                    <DetailPanel
-                      feat={rowSelected}
-                      content={rowContent}
-                      onClose={() => setSelectedFeature(null)}
-                    />
-                  )}
+            {DARK_ROWS.map((row, rowIdx) => (
+              <div key={rowIdx}>
+                <div className="grid grid-cols-12 gap-4">
+                  {row.map((feat) => (
+                    <div key={feat.id} className="col-span-12 sm:col-span-6 lg:col-span-3">
+                      <FeatureCard
+                        feat={feat}
+                        content={isEn ? feat.en : feat.de}
+                        selected={selectedFeature === feat.id}
+                        onToggle={() => handleFeatureToggle(feat.id)}
+                      />
+                    </div>
+                  ))}
                 </div>
-              )
-            })}
+                {rowIdx === selectedRowIdx && selectedFeatDef && selectedFeatContent && (
+                  <DetailPanel
+                    feat={selectedFeatDef}
+                    content={selectedFeatContent}
+                    onClose={() => setSelectedFeature(null)}
+                  />
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           // Light: 10 features in 3 rows (3/3/4)
           <div className="flex flex-col gap-4">
             {LIGHT_ROWS.map((row, rowIdx) => {
-              const colClass    = rowIdx < 2
+              const colClass = rowIdx < 2
                 ? 'col-span-12 sm:col-span-6 lg:col-span-4'
                 : 'col-span-12 sm:col-span-6 lg:col-span-3'
-              const rowSelected = row.find(f => f.id === selectedFeature) ?? null
-              const rowContent  = rowSelected ? (isEn ? rowSelected.en : rowSelected.de) : null
               return (
                 <div key={rowIdx}>
                   <div className="grid grid-cols-12 gap-4">
@@ -501,10 +506,10 @@ export default function B2BPage() {
                       </div>
                     ))}
                   </div>
-                  {rowSelected && rowContent && (
+                  {rowIdx === selectedRowIdx && selectedFeatDef && selectedFeatContent && (
                     <DetailPanel
-                      feat={rowSelected}
-                      content={rowContent}
+                      feat={selectedFeatDef}
+                      content={selectedFeatContent}
                       onClose={() => setSelectedFeature(null)}
                     />
                   )}
