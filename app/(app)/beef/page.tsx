@@ -7,6 +7,7 @@ import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
 import { Flame, Swords, Trophy, Users } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 type BeefStatus = 'pending_approval'|'waiting'|'active'|'closed'|'chickened'
 
@@ -25,6 +26,7 @@ interface Beef {
 type Tab = 'requests' | 'mine' | 'public' | 'highscore'
 
 export default function BeefPage() {
+  const { t } = useTranslation()
   const router   = useRouter()
   const isHidden = useHiddenStore((s) => s.isHidden)
   const token    = useAuthStore((s) => s.accessToken)
@@ -111,10 +113,10 @@ export default function BeefPage() {
   if (!isHidden) return null
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: 'requests',  label: 'Anfragen',    icon: <Swords size={15}/> },
-    { key: 'mine',      label: 'Meine Beefs', icon: <Flame size={15}/> },
-    { key: 'public',    label: 'Public',      icon: <Users size={15}/> },
-    { key: 'highscore', label: 'Highscore',   icon: <Trophy size={15}/> },
+    { key: 'requests',  label: t.beef.tabRequests,  icon: <Swords size={15}/> },
+    { key: 'mine',      label: t.beef.tabMine,      icon: <Flame size={15}/> },
+    { key: 'public',    label: t.beef.tabPublic,    icon: <Users size={15}/> },
+    { key: 'highscore', label: t.beef.tabHighscore, icon: <Trophy size={15}/> },
   ]
 
   return (
@@ -124,7 +126,7 @@ export default function BeefPage() {
       {coinSuccess !== null && (
         <div className="mb-4 rounded-lg bg-tertiary-container text-on-tertiary-container text-sm px-4 py-3 flex items-center gap-2">
           <span className="text-base">🪙</span>
-          <span><strong>{coinSuccess} Coins</strong> wurden gutgeschrieben! Du wirst gleich weitergeleitet…</span>
+          <span>{t.beef.coinsCredited.replace('{coins}', String(coinSuccess))}</span>
         </div>
       )}
 
@@ -138,7 +140,7 @@ export default function BeefPage() {
       {/* Page title */}
       <div className="flex items-center gap-3 mb-6">
         <Swords size={24} className="text-primary-fixed-dim"/>
-        <h1 className="text-xl font-bold text-on-surface">Beef Zone</h1>
+        <h1 className="text-xl font-bold text-on-surface">{t.beef.title}</h1>
         {requests.length > 0 && (
           <span className="ml-auto bg-error text-on-error text-xs
             font-bold px-2 py-0.5 rounded-full">
@@ -185,7 +187,7 @@ export default function BeefPage() {
               {requests.length === 0 ? (
                 <div className="text-center py-16 text-on-surface-variant">
                   <Swords size={40} className="mx-auto mb-3 opacity-30"/>
-                  <p className="text-sm">Keine offenen Beef-Anfragen</p>
+                  <p className="text-sm">{t.beef.noRequests}</p>
                 </div>
               ) : requests.map(beef => (
                 <div key={beef.id}
@@ -193,7 +195,7 @@ export default function BeefPage() {
                     rounded-2xl p-5 flex flex-col gap-4">
                   <div>
                     <span className="text-xs text-on-surface-variant uppercase
-                      tracking-widest font-mono">Beef Anfrage</span>
+                      tracking-widest font-mono">{t.beef.beefRequest}</span>
                     <p className="font-bold text-on-surface mt-1 text-lg">
                       {beef.tldr}
                     </p>
@@ -201,7 +203,7 @@ export default function BeefPage() {
                   <div className="bg-surface-container-low rounded-xl p-3
                     border-l-2 border-primary-fixed-dim">
                     <p className="text-xs text-on-surface-variant mb-1">
-                      Passage
+                      {t.beef.passageLabel}
                     </p>
                     <p className="text-sm text-on-surface-variant italic leading-relaxed">
                       {beef.chat_passage}
@@ -238,7 +240,7 @@ export default function BeefPage() {
               {myBeefs.length === 0 ? (
                 <div className="text-center py-16 text-on-surface-variant">
                   <Flame size={40} className="mx-auto mb-3 opacity-30"/>
-                  <p className="text-sm">Keine laufenden Beefs gerade</p>
+                  <p className="text-sm">{t.beef.noMine}</p>
                 </div>
               ) : myBeefs.map(beef => (
                 <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
@@ -249,7 +251,7 @@ export default function BeefPage() {
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-primary-fixed-dim font-bold
                           uppercase tracking-widest font-mono">
-                          Du bist dabei
+                          {t.beef.inProgress}
                         </span>
                         <p className="font-bold text-on-surface">{beef.tldr}</p>
                       </div>
@@ -257,7 +259,7 @@ export default function BeefPage() {
                         <span className="text-xs text-on-surface-variant
                           bg-surface-container-high px-2 py-0.5 rounded-full
                           whitespace-nowrap flex-shrink-0">
-                          🕐 läuft
+                          {t.beef.running}
                         </span>
                       )}
                     </div>
@@ -280,7 +282,7 @@ export default function BeefPage() {
               {publicBeefs.length === 0 ? (
                 <div className="text-center py-16 text-on-surface-variant">
                   <Users size={40} className="mx-auto mb-3 opacity-30"/>
-                  <p className="text-sm">Keine aktiven Beefs gerade</p>
+                  <p className="text-sm">{t.beef.noPublic}</p>
                 </div>
               ) : publicBeefs.map(beef => (
                 <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
@@ -293,7 +295,7 @@ export default function BeefPage() {
                         <span className="text-xs text-on-surface-variant
                           bg-surface-container-high px-2 py-0.5 rounded-full
                           whitespace-nowrap flex-shrink-0">
-                          🕐 läuft
+                          {t.beef.running}
                         </span>
                       )}
                     </div>
@@ -315,12 +317,12 @@ export default function BeefPage() {
             <div className="flex flex-col gap-3">
               <h2 className="font-bold text-on-surface flex items-center gap-2">
                 <Trophy size={18} className="text-primary-fixed-dim"/>
-                Slain Enemies
+                {t.beef.slainEnemies}
               </h2>
               {highscore.length === 0 ? (
                 <div className="text-center py-16 text-on-surface-variant">
                   <Trophy size={40} className="mx-auto mb-3 opacity-30"/>
-                  <p className="text-sm">Noch keine Beefs beendet</p>
+                  <p className="text-sm">{t.beef.noHighscore}</p>
                 </div>
               ) : highscore.map((row, i) => (
                 <div key={row.user_id}
@@ -339,7 +341,7 @@ export default function BeefPage() {
                     <p className="font-bold text-primary-fixed-dim tabular-nums">
                       {row.wins}
                     </p>
-                    <p className="text-xs text-on-surface-variant">Wins</p>
+                    <p className="text-xs text-on-surface-variant">{t.beef.wins}</p>
                   </div>
                 </div>
               ))}

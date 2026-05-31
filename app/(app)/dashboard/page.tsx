@@ -278,33 +278,34 @@ export default function DashboardPage() {
 
       {/* ── Mein Überblick (user only) ──────────────────────────────────────── */}
       {!isAdmin && <section>
-        <SectionHeading label="Mein Überblick" icon={<UserCheck className="h-3.5 w-3.5" />} />
+        <SectionHeading label={t.dashboard.myOverview} icon={<UserCheck className="h-3.5 w-3.5" />} />
         {userStatsLoading ? (
           <StatRowSkeleton cols={3} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <StatCard
-              label="Offene Anfragen"
+              label={t.dashboard.openRequests}
               value={userStats?.pendingRequests}
               href="/chat?tab=requests"
               alert
             />
             <StatCard
-              label="Aktive Chats"
+              label={t.dashboard.activeChats}
               value={userStats?.activeConversations}
               href="/chat"
             />
             <div className="rounded-xl border border-outline-variant bg-surface-container-high p-3 flex flex-col gap-1">
-              <p className="text-xs text-on-surface-variant">Abo-Status</p>
+              <p className="text-xs text-on-surface-variant">{t.dashboard.subscriptionStatus}</p>
               {userStats?.subscription ? (
                 <>
+                  {/* i18n: backend value — plan name (e.g. "monthly") comes from backend */}
                   <p className="text-lg font-bold text-on-surface capitalize mt-0.5">{userStats.subscription.plan}</p>
                   <p className="text-xs text-on-surface-variant">
-                    bis {fmtExpiry(userStats.subscription.expires_at)}
+                    {t.dashboard.validUntil.replace('{date}', fmtExpiry(userStats.subscription.expires_at))}
                   </p>
                 </>
               ) : (
-                <p className="text-xl font-bold text-on-surface mt-0.5">Kein Abo</p>
+                <p className="text-xl font-bold text-on-surface mt-0.5">{t.dashboard.noSubscription}</p>
               )}
             </div>
           </div>
@@ -314,31 +315,31 @@ export default function DashboardPage() {
       {/* ── Moderations-Überblick (admin + owner) ───────────────────────────── */}
       {isAdmin && (
         <section>
-          <SectionHeading label="Moderations-Überblick" icon={<Shield className="h-3.5 w-3.5" />} />
+          <SectionHeading label={t.dashboard.moderationOverview} icon={<Shield className="h-3.5 w-3.5" />} />
           {adminStatsLoading ? (
             <StatRowSkeleton cols={4} />
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <StatCard
-                label="Offene Meldungen"
+                label={t.dashboard.openReports}
                 value={adminStats?.openReports}
                 href="/admin?tab=meldungen"
                 alert
               />
               <StatCard
-                label="Offene Tickets"
+                label={t.dashboard.openTickets}
                 value={adminStats?.openTickets}
                 href="/admin?tab=tickets"
                 alert
               />
               <StatCard
-                label="Ungeprüfte Medien"
+                label={t.dashboard.unverifiedMedia}
                 value={adminStats?.pendingMedia}
                 href="/admin?tab=medien"
                 alert
               />
               <StatCard
-                label="Strikes diese Woche"
+                label={t.dashboard.strikesThisWeek}
                 value={adminStats?.strikesThisWeek}
               />
             </div>
@@ -349,7 +350,7 @@ export default function DashboardPage() {
       {/* ── Plattform-Übersicht (owner only) ────────────────────────────────── */}
       {isOwner && (
         <section>
-          <SectionHeading label="Plattform-Übersicht" icon={<Crown className="h-3.5 w-3.5" />} />
+          <SectionHeading label={t.dashboard.platformOverview} icon={<Crown className="h-3.5 w-3.5" />} />
           {ownerStatsLoading ? (
             <div className="space-y-2">
               <StatRowSkeleton cols={4} />
@@ -361,38 +362,38 @@ export default function DashboardPage() {
             <div className="space-y-2">
               {/* Row 1 — Users */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <StatCard label="Nutzer gesamt"  value={ownerStats?.totalUsers} />
-                <StatCard label="Aktiv"          value={ownerStats?.activeUsers} />
-                <StatCard label="Gesperrt"       value={ownerStats?.bannedUsers} />
-                <StatCard label="Neu heute"      value={ownerStats?.newUsersToday} />
+                <StatCard label={t.dashboard.totalUsers}  value={ownerStats?.totalUsers} />
+                <StatCard label={t.dashboard.activeUsers} value={ownerStats?.activeUsers} />
+                <StatCard label={t.dashboard.bannedUsers} value={ownerStats?.bannedUsers} />
+                <StatCard label={t.dashboard.newToday}    value={ownerStats?.newUsersToday} />
               </div>
 
               {/* Row 2 — Activity */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <StatCard label="Online jetzt"       value={ownerStats?.onlineUsers} />
-                <StatCard label="Nachrichten heute"  value={ownerStats?.messagesToday} />
-                <StatCard label="Anfragen heute"     value={ownerStats?.contactRequestsToday} />
-                <StatCard label="Neu diese Woche"    value={ownerStats?.newUsersThisWeek} />
+                <StatCard label={t.dashboard.onlineNow}      value={ownerStats?.onlineUsers} />
+                <StatCard label={t.dashboard.messagesToday}  value={ownerStats?.messagesToday} />
+                <StatCard label={t.dashboard.requestsToday}  value={ownerStats?.contactRequestsToday} />
+                <StatCard label={t.dashboard.newThisWeek}    value={ownerStats?.newUsersThisWeek} />
               </div>
 
               {/* Row 3 — Business */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <StatCard label="Aktive Abos"         value={ownerStats?.activeSubscriptions} />
+                <StatCard label={t.dashboard.activeSubscriptions} value={ownerStats?.activeSubscriptions} />
                 <StatCard
-                  label="Umsatz gesamt (€)"
+                  label={t.dashboard.totalRevenue}
                   value={ownerStats?.totalRevenue != null
                     ? ownerStats.totalRevenue.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     : undefined}
                 />
-                <StatCard label="Neue Abos diese Woche" value={ownerStats?.newUsersThisWeek} />
+                <StatCard label={t.dashboard.newSubscriptionsThisWeek} value={ownerStats?.newUsersThisWeek} />
               </div>
 
               {/* Row 4 — Moderation */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <StatCard label="Offene Meldungen"    value={ownerStats?.openReports}     alert />
-                <StatCard label="Strikes diese Woche" value={ownerStats?.strikesThisWeek} />
-                <StatCard label="Offene Tickets"      value={ownerStats?.openTickets}     alert />
-                <StatCard label="Ungeprüfte Medien"   value={ownerStats?.pendingMedia}    alert />
+                <StatCard label={t.dashboard.openReports}     value={ownerStats?.openReports}     alert />
+                <StatCard label={t.dashboard.strikesThisWeek} value={ownerStats?.strikesThisWeek} />
+                <StatCard label={t.dashboard.openTickets}     value={ownerStats?.openTickets}     alert />
+                <StatCard label={t.dashboard.unverifiedMedia} value={ownerStats?.pendingMedia}    alert />
               </div>
             </div>
           )}

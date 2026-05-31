@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { User, Clock, CheckCircle, XCircle, Inbox, Send } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useNotificationStore } from '@/lib/store/notificationStore'
+import { useTranslation } from '@/lib/i18n'
 
 interface ContactRequest {
   id: string
@@ -254,6 +255,7 @@ function SkeletonCard() {
 type Tab = 'incoming' | 'outgoing'
 
 export default function RequestsPage() {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<ContactRequest[]>([])
   const [outgoing, setOutgoing] = useState<ContactRequest[]>([])
@@ -316,13 +318,13 @@ export default function RequestsPage() {
   }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: 'incoming', label: 'Eingehend', count: incoming.length },
-    { key: 'outgoing', label: 'Ausgehend', count: outgoing.length },
+    { key: 'incoming', label: t.requests.tabIncoming, count: incoming.length },
+    { key: 'outgoing', label: t.requests.tabOutgoing, count: outgoing.length },
   ]
 
   return (
     <main className="min-h-screen bg-background p-4 sm:p-6 pb-24 sm:pb-8 space-y-5">
-      <h1 className="text-2xl font-bold text-on-surface">Kontaktanfragen</h1>
+      <h1 className="text-2xl font-bold text-on-surface">{t.requests.title}</h1>
 
       {/* Tabs */}
       <div
@@ -398,7 +400,7 @@ export default function RequestsPage() {
             {incoming.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
                 <Inbox className="h-10 w-10 text-on-surface-variant" aria-hidden="true" />
-                <p className="text-on-surface font-semibold">Keine eingehenden Anfragen</p>
+                <p className="text-on-surface font-semibold">{t.requests.noIncoming}</p>
               </div>
             ) : (
               <ul className="space-y-3" aria-label="Eingehende Anfragen">
@@ -418,7 +420,7 @@ export default function RequestsPage() {
             {outgoing.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
                 <Send className="h-10 w-10 text-on-surface-variant" aria-hidden="true" />
-                <p className="text-on-surface font-semibold">Keine ausgehenden Anfragen</p>
+                <p className="text-on-surface font-semibold">{t.requests.noOutgoing}</p>
               </div>
             ) : (
               <ul className="space-y-3" aria-label="Ausgehende Anfragen">

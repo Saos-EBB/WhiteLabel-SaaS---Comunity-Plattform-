@@ -8,6 +8,7 @@ import { fetchApi } from '@/lib/api'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 import { useConnectionAction, type ConnectionStatus } from '@/hooks/useConnectionAction'
 import { CityAutocomplete } from '@/components/ui/CityAutocomplete'
+import { useTranslation } from '@/lib/i18n'
 
 interface ProfileInterest {
   id: string
@@ -100,6 +101,7 @@ function ProfileCard({
   onUpdate: (userId: string, changes: Partial<Profile>) => void
 }) {
   const router = useRouter()
+  const { t } = useTranslation()
   const [disconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false)
   const conn = useConnectionAction(
     profile.user_id,
@@ -139,16 +141,16 @@ function ProfileCard({
             onClick={() => conn.conversationId && router.push(`/chat/${conn.conversationId}`)}
             disabled={!conn.conversationId}
             className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            aria-label={`Mit ${profile.nickname} chatten`}
+            aria-label={t.discover.chatWithAriaLabel.replace('{nickname}', profile.nickname)}
           >
-            Chatten →
+            {t.publicProfile.chat}
           </button>
           <button
             onClick={() => setDisconnectConfirmOpen(true)}
             className="w-full py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-xs sm:text-sm font-medium min-h-[44px] hover:bg-surface-container-high active:scale-95 transition-all"
-            aria-label={`Verbindung mit ${profile.nickname} trennen`}
+            aria-label={t.discover.disconnectAriaLabel.replace('{nickname}', profile.nickname)}
           >
-            Verbindung trennen
+            {t.discover.disconnectLabel}
           </button>
         </div>
       )
@@ -160,7 +162,7 @@ function ProfileCard({
           role="status"
           aria-live="polite"
         >
-          Anfrage gesendet ✓
+          {t.discover.requestSent}
         </div>
       )
     }
@@ -170,9 +172,9 @@ function ProfileCard({
           onClick={handleAccept}
           disabled={conn.isLoading}
           className="w-full py-2.5 rounded-full bg-tertiary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          aria-label={`Anfrage von ${profile.nickname} annehmen`}
+          aria-label={t.discover.acceptAriaLabel.replace('{nickname}', profile.nickname)}
         >
-          {conn.isLoading ? <Spinner /> : 'Anfrage annehmen'}
+          {conn.isLoading ? <Spinner /> : t.discover.acceptRequest}
         </button>
       )
     }
@@ -181,9 +183,9 @@ function ProfileCard({
         onClick={handleConnect}
         disabled={conn.isLoading}
         className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        aria-label={`Mit ${profile.nickname} verbinden`}
+        aria-label={t.discover.connectAriaLabel.replace('{nickname}', profile.nickname)}
       >
-        {conn.isLoading ? <Spinner /> : 'Verbinden'}
+        {conn.isLoading ? <Spinner /> : t.publicProfile.connect}
       </button>
     )
   }
@@ -191,7 +193,9 @@ function ProfileCard({
   return (
     <article
       className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden flex flex-col"
-      aria-label={age !== null ? `Profil von ${profile.nickname}, ${age} Jahre` : `Profil von ${profile.nickname}`}
+      aria-label={age !== null
+          ? t.discover.profileAriaLabel.replace('{nickname}', profile.nickname).replace('{age}', String(age))
+          : t.discover.profileAriaLabelNoAge.replace('{nickname}', profile.nickname)}
     >
       {/* Photo or placeholder */}
       <div
@@ -209,7 +213,7 @@ function ProfileCard({
         )}
         {profile.photo_needs_review && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-error/80 text-white text-[10px] font-semibold px-2 py-1 rounded-full backdrop-blur-sm whitespace-nowrap pointer-events-none">
-            Wird überprüft
+            {t.publicProfile.underReview}
           </div>
         )}
         {profile.is_online && (
@@ -276,13 +280,13 @@ function ProfileCard({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Verbindung trennen"
+          aria-label={t.discover.disconnectLabel}
         >
           <div className="bg-surface-container-high rounded-2xl p-6">
             <div className="flex flex-col items-center gap-2 text-center">
-              <p className="font-semibold text-on-surface">Verbindung trennen?</p>
+              <p className="font-semibold text-on-surface">{t.publicProfile.disconnectTitle}</p>
               <p className="text-sm text-on-surface-variant">
-                Der gemeinsame Chat wird für beide Seiten gelöscht und kann nicht wiederhergestellt werden.
+                {t.discover.disconnectDesc}
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
@@ -294,14 +298,14 @@ function ProfileCard({
                 {conn.isLoading && (
                   <span className="h-3.5 w-3.5 rounded-full border-2 border-error/30 border-t-error animate-spin" aria-hidden="true" />
                 )}
-                Trennen
+                {t.publicProfile.disconnect}
               </button>
               <button
                 onClick={() => setDisconnectConfirmOpen(false)}
                 disabled={conn.isLoading}
                 className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 disabled:opacity-50 transition-all"
               >
-                Abbrechen
+                {t.common.cancel}
               </button>
             </div>
           </div>
@@ -327,6 +331,7 @@ function SkeletonCard() {
 }
 
 export default function DiscoverPage() {
+  const { t } = useTranslation()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -366,7 +371,7 @@ export default function DiscoverPage() {
 
       {/* Header + filter panel */}
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold text-on-surface">Entdecken</h1>
+        <h1 className="text-2xl font-bold text-on-surface">{t.discover.title}</h1>
 
         <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 space-y-3">
 
@@ -383,8 +388,8 @@ export default function DiscoverPage() {
                 value={filters.city}
                 onSelect={(city) => setFilters(f => ({ ...f, city: city.name, lat: Number(city.lat), lng: Number(city.lng) }))}
                 onClear={() => setFilters(f => ({ ...f, city: '', lat: null, lng: null }))}
-                placeholder="Stadt"
-                ariaLabel="Nach Stadt filtern"
+                placeholder={t.discover.cityPlaceholder}
+                ariaLabel={t.discover.cityAriaLabel}
                 inputClassName="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
               />
             </div>
@@ -397,12 +402,12 @@ export default function DiscoverPage() {
                 className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
                 aria-label="Nach Geschlecht filtern"
               >
-                <option value="">Alle</option>
-                <option value="male">Mann</option>
-                <option value="female">Frau</option>
-                <option value="non_binary">Non-Binary</option>
-                <option value="diverse">Divers</option>
-                <option value="not_specified">Keine Angabe</option>
+                <option value="">{t.discover.filterAll}</option>
+                <option value="male">{t.onboarding.genderMale}</option>
+                <option value="female">{t.onboarding.genderFemale}</option>
+                <option value="non_binary">{t.onboarding.genderNonBinary}</option>
+                <option value="diverse">{t.onboarding.genderDiverse}</option>
+                <option value="not_specified">{t.onboarding.noChoice}</option>
               </select>
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
             </div>
@@ -415,10 +420,10 @@ export default function DiscoverPage() {
                 className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
                 aria-label="Nach Suchanliegen filtern"
               >
-                <option value="">Alle</option>
-                <option value="friendship">Freundschaft</option>
-                <option value="relationship">Beziehung</option>
-                <option value="exchange">Austausch</option>
+                <option value="">{t.discover.filterAll}</option>
+                <option value="friendship">{t.publicProfile.lookingForFriendship}</option>
+                <option value="relationship">{t.publicProfile.lookingForRelationship}</option>
+                <option value="exchange">{t.publicProfile.lookingForExchange}</option>
               </select>
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
             </div>
@@ -439,7 +444,9 @@ export default function DiscoverPage() {
               aria-label="Umkreis in km"
             />
             <span className="text-sm text-on-surface-variant w-40 text-right">
-              {filters.lat != null ? `Umkreis: ${filters.radius} km` : 'Umkreis: — (Stadt wählen)'}
+              {filters.lat != null
+                ? t.discover.radiusWithCity.replace('{radius}', String(filters.radius))
+                : t.discover.radiusNoCity}
             </span>
           </div>
 
@@ -451,7 +458,7 @@ export default function DiscoverPage() {
               type="number"
               value={filters.min_age}
               onChange={(e) => setFilters(f => ({ ...f, min_age: e.target.value }))}
-              placeholder="Alter von"
+              placeholder={t.discover.ageFrom}
               min={18}
               max={99}
               className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
@@ -462,7 +469,7 @@ export default function DiscoverPage() {
               type="number"
               value={filters.max_age}
               onChange={(e) => setFilters(f => ({ ...f, max_age: e.target.value }))}
-              placeholder="Alter bis"
+              placeholder={t.discover.ageTo}
               min={18}
               max={99}
               className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
@@ -477,13 +484,13 @@ export default function DiscoverPage() {
                 className="appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
                 aria-label="Nach Verbindungsstatus filtern"
               >
-                <option value="">Verbindung: Alle</option>
-                <option value="CONNECTED">Verbunden</option>
-                <option value="SENT">Anfrage gesendet</option>
+                <option value="">{t.discover.connectionAll}</option>
+                <option value="CONNECTED">{t.discover.connectedFilter}</option>
+                <option value="SENT">{t.discover.requestSent}</option>
                 <option value="RECEIVED">
-                  {receivedCount > 0 ? `Anfrage erhalten (${receivedCount})` : 'Anfrage erhalten'}
+                  {receivedCount > 0 ? `${t.discover.requestReceived} (${receivedCount})` : t.discover.requestReceived}
                 </option>
-                <option value="NONE">Keine Verbindung</option>
+                <option value="NONE">{t.discover.noConnection}</option>
               </select>
               <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
             </div>
@@ -507,7 +514,7 @@ export default function DiscoverPage() {
                   }`}
                 />
               </span>
-              <span className="text-sm text-on-surface whitespace-nowrap">Online jetzt</span>
+              <span className="text-sm text-on-surface whitespace-nowrap">{t.discover.onlineNow}</span>
             </label>
 
             {/* Push buttons to the right */}
@@ -517,14 +524,14 @@ export default function DiscoverPage() {
               onClick={handleReset}
               className="px-4 py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium min-h-[44px] hover:bg-surface-container-high transition-colors"
             >
-              Zurücksetzen
+              {t.discover.reset}
             </button>
             <button
               onClick={handleApply}
               disabled={loading}
               className="px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold min-h-[44px] hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
-              Filter anwenden
+              {t.discover.applyFilter}
             </button>
           </div>
         </div>
