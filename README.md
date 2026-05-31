@@ -500,6 +500,9 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Fix (`chat.gateway.ts`): Owner-Rolle wird jetzt ebenfalls in den `admin`-WebSocket-Raum aufgenommen — zuvor erhielt der Platform-Owner keine Admin-Benachrichtigungen (`ticket.new`, `media:pending_review`)
+
+### 2026-05-31
 - Fix (`admin.service.ts`): „Aktive Chats" auf dem User-Dashboard zählte auch Gespräche, die der User bereits gelöscht hatte — Query filtert jetzt korrekt nach `deleted_at_a`/`deleted_at_b`
 
 ### 2026-05-31

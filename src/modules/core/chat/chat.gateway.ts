@@ -60,7 +60,7 @@ const payload = this.jwtService.verify<{ sub: string }>(token);
         try {
             const token = (client.handshake.auth?.token ?? client.handshake.query?.token) as string;
             const { role } = this.jwtService.verify<{ sub: string; role?: string }>(token);
-            if (role === 'admin') client.join('admin');
+            if (role === 'admin' || role === 'owner') client.join('admin');
         } catch { /* non-critical — client stays connected as regular user */ }
 
         const conversations = await this.conversationRepo.find({
