@@ -788,7 +788,7 @@ export default function ConversationPage() {
           className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-end justify-center"
           onClick={(e) => { if (e.target === e.currentTarget) closeBeef() }}
         >
-          <div className="w-full max-w-lg bg-surface-container rounded-t-2xl p-6 flex flex-col gap-4 max-h-[80vh]">
+          <div className="w-full max-w-lg bg-surface-container rounded-t-2xl pt-6 px-6 pb-10 flex flex-col gap-4 max-h-[80vh]">
 
             {/* Header */}
             <div className="flex items-center justify-between flex-shrink-0">
