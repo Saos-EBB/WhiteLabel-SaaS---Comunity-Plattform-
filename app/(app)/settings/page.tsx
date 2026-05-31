@@ -360,7 +360,7 @@ export default function SettingsPage() {
       setSubDetail(null)
       setSubFetched(false)
       setCancelConfirm(false)
-      showToast('Abonnement gekündigt')
+      showToast(t.settings.subscriptionCancelled)
     } catch (err) {
       showToast(err instanceof Error ? err.message : t.common.error, false)
     } finally {
@@ -413,7 +413,7 @@ export default function SettingsPage() {
       })
       setProfile(updated)
       useAccessibilityStore.getState().applySettings(updated)
-      showToast('Gespeichert')
+      showToast(t.common.saved)
     } catch {
       setProfile(prev)
       showToast(t.common.error, false)
@@ -435,7 +435,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ [key]: value }),
       })
       setNotif((current) => current ? { ...current, ...updated } : updated)
-      showToast('Gespeichert')
+      showToast(t.common.saved)
     } catch {
       setNotif(prev)
       showToast(t.common.error, false)
@@ -456,7 +456,7 @@ export default function SettingsPage() {
         method: 'PUT',
         body: JSON.stringify({ is_published: value }),
       })
-      showToast(value ? 'Profil veröffentlicht' : 'Profil zurückgezogen')
+      showToast(value ? t.settings.profilePublished : t.settings.profileUnpublished)
     } catch {
       setProfile(prev)
       showToast(t.common.error, false)
@@ -478,7 +478,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ [field]: value }),
       })
       setProfile(updated)
-      showToast('Gespeichert')
+      showToast(t.common.saved)
     } catch {
       setProfile(prev)
       showToast(t.common.error, false)
@@ -554,7 +554,7 @@ export default function SettingsPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string }
         if (res.status === 403 || res.status === 429) {
-          setGdprCooldown(body.message ?? 'Export noch nicht verfügbar.')
+          setGdprCooldown(body.message ?? t.settings.gdprExportUnavailable)
         } else {
           setGdprError('Export fehlgeschlagen. Bitte versuche es später erneut.')
         }
@@ -583,7 +583,7 @@ export default function SettingsPage() {
       await fetchApi(`/profile/me/block/${userId}`, { method: 'DELETE' })
       setBlockedUsers((prev) => prev.filter((b) => b.user_id !== userId))
       setConfirmingUnblockId(null)
-      showToast('Blockierung aufgehoben')
+      showToast(t.settings.unblocked)
     } catch (err) {
       showToast(err instanceof Error ? err.message : t.common.error, false)
     } finally {
@@ -669,7 +669,7 @@ export default function SettingsPage() {
           <ToggleRow
             id="profanity-filter"
             label={t.settings.profanityFilter}
-            description="Unangemessene Wörter werden unkenntlich gemacht"
+            description={t.settings.profanityFilterDesc}
             checked={profile.profanity_filter}
             onChange={(v) => saveAccessibility({ profanity_filter: v })}
             saving={accessSaving}
@@ -784,9 +784,9 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <SectionLabel>{t.settings.notifEmail}</SectionLabel>
             {([
-              { key: 'email_messages', label: t.settings.notifNewMessages, desc: 'Bei neuen Chat-Nachrichten' },
-              { key: 'email_matches',  label: t.settings.notifNewMatches,  desc: 'Bei neuen Verbindungen' },
-              { key: 'email_system',   label: t.settings.notifSystem,      desc: 'Bei wichtigen Updates' },
+              { key: 'email_messages', label: t.settings.notifNewMessages, desc: t.settings.notifNewMessagesDesc },
+              { key: 'email_matches',  label: t.settings.notifNewMatches,  desc: t.settings.notifNewMatchesDesc },
+              { key: 'email_system',   label: t.settings.notifSystem,      desc: t.settings.notifSystemDesc },
             ] as const).map(({ key, label, desc }) => (
               <ToggleRow
                 key={key}
@@ -805,9 +805,9 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <SectionLabel>{t.settings.notifPush}</SectionLabel>
             {([
-              { key: 'push_messages', label: t.settings.notifNewMessages, desc: 'Bei neuen Chat-Nachrichten' },
-              { key: 'push_matches',  label: t.settings.notifNewMatches,  desc: 'Bei neuen Verbindungen' },
-              { key: 'push_system',   label: t.settings.notifSystem,      desc: 'Bei wichtigen Updates' },
+              { key: 'push_messages', label: t.settings.notifNewMessages, desc: t.settings.notifNewMessagesDesc },
+              { key: 'push_matches',  label: t.settings.notifNewMatches,  desc: t.settings.notifNewMatchesDesc },
+              { key: 'push_system',   label: t.settings.notifSystem,      desc: t.settings.notifSystemDesc },
             ] as const).map(({ key, label, desc }) => (
               <ToggleRow
                 key={key}
@@ -843,12 +843,12 @@ export default function SettingsPage() {
           />
 
           <p className="text-xs text-on-surface-variant">
-            Nickname und Profilbild sind immer sichtbar
+            {t.settings.visibilityAlwaysVisible}
           </p>
 
           {!profile.is_published && !profile.onboarding_completed && (
             <p className="text-xs text-on-surface-variant">
-              Schließe dein Onboarding ab, um dein Profil zu veröffentlichen.
+              {t.settings.visibilityCompleteOnboarding}
             </p>
           )}
 
@@ -948,7 +948,7 @@ export default function SettingsPage() {
                 }
               </button>
               <p className="text-xs text-on-surface-variant mt-1 px-1">
-                Gemäß Art. 15 DSGVO · max. 1× pro 30 Tage
+                {t.settings.gdprInfo}
               </p>
               {gdprCooldown && (
                 <p className="text-xs text-amber-500 mt-1 px-1">{gdprCooldown}</p>
@@ -990,7 +990,7 @@ export default function SettingsPage() {
                       type="button"
                       onClick={() => setPwShowCurrent((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
-                      aria-label={pwShowCurrent ? 'Passwort verbergen' : 'Passwort anzeigen'}
+                      aria-label={pwShowCurrent ? t.common.hidePassword : t.common.showPassword}
                       tabIndex={-1}
                     >
                       {pwShowCurrent
@@ -1086,7 +1086,7 @@ export default function SettingsPage() {
                     value={emNew}
                     onChange={(e) => setEmNew(e.target.value)}
                     autoComplete="email"
-                    placeholder="neue@email.de"
+                    placeholder={t.settings.newEmailPlaceholder}
                     className="w-full px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim transition-colors min-h-[44px]"
                   />
                 </div>
@@ -1326,10 +1326,7 @@ export default function SettingsPage() {
 
               <ul className="text-sm text-on-surface-variant space-y-2 mb-5 list-disc list-inside leading-relaxed">
                 <li>{t.settings.deleteAccountWarning1}</li>
-                <li>
-                  Du hast 30 Tage Zeit — wenn du dich in dieser Zeit einloggst,
-                  wird dein Konto automatisch reaktiviert
-                </li>
+                <li>{t.settings.deleteAccountWarning2}</li>
                 <li>
                   {t.settings.deleteAccountWarning3}
                 </li>

@@ -384,6 +384,7 @@ export interface Translations {
     lightMode: string
     lightModeDesc: string
     profanityFilter: string
+    profanityFilterDesc: string
     fontSize: string
     fontSizeNormal: string
     fontSizeLarge: string
@@ -398,11 +399,16 @@ export interface Translations {
     notifEmail: string
     notifPush: string
     notifNewMessages: string
+    notifNewMessagesDesc: string
     notifNewMatches: string
+    notifNewMatchesDesc: string
     notifSystem: string
+    notifSystemDesc: string
     visibilityProfilePublic: string
     visibilityPublicDesc: string
     visibilityPrivateDesc: string
+    visibilityAlwaysVisible: string
+    visibilityCompleteOnboarding: string
     visibilityOnlineStatus: string
     visibilityBio: string
     visibilityCity: string
@@ -415,6 +421,8 @@ export interface Translations {
     noSubscription: string
     deleteAccount: string
     exportData: string
+    gdprInfo: string
+    gdprExportUnavailable: string
     validUntil: string
     changePassword: string
     changeEmail: string
@@ -424,9 +432,11 @@ export interface Translations {
     confirmPassword: string
     passwordChanged: string
     newEmailAddress: string
+    newEmailPlaceholder: string
     emailUpdated: string
     noBlockedUsers: string
     unblock: string
+    unblocked: string
     unblockConfirmTitle: string
     unblockConfirmDesc: string
     subscriptionActive: string
@@ -435,6 +445,9 @@ export interface Translations {
     subscriptionLifetime: string
     cancelSubscription: string
     cancelSubscriptionConfirm: string
+    subscriptionCancelled: string
+    profilePublished: string
+    profileUnpublished: string
     supportText: string
     reportProblem: string
     deleteAccountTitle: string
