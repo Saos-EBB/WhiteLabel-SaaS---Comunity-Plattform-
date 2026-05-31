@@ -626,6 +626,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Fix (`dashboard`): „Mein Überblick"-Sektion (Offene Anfragen, Aktive Chats, Abo-Status) wird für Admin- und Owner-Rollen ausgeblendet
+
+### 2026-05-31
 - Feat (`notificationStore`, `useSocketBus`): Admin-Benachrichtigungs-Sound event-driven via `adminSoundTick`-Zähler — beide Events (`ticket.new`, `media:pending_review`) triggern den Sound über einen zentralen `useEffect`
 - Fix (`TicketsTab`): alle drei Listen (Meldungen, Support, Medien) aktualisieren sich jetzt in Echtzeit wenn ein Admin-Event eintrifft — kein manuelles Refresh mehr nötig
 

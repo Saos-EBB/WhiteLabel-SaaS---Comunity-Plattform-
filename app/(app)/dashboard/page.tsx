@@ -276,8 +276,8 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ── Mein Überblick (all users) ──────────────────────────────────────── */}
-      <section>
+      {/* ── Mein Überblick (user only) ──────────────────────────────────────── */}
+      {!isAdmin && <section>
         <SectionHeading label="Mein Überblick" icon={<UserCheck className="h-3.5 w-3.5" />} />
         {userStatsLoading ? (
           <StatRowSkeleton cols={3} />
@@ -309,7 +309,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
       {/* ── Moderations-Überblick (admin + owner) ───────────────────────────── */}
       {isAdmin && (
