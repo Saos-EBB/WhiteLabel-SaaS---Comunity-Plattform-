@@ -626,6 +626,11 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Fix (`TopNav`): Boxhandschuh-Emoji vom „Beef"-Nav-Link entfernt
+- Fix (`mobile`): Toast-Benachrichtigungen erscheinen jetzt unterhalb der TopNav statt dahinter; Bell- und StatusPicker-Dropdown werden auf Mobile als volle Breite unter der TopNav fixiert statt seitlich aus dem Viewport zu fliegen; Admin-Modal-Overlay liegt nun über der BottomNav; Beef-Bottom-Sheet hat mehr Bottom-Padding für den iOS Home Indicator
+- Fix (`notifications`): Migration 028 ausgeführt — `content_vars JSONB`-Spalte in der `notifications`-Tabelle nachgezogen; `/notifications` lieferte vorher 500
+
+### 2026-05-31
 - Feat (`settings`, `i18n`): Leetspeak (`1337 5p34k`) als Sprachoption im Language-Picker hinzugefügt
 
 ### 2026-05-31

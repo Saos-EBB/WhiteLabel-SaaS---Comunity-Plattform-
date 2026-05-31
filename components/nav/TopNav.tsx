@@ -30,7 +30,7 @@ export default function TopNav() {
     ? navLinks.map((l) => l.href === '/requests' ? { href: '/admin', label: t.nav.admin } : l)
     : navLinks
   const activeNavLinks = isHidden
-    ? [...baseNavLinks, { href: '/beef', label: 'Beef 🥊' }]
+    ? [...baseNavLinks, { href: '/beef', label: 'Beef' }]
     : baseNavLinks
 
   return (
