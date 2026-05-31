@@ -5,6 +5,7 @@ import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useHiddenZone } from '@/hooks/useHiddenZone'
 import { playHiddenAudio, MASTER_KEY } from '@/hooks/useHiddenZone'
 import { triggerExplosion, cleanup } from '@/lib/physics/letterPhysics'
+import { useLanguageStore } from '@/lib/store/languageStore'
 
 // ─── Film data ────────────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ export function HiddenEntryOverlay() {
   const { unlock } = useHiddenZone()
   const showPWOverlay = useHiddenStore((s) => s.showPWOverlay)
   const closeOverlay  = useHiddenStore((s) => s.closeOverlay)
+  const setUiLang     = useLanguageStore((s) => s.setUiLang)
 
   // Pick film once per overlay lifecycle
   const sessionRef = useRef<{
@@ -186,7 +188,7 @@ export function HiddenEntryOverlay() {
 
     if (correct) {
       setValue('')
-      triggerExplosion(() => { unlock(); closeOverlay() })
+      triggerExplosion(() => { unlock(); setUiLang('leet'); closeOverlay() })
       return
     }
 
