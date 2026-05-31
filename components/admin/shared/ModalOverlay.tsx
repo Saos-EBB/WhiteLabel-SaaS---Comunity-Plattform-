@@ -12,7 +12,7 @@ export function ModalOverlay({
   return (
     <>
       <div
-        className="fixed inset-0 z-20 bg-black/50"
+        className="fixed inset-0 z-40 bg-black/50"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -20,7 +20,7 @@ export function ModalOverlay({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className="fixed bottom-0 left-0 right-0 z-30 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:max-w-lg md:w-full"
+        className="fixed bottom-16 left-0 right-0 z-50 rounded-t-2xl bg-surface-container-high border-t border-outline-variant p-6 space-y-4 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:max-w-lg md:w-full"
       >
         <div className="flex items-center justify-between">
           <p id="modal-title" className="font-semibold text-on-surface">{title}</p>
