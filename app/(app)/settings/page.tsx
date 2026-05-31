@@ -746,6 +746,7 @@ export default function SettingsPage() {
                 <option value="ru">Русский</option>
                 <option value="ja">日本語</option>
                 <option value="de_easy">Leichte Sprache</option>
+                <option value="leet">1337 5p34k</option>
               </select>
               <ChevronDown
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none"

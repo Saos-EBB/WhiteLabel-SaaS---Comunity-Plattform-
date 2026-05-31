@@ -626,6 +626,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Feat (`settings`, `i18n`): Leetspeak (`1337 5p34k`) als Sprachoption im Language-Picker hinzugefügt
+
+### 2026-05-31
 - Fix (`dashboard`): „Mein Überblick"-Sektion (Offene Anfragen, Aktive Chats, Abo-Status) wird für Admin- und Owner-Rollen ausgeblendet
 
 ### 2026-05-31
