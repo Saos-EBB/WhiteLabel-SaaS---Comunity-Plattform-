@@ -75,31 +75,6 @@ export function TicketsTab({ showToast }: Props) {
     }
   }
 
-  async function approveMediaItem(id: string) {
-    try {
-      await fetchApi<void>(`/admin/media/${id}/approve`, { method: 'PATCH' })
-      setPendingMedia((prev) => prev.filter((m) => m.id !== id))
-      setAdminMediaCount(Math.max(0, adminMediaCount - 1))
-      showToast(t.admin.toastMediaApproved)
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : t.common.error, false)
-    }
-  }
-
-  async function rejectMediaItem(id: string) {
-    try {
-      await fetchApi<void>(`/admin/media/${id}/reject`, {
-        method: 'PATCH',
-        body: JSON.stringify({ reason: 'Abgelehnt' }),
-      })
-      setPendingMedia((prev) => prev.filter((m) => m.id !== id))
-      setAdminMediaCount(Math.max(0, adminMediaCount - 1))
-      showToast(t.admin.toastMediaRejected)
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : t.common.error, false)
-    }
-  }
-
   useEffect(() => {
     void loadTickets()
     void loadSupportTickets()
@@ -308,22 +283,9 @@ export function TicketsTab({ showToast }: Props) {
                           <p className="text-xs text-on-surface-variant/60">{fmtDate(m.uploaded_at)}</p>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => void approveMediaItem(m.id)}
-                          className="px-3 py-1.5 rounded-lg bg-primary-fixed-dim text-on-primary-container text-xs font-medium hover:opacity-90 transition-opacity"
-                        >
-                          Freigeben
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void rejectMediaItem(m.id)}
-                          className="px-3 py-1.5 rounded-lg bg-error-container text-error text-xs font-medium hover:opacity-90 transition-opacity"
-                        >
-                          Ablehnen
-                        </button>
-                      </div>
+                      <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-error-container text-error">
+                        pending
+                      </span>
                     </div>
                   ))}
                 </div>
