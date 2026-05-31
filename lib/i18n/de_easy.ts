@@ -685,4 +685,14 @@ export const deEasy = {
     profanityRemoveAriaLabel: '{word} löschen',
     autoSuspendBadge: 'Automatische Sperre',
   },
+
+  b2b: {
+    nav: { features: 'Features', licensing: 'Lizenzmodelle', contact: 'Kontakt', cta: 'Demo anfragen' },
+    hero: { badge: 'White-Label SaaS · Ihre Plattform.', line1: 'Die soziale Plattform', line2_light: 'für verantwortungsvolle Organisationen.', line2_dark: 'mit einer versteckten Seite.', sub_light: 'YourBrand ist eine lizenzierbare SaaS-Lösung — DSGVO-konform, barrierefrei und sicher für vulnerable Nutzergruppen.', sub_dark: 'YourBrand enthält eine Hidden Zone mit Beef-Battles, Coin-Economy und Monetarisierungs-Loop.', cta: 'Demo anfragen', video: 'Produkt-Video ansehen' },
+    features: { label: 'Was YourBrand mitbringt' },
+    tiers: { label: 'Lizenzmodelle', popular: 'Beliebt', cta: 'Angebot anfragen' },
+    contact: { heading: 'Kontakt aufnehmen', sub: 'Für Demos, Angebote und technische Fragen stehen wir jederzeit zur Verfügung.' },
+    tech: { toggle: 'Technische Details', heading: 'Für Entscheider mit technischem Hintergrund' },
+    footer: { text: '© 2025 YourBrand · White-Label SaaS für Organisationen' },
+  },
 } satisfies Translations
