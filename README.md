@@ -500,6 +500,10 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ## Changelog
 
 ### 2026-05-31 (latest)
+- Fix (`beef.service.ts`, `notifications.service.ts`): Beef-Benachrichtigungen (`notifyBeefRequest`, `notifyBeefAccepted`) enthielten keine Nicknamen — beide Methoden holen jetzt das Profil per gezielter SQL-Query und übergeben den Nickname als `content_vars`
+- Feat (`notifications.service.ts`): alle `notify*`-Domain-Methoden speichern jetzt strukturierte i18n-Keys + `content_vars` statt interpolierter deutscher Strings; Migration `028` fügt `content_vars JSONB` zur `notifications`-Tabelle hinzu; Ban-Methode aufgeteilt in `notifyBanTemp` / `notifyBanPermanent` / `notifyBanRevoked`; `admin.service`, `chat.service`, `moderation.service`, `payment.service` angepasst
+
+### 2026-05-31
 - Fix (`chat.gateway.ts`): Owner-Rolle wird jetzt ebenfalls in den `admin`-WebSocket-Raum aufgenommen — zuvor erhielt der Platform-Owner keine Admin-Benachrichtigungen (`ticket.new`, `media:pending_review`)
 
 ### 2026-05-31
