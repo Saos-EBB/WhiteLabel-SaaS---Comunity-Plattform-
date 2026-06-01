@@ -195,6 +195,7 @@ function AccordionItem({
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { uiLang, setUiLang } = useLanguageStore()
+  const prevLangRef = useRef<UiLang>(uiLang)
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [notif, setNotif]     = useState<NotifSettings | null>(null)
@@ -720,7 +721,15 @@ export default function SettingsPage() {
             label={t.settings.easyLanguage}
             description={t.settings.easyLanguageDesc}
             checked={profile.lang_simple}
-            onChange={(v) => saveAccessibility({ lang_simple: v })}
+            onChange={(v) => {
+                if (v) {
+                  prevLangRef.current = uiLang !== 'de_easy' ? uiLang : prevLangRef.current
+                  setUiLang('de_easy')
+                } else {
+                  setUiLang(prevLangRef.current === 'de_easy' ? 'de' : prevLangRef.current)
+                }
+                saveAccessibility({ lang_simple: v })
+              }}
             saving={accessSaving}
           />
 

@@ -625,6 +625,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
+### 2026-06-01 (latest)
+- Fix (`settings`): „Einfache Sprache"-Toggle setzt den Language-Picker automatisch auf „Leichte Sprache" (`de_easy`); beim Deaktivieren wird die vorherige Sprache wiederhergestellt
+
 ### 2026-05-31 (latest)
 - Fix (`TopNav`): Boxhandschuh-Emoji vom „Beef"-Nav-Link entfernt
 - Fix (`mobile`): Toast-Benachrichtigungen erscheinen jetzt unterhalb der TopNav statt dahinter; Bell- und StatusPicker-Dropdown werden auf Mobile als volle Breite unter der TopNav fixiert statt seitlich aus dem Viewport zu fliegen; Admin-Modal-Overlay liegt nun über der BottomNav; Beef-Bottom-Sheet hat mehr Bottom-Padding für den iOS Home Indicator
