@@ -626,6 +626,9 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 ## Changelog
 
 ### 2026-06-01 (latest)
+- Fix (`TopNav/StatusPicker`): Online-Status-Icon reset nach jedem Page-Reload — Root Cause: Backend liefert `statusMessage`/`statusVisible` (camelCase), Picker las aber `status_message`/`status_visible` (snake_case) → immer `undefined`; `user`-Objekt wird jetzt im Zustand-Store persistiert und nach erfolgreichem PUT sofort aktualisiert
+
+### 2026-06-01
 - Fix (`settings`): „Einfache Sprache"-Toggle setzt den Language-Picker automatisch auf „Leichte Sprache" (`de_easy`); beim Deaktivieren wird die vorherige Sprache wiederhergestellt
 
 ### 2026-05-31 (latest)

@@ -12,6 +12,7 @@ export function StatusPicker() {
   const { t }        = useTranslation()
   const accessToken  = useAuthStore((s) => s.accessToken)
   const user         = useAuthStore((s) => s.user)
+  const setUser      = useAuthStore((s) => s.setUser)
 
   // Optimistic overrides — null/undefined means "use store value"
   const [pendingVisible, setPendingVisible] = useState<boolean | null>(null)
@@ -23,10 +24,10 @@ export function StatusPicker() {
   // Derive effective values from store; pending override wins while saving
   const statusVisible = pendingVisible !== null
     ? pendingVisible
-    : ((user?.status_visible as boolean | undefined) ?? true)
+    : ((user?.statusVisible as boolean | undefined) ?? true)
   const statusMessage = pendingMessage !== 'unset'
     ? pendingMessage
-    : ((user?.status_message as StatusMessage | undefined) ?? null)
+    : ((user?.statusMessage as StatusMessage | undefined) ?? null)
 
   const STATUS_OPTIONS: { value: StatusMessage; label: string; color: string }[] = [
     { value: 'available',        label: t.status.available,      color: '#4ade80' },
@@ -54,6 +55,7 @@ export function StatusPicker() {
         method: 'PUT',
         body: JSON.stringify({ status_message: value }),
       })
+      if (user) setUser({ ...user, statusMessage: value })
     } catch {
       setPendingMessage('unset')
     } finally {
@@ -72,6 +74,7 @@ export function StatusPicker() {
         method: 'PUT',
         body: JSON.stringify({ status_visible: next }),
       })
+      if (user) setUser({ ...user, statusVisible: next })
     } catch {
       setPendingVisible(null)
     } finally {
