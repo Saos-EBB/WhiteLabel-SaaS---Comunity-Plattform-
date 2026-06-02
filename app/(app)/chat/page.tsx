@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageCircle, User } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
 import { fetchApi, normalise } from '@/lib/api'
-import { useAuthStore } from '@/lib/store/authStore'
+import { useAuthStore, selectUserId } from '@/lib/store/authStore'
 import { useConversationStore, type Conversation } from '@/lib/store/conversationStore'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 import { useTranslation } from '@/lib/i18n'
@@ -28,9 +28,10 @@ function SkeletonItem() {
 export default function ChatPage() {
   const { t, locale } = useTranslation()
   const router = useRouter()
-  const currentUserId = useAuthStore((s) => (s.user as any)?.user_id ?? s.user?.id)
+  const currentUserId = useAuthStore(selectUserId)
   const conversations = useConversationStore((s) => s.conversations)
   const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
+  const [photos, setPhotos] = useState<Map<string, string | null>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,19 +55,24 @@ export default function ChatPage() {
         const convs = normalise(res)
         useConversationStore.getState().setConversations(convs)
 
-        const myId = (useAuthStore.getState().user as any)?.user_id ?? useAuthStore.getState().user?.id
+        const myId = selectUserId(useAuthStore.getState())
         const partnerIds = [...new Set(convs.map((c) => c.user_a_id === myId ? c.user_b_id : c.user_a_id))]
         const profiles = await Promise.all(
           partnerIds.map((pid) =>
-            fetchApi<{ nickname: string }>(`/profile/user/${pid}`).catch(() => null)
+            fetchApi<{ nickname: string; photo_url: string | null }>(`/profile/user/${pid}`).catch(() => null)
           )
         )
         const map = new Map<string, string>()
+        const photoMap = new Map<string, string | null>()
         partnerIds.forEach((pid, i) => {
           const p = profiles[i]
-          if (p) map.set(pid, p.nickname)
+          if (p) {
+            map.set(pid, p.nickname)
+            photoMap.set(pid, p.photo_url ?? null)
+          }
         })
         setNicknames(map)
+        setPhotos(photoMap)
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : t.chat.loadError)
@@ -127,6 +133,7 @@ export default function ChatPage() {
             const realNickname = nicknames.get(partnerId)
             const nickname = realNickname ?? shortId(partnerId)
             const preview = getPreview(conv.last_message_content)
+            const partnerPhotoUrl = photos.get(partnerId) ?? null
             return (
               <li key={conv.id}>
                 <div
@@ -135,12 +142,22 @@ export default function ChatPage() {
                   aria-label={`${t.chat.conversationWith.replace('{nickname}', nickname)}${conv.last_message_at ? ', ' + formatTime(conv.last_message_at) : ''}`}
                 >
                   <div className="relative flex-shrink-0">
-                    <div
-                      className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center"
-                      aria-hidden="true"
-                    >
-                      <User className="h-6 w-6 text-outline" />
-                    </div>
+                    {partnerPhotoUrl ? (
+                      <img
+                        src={partnerPhotoUrl.replace('http://localhost:3000', '')}
+                        alt=""
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center"
+                        aria-hidden="true"
+                      >
+                        <span className="text-base font-semibold text-on-surface-variant select-none">
+                          {nickname.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                     <span
                       className="absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-background"
                       style={{ backgroundColor: getStatusColor(conv.partner_is_online ?? false, conv.partner_status_message) }}

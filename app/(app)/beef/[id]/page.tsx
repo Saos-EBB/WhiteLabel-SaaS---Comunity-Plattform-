@@ -36,6 +36,13 @@ interface Comment {
 
 const WAGER_PRESETS = [1, 5, 10, 50, 100]
 
+function parsePassage(raw: string): { nickname: string; content: string }[] {
+  return raw.split('\n').filter(Boolean).map(line => {
+    const m = line.match(/^\[(.+?)\]: (.+)$/)
+    return m ? { nickname: m[1], content: m[2] } : { nickname: '', content: line }
+  })
+}
+
 function useCountdown(endsAt: string | null) {
   const [remaining, setRemaining] = useState('')
   useEffect(() => {
@@ -67,14 +74,16 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
     } catch { return null }
   })()
 
-  const [beef, setBeef]         = useState<BeefDetail | null>(null)
-  const [comments, setComments] = useState<Comment[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [wager, setWager]       = useState(10)
-  const [voting, setVoting]     = useState(false)
-  const [comment, setComment]   = useState('')
-  const [sending, setSending]   = useState(false)
-  const [balance, setBalance]   = useState<number | null>(null)
+  const [beef, setBeef]                       = useState<BeefDetail | null>(null)
+  const [comments, setComments]               = useState<Comment[]>([])
+  const [loading, setLoading]                 = useState(true)
+  const [wager, setWager]                     = useState(10)
+  const [voting, setVoting]                   = useState(false)
+  const [comment, setComment]                 = useState('')
+  const [sending, setSending]                 = useState(false)
+  const [balance, setBalance]                 = useState<number | null>(null)
+  const [initiatorPhotoUrl, setInitiatorPhotoUrl] = useState<string | null>(null)
+  const [targetPhotoUrl, setTargetPhotoUrl]       = useState<string | null>(null)
 
   const countdown = useCountdown(beef?.ends_at ?? null)
 
@@ -97,6 +106,18 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
     if (!isHidden) { router.replace('/dashboard'); return }
     load()
   }, [isHidden, load, router])
+
+  // Fetch participant avatars once IDs are known — runs only when the beef first loads
+  useEffect(() => {
+    if (!beef?.initiator_id || !beef?.target_id) return
+    Promise.all([
+      fetchApi<{ photo_url: string | null }>(`/profile/user/${beef.initiator_id}`).catch(() => null),
+      fetchApi<{ photo_url: string | null }>(`/profile/user/${beef.target_id}`).catch(() => null),
+    ]).then(([init, targ]) => {
+      setInitiatorPhotoUrl(init?.photo_url ?? null)
+      setTargetPhotoUrl(targ?.photo_url ?? null)
+    })
+  }, [beef?.initiator_id, beef?.target_id])
 
   useEffect(() => {
     if (!isHidden || !id) return
@@ -204,42 +225,100 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
 
       {/* Participants */}
       <div className="flex items-center justify-between bg-surface-container
-        border border-outline-variant rounded-2xl p-5 mb-4">
-        <div className="flex flex-col items-center gap-1 flex-1">
-          <span className={`font-bold text-sm ${
-            isClosed && beef.winner_id === beef.initiator_id
-              ? 'text-primary-fixed-dim' : 'text-on-surface'
-          }`}>
-            {beef.initiator_nickname ?? '???'}
-          </span>
-          <span className="text-xs text-on-surface-variant">Initiator</span>
-          {isClosed && beef.winner_id === beef.initiator_id && (
-            <Trophy size={14} className="text-primary-fixed-dim"/>
+        border border-outline-variant rounded-2xl p-5 mb-4 gap-3">
+
+        {/* Initiator — avatar far left, name+role to its right */}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {initiatorPhotoUrl ? (
+            <img
+              src={initiatorPhotoUrl.replace('http://localhost:3000', '')}
+              alt=""
+              className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-semibold text-on-surface-variant select-none">
+                {(beef.initiator_nickname ?? '?').charAt(0).toUpperCase()}
+              </span>
+            </div>
           )}
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className={`font-bold text-sm truncate ${
+              isClosed && beef.winner_id === beef.initiator_id
+                ? 'text-primary-fixed-dim' : 'text-on-surface'
+            }`}>
+              {beef.initiator_nickname ?? '???'}
+            </span>
+            <span className="text-xs text-on-surface-variant">Initiator</span>
+            {isClosed && beef.winner_id === beef.initiator_id && (
+              <Trophy size={14} className="text-primary-fixed-dim"/>
+            )}
+          </div>
         </div>
+
         <Swords size={24} className="text-primary-fixed-dim flex-shrink-0"/>
-        <div className="flex flex-col items-center gap-1 flex-1">
-          <span className={`font-bold text-sm ${
-            isClosed && beef.winner_id === beef.target_id
-              ? 'text-primary-fixed-dim' : 'text-on-surface'
-          }`}>
-            {beef.target_nickname ?? '???'}
-          </span>
-          <span className="text-xs text-on-surface-variant">Target</span>
-          {isClosed && beef.winner_id === beef.target_id && (
-            <Trophy size={14} className="text-primary-fixed-dim"/>
+
+        {/* Target — name+role on the left of its cell, avatar far right */}
+        <div className="flex items-center gap-3 flex-1 flex-row-reverse min-w-0">
+          {targetPhotoUrl ? (
+            <img
+              src={targetPhotoUrl.replace('http://localhost:3000', '')}
+              alt=""
+              className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="h-12 w-12 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-semibold text-on-surface-variant select-none">
+                {(beef.target_nickname ?? '?').charAt(0).toUpperCase()}
+              </span>
+            </div>
           )}
+          <div className="flex flex-col gap-0.5 items-end min-w-0">
+            <span className={`font-bold text-sm truncate ${
+              isClosed && beef.winner_id === beef.target_id
+                ? 'text-primary-fixed-dim' : 'text-on-surface'
+            }`}>
+              {beef.target_nickname ?? '???'}
+            </span>
+            <span className="text-xs text-on-surface-variant">Target</span>
+            {isClosed && beef.winner_id === beef.target_id && (
+              <Trophy size={14} className="text-primary-fixed-dim"/>
+            )}
+          </div>
         </div>
+
       </div>
 
       {/* Passage */}
-      <div className="bg-surface-container-low border-l-2 border-primary-fixed-dim
-        rounded-r-xl p-4 mb-4">
-        <p className="text-xs text-on-surface-variant mb-1">Chat Passage</p>
-        <p className="text-sm text-on-surface-variant italic leading-relaxed whitespace-pre-line">
-          {beef.chat_passage}
-        </p>
-      </div>
+      {(() => {
+        const ownNickname =
+          currentUserId === beef.initiator_id ? beef.initiator_nickname :
+          currentUserId === beef.target_id    ? beef.target_nickname    : null
+        return (
+          <div className="bg-surface-container-low border border-outline-variant rounded-2xl p-4 mb-4">
+            <p className="text-xs text-on-surface-variant mb-3">Chat Passage</p>
+            <div className="flex flex-col gap-2">
+              {parsePassage(beef.chat_passage).map((line, i) => {
+                const isOwn = ownNickname != null && line.nickname === ownNickname
+                return (
+                  <div key={i} className={`flex flex-col gap-0.5 ${isOwn ? 'items-end' : 'items-start'}`}>
+                    <span className={`text-[10px] font-semibold px-1 ${isOwn ? 'text-primary-fixed-dim' : 'text-on-surface-variant'}`}>
+                      {line.nickname || '?'}
+                    </span>
+                    <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-snug ${
+                      isOwn
+                        ? 'rounded-br-sm bg-surface-container text-on-surface'
+                        : 'rounded-bl-sm bg-primary-fixed-dim/20 text-on-surface'
+                    }`}>
+                      {line.content}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Vote distribution bar */}
       {totalCoins > 0 && (
@@ -343,23 +422,29 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {comments.map(c => (
-              <div key={c.id}
-                className="bg-surface-container rounded-xl px-4 py-3">
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-xs font-semibold text-primary-fixed-dim">
-                    {c.nickname ?? c.user_id.slice(0, 8)}
-                  </span>
-                  <span className="text-[10px] text-on-surface-variant">
-                    {new Date(c.created_at).toLocaleTimeString('de-AT',
-                      { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+            {comments.map(c => {
+              const isOwn = c.user_id === currentUserId
+              return (
+                <div key={c.id} className={`flex flex-col gap-0.5 ${isOwn ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex items-baseline gap-1.5 px-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <span className="text-[10px] font-semibold text-primary-fixed-dim">
+                      {c.nickname ?? c.user_id.slice(0, 8)}
+                    </span>
+                    <span className="text-[10px] text-on-surface-variant">
+                      {new Date(c.created_at).toLocaleTimeString('de-AT',
+                        { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-snug ${
+                    isOwn
+                      ? 'rounded-br-sm bg-surface-container text-on-surface'
+                      : 'rounded-bl-sm bg-primary-fixed-dim/20 text-on-surface'
+                  }`}>
+                    {c.content}
+                  </div>
                 </div>
-                <p className="text-sm text-on-surface-variant leading-snug">
-                  {c.content}
-                </p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

@@ -38,12 +38,16 @@ function MessageBubble({
   profanityFilter,
   onLongPress,
   onContextMenu,
+  avatarUrl,
+  avatarInitial,
 }: {
   msg: LocalMessage
   isOwn: boolean
   profanityFilter: boolean
   onLongPress: (id: string) => void
   onContextMenu: (e: React.MouseEvent, id: string) => void
+  avatarUrl?: string | null
+  avatarInitial?: string
 }) {
   const { t, locale } = useTranslation()
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -100,12 +104,24 @@ function MessageBubble({
     >
       {/* Avatar — only for other user */}
       {!isOwn && (
-        <div
-          className="flex-shrink-0 h-7 w-7 rounded-full bg-surface-container-high flex items-center justify-center mb-0.5"
-          aria-hidden="true"
-        >
-          <User className="h-3.5 w-3.5 text-outline" />
-        </div>
+        avatarUrl ? (
+          <img
+            src={avatarUrl.replace('http://localhost:3000', '')}
+            alt=""
+            className="flex-shrink-0 h-7 w-7 rounded-full object-cover mb-0.5"
+          />
+        ) : (
+          <div
+            className="flex-shrink-0 h-7 w-7 rounded-full bg-surface-container-high flex items-center justify-center mb-0.5"
+            aria-hidden="true"
+          >
+            {avatarInitial ? (
+              <span className="text-[10px] font-semibold text-on-surface-variant select-none">{avatarInitial}</span>
+            ) : (
+              <User className="h-3.5 w-3.5 text-outline" />
+            )}
+          </div>
+        )
       )}
 
       <div className={`flex flex-col gap-1 max-w-[75%] sm:max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -146,6 +162,7 @@ export default function ConversationPage() {
   const currentUserId   = useAuthStore(selectUserId)
   const accessToken     = useAuthStore((s) => s.accessToken)
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
+  const ownNickname     = useAuthStore((s) => (s.user as any)?.nickname as string | undefined)
 
   const DURATION_OPTIONS = [
     { label: '15 Min',     value: 900 },
@@ -197,6 +214,7 @@ export default function ConversationPage() {
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const [partnerNickname, setPartnerNickname] = useState<string | null>(null)
+  const [partnerPhotoUrl, setPartnerPhotoUrl] = useState<string | null>(null)
   const [partnerIsOnline, setPartnerIsOnline] = useState(false)
   const [partnerStatusMessage, setPartnerStatusMessage] = useState<string | null>(null)
   // Ref so the socket closure always reads the current nickname without re-subscribing
@@ -229,6 +247,8 @@ export default function ConversationPage() {
     useConversationStore.getState().clearPendingMessages()
     if (msgs.length === 0) return
     const myId = selectUserId(useAuthStore.getState())
+    // A message from the partner proves they are active right now
+    if (msgs.some((m) => m.sender_id !== myId)) setPartnerIsOnline(true)
     setMessages((prev) => {
       let next = [...prev]
       for (const msg of msgs) {
@@ -267,12 +287,13 @@ export default function ConversationPage() {
           .then(async (p) => {
             setPartnerNickname(p.nickname)
             partnerNicknameRef.current = p.nickname
-            const pub = await fetchApi<{ is_online: boolean; status_message: string | null }>(
+            const pub = await fetchApi<{ is_online: boolean; status_message: string | null; photoUrl: string | null }>(
               `/profile/${encodeURIComponent(p.nickname)}`
             ).catch(() => null)
             if (pub) {
               setPartnerIsOnline(pub.is_online)
               setPartnerStatusMessage(pub.status_message ?? null)
+              setPartnerPhotoUrl(pub.photoUrl ?? null)
             }
           })
           .catch(() => { /* header falls back to shortId */ })
@@ -285,6 +306,25 @@ export default function ConversationPage() {
     }
     load()
   }, [conversationId])
+
+  // ── Presence poll — re-check partner online state every 30 s ─────────────
+  // The backend derives is_online from last_active_at (updated on every request);
+  // there are no socket presence events, so polling is the only way to catch
+  // the partner going offline after the initial load snapshot.
+
+  useEffect(() => {
+    if (!partnerNickname) return
+    const interval = setInterval(async () => {
+      const pub = await fetchApi<{ is_online: boolean; status_message: string | null }>(
+        `/profile/${encodeURIComponent(partnerNickname)}`
+      ).catch(() => null)
+      if (pub) {
+        setPartnerIsOnline(pub.is_online)
+        setPartnerStatusMessage(pub.status_message ?? null)
+      }
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [partnerNickname])
 
   // ── Socket — join room + mark read (listeners handled by useSocketBus) ─────
 
@@ -460,7 +500,7 @@ export default function ConversationPage() {
       const hi = Math.max(rangeStart, rangeEnd ?? rangeStart)
       const selected = filteredMsgs.slice(lo, hi + 1)
       const chat_passage = selected
-        .map(m => `[${m.sender_id === currentUserId ? 'Du' : partnerNickname ?? 'Partner'}]: ${m.content}`)
+        .map(m => `[${m.sender_id === currentUserId ? (ownNickname ?? 'Du') : partnerNickname ?? 'Partner'}]: ${m.content}`)
         .join('\n')
       await fetchApi('/hidden/beef', {
         method: 'POST',
@@ -499,12 +539,26 @@ export default function ConversationPage() {
           <ChevronLeft className="h-5 w-5 text-on-surface" aria-hidden="true" />
         </Link>
 
-        <div
-          className="flex-shrink-0 h-9 w-9 rounded-full bg-surface-container-high flex items-center justify-center"
-          aria-hidden="true"
-        >
-          <User className="h-5 w-5 text-outline" />
-        </div>
+        {partnerPhotoUrl ? (
+          <img
+            src={partnerPhotoUrl.replace('http://localhost:3000', '')}
+            alt=""
+            className="flex-shrink-0 h-9 w-9 rounded-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex-shrink-0 h-9 w-9 rounded-full bg-surface-container-high flex items-center justify-center"
+            aria-hidden="true"
+          >
+            {partnerNickname ? (
+              <span className="text-sm font-semibold text-on-surface-variant select-none">
+                {partnerNickname.charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <User className="h-5 w-5 text-outline" />
+            )}
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-on-surface text-sm truncate">
@@ -616,17 +670,33 @@ export default function ConversationPage() {
               profanityFilter={profanityFilter}
               onLongPress={openDeleteSheet}
               onContextMenu={(_, id) => openDeleteSheet(id)}
+              avatarUrl={partnerPhotoUrl}
+              avatarInitial={(partnerNickname ?? '').charAt(0).toUpperCase() || undefined}
             />
           ))
         )}
         {partnerTyping && (
           <div className="flex items-end gap-2 justify-start" aria-label={t.chat.typingAriaLabel}>
-            <div
-              className="flex-shrink-0 h-7 w-7 rounded-full bg-surface-container-high flex items-center justify-center mb-0.5"
-              aria-hidden="true"
-            >
-              <User className="h-3.5 w-3.5 text-outline" />
-            </div>
+            {partnerPhotoUrl ? (
+              <img
+                src={partnerPhotoUrl.replace('http://localhost:3000', '')}
+                alt=""
+                className="flex-shrink-0 h-7 w-7 rounded-full object-cover mb-0.5"
+              />
+            ) : (
+              <div
+                className="flex-shrink-0 h-7 w-7 rounded-full bg-surface-container-high flex items-center justify-center mb-0.5"
+                aria-hidden="true"
+              >
+                {partnerNickname ? (
+                  <span className="text-[10px] font-semibold text-on-surface-variant select-none">
+                    {partnerNickname.charAt(0).toUpperCase()}
+                  </span>
+                ) : (
+                  <User className="h-3.5 w-3.5 text-outline" />
+                )}
+              </div>
+            )}
             <div className="rounded-2xl rounded-bl-sm bg-primary-fixed-dim px-4 py-3">
               <div className="flex gap-1 items-center">
                 <span className="h-1.5 w-1.5 rounded-full bg-background animate-bounce [animation-delay:0ms]" />
@@ -896,37 +966,38 @@ export default function ConversationPage() {
                       const isEndEdge = idx === hi && rangeEnd !== null
 
                       return (
-                        <button
-                          key={m.id}
-                          onClick={() => handleMsgTap(idx)}
-                          className={`
-                            w-full text-left px-3 py-2 rounded-xl text-sm
-                            transition-all border
-                            ${inRange
-                              ? 'bg-primary-fixed-dim/20 border-primary-fixed-dim'
-                              : 'bg-surface-container-low border-transparent hover:border-outline-variant'
-                            }
-                          `}
-                        >
-                          <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                            <span className={`text-[10px] font-semibold ${
-                              isOwn ? 'text-primary-fixed-dim' : 'text-on-surface-variant'
+                        <div key={m.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                          <button
+                            onClick={() => handleMsgTap(idx)}
+                            className={`
+                              max-w-[75%] text-left px-3 py-2 text-sm transition-all border
+                              ${isOwn ? 'rounded-2xl rounded-br-sm' : 'rounded-2xl rounded-bl-sm'}
+                              ${inRange
+                                ? 'bg-primary-fixed-dim/20 border-primary-fixed-dim'
+                                : 'bg-surface-container-low border-transparent hover:border-outline-variant'
+                              }
+                            `}
+                          >
+                            <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                              <span className={`text-[10px] font-semibold ${
+                                isOwn ? 'text-primary-fixed-dim' : 'text-on-surface-variant'
+                              }`}>
+                                {isOwn ? (ownNickname ?? 'Du') : (partnerNickname ?? 'Partner')}
+                              </span>
+                              {isStart && (
+                                <span className="text-[9px] text-primary-fixed-dim font-bold">START</span>
+                              )}
+                              {isEndEdge && rangeEnd !== null && (
+                                <span className="text-[9px] text-primary-fixed-dim font-bold">END</span>
+                              )}
+                            </div>
+                            <span className={`leading-snug ${
+                              inRange ? 'text-on-surface' : 'text-on-surface-variant'
                             }`}>
-                              {isOwn ? 'Du' : partnerNickname ?? 'Partner'}
+                              {m.content}
                             </span>
-                            {isStart && (
-                              <span className="text-[9px] text-primary-fixed-dim font-bold">START</span>
-                            )}
-                            {isEndEdge && rangeEnd !== null && (
-                              <span className="text-[9px] text-primary-fixed-dim font-bold">END</span>
-                            )}
-                          </div>
-                          <span className={`leading-snug ${
-                            inRange ? 'text-on-surface' : 'text-on-surface-variant'
-                          }`}>
-                            {m.content}
-                          </span>
-                        </button>
+                          </button>
+                        </div>
                       )
                     })}
                   </div>

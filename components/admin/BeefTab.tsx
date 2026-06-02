@@ -15,6 +15,13 @@ interface PendingBeef {
   target_nickname: string | null
 }
 
+function parsePassage(raw: string): { nickname: string; content: string }[] {
+  return raw.split('\n').filter(Boolean).map(line => {
+    const m = line.match(/^\[(.+?)\]: (.+)$/)
+    return m ? { nickname: m[1], content: m[2] } : { nickname: '', content: line }
+  })
+}
+
 interface Props {
   showToast: (msg: string, ok?: boolean) => void
   onCountChange: (count: number) => void
@@ -94,10 +101,26 @@ export function BeefTab({ onCountChange }: Props) {
             <p className="font-bold text-on-surface mt-2 text-lg">{beef.tldr}</p>
           </div>
           <div className="bg-surface-container-low rounded-xl p-3 border-l-2 border-outline-variant">
-            <p className="text-xs text-on-surface-variant mb-1">Passage</p>
-            <p className="text-sm text-on-surface-variant italic leading-relaxed">
-              {beef.chat_passage}
-            </p>
+            <p className="text-xs text-on-surface-variant mb-2">Passage</p>
+            <div className="flex flex-col gap-1.5">
+              {parsePassage(beef.chat_passage).map((line, i) => {
+                const isTarget = beef.target_nickname != null && line.nickname === beef.target_nickname
+                return (
+                  <div key={i} className={`flex flex-col gap-0.5 ${isTarget ? 'items-end' : 'items-start'}`}>
+                    <span className="text-[10px] font-semibold text-on-surface-variant px-1">
+                      {line.nickname || '?'}
+                    </span>
+                    <div className={`max-w-[85%] px-3 py-1.5 rounded-2xl text-sm leading-snug ${
+                      isTarget
+                        ? 'rounded-br-sm bg-surface-container-high text-on-surface'
+                        : 'rounded-bl-sm bg-primary-fixed-dim/15 text-on-surface'
+                    }`}>
+                      {line.content}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-on-surface-variant font-mono">
