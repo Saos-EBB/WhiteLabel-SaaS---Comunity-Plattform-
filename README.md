@@ -4,6 +4,52 @@ Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backen
 
 ---
 
+## Contents
+
+- [Tech Stack](#tech-stack)
+- [Setup](#setup)
+- [Environment Variables](#environment-variables)
+- [Key Features](#key-features)
+  - [Auth & Onboarding](#auth--onboarding)
+  - [Discover](#discover)
+  - [Real-time Chat](#real-time-chat)
+  - [Notification Center](#notification-center)
+  - [Admin Panel](#admin-panel-admin)
+  - [Hidden Zone](#hidden-zone)
+  - [Ban Screen](#ban-screen)
+  - [Settings](#settings-settings)
+  - [Public Profiles](#public-profiles)
+  - [i18n](#i18n)
+  - [Runtime Configuration](#runtime-configuration-configpublicconfigts)
+- [Screens](#screens)
+  - [Auth — `(auth)`](#auth--auth)
+  - [App — `(app)`](#app--app)
+  - [Public — `(public)`](#public--public)
+- [Navigation](#navigation)
+  - [TopNav](#topnav--componentsnav-topnavtsx)
+  - [BottomNav](#bottomnav--componentsnav-bottomnavtsx)
+- [Auth](#auth)
+- [WebSocket](#websocket)
+- [Notifications](#notifications)
+- [Components](#components)
+  - [OnlineIndicator](#onlineindicator--componentsuionlineindicatortsx)
+  - [CityAutocomplete](#cityautocomplete--componentsuicityautocompletetsx)
+  - [StripeCheckoutModal](#stripecheckoutmodal--componentsuistripecheckoutmodaltsx)
+  - [ReportModal](#reportmodal--componentsuireportmodaltsx)
+  - [AudioPlayer](#audioplayer--componentsuiaudioplayertsx)
+  - [BanModal](#banmodal--componentsuibanmodaltsx)
+  - [ContactSupportModal](#contactsupportmodal--componentsuicontactsupportmodaltsx)
+  - [BanScreen](#banscreen--componentsuibanscreentsx)
+  - [ErrorCard](#errorcard--componentsuierrorcardtsx)
+- [Config](#config)
+  - [`config/public.config.ts`](#configpublicconfigts)
+  - [`useConnectionAction`](#useconnectionaction--hooksuseconnectionactionts)
+- [Key notes](#key-notes)
+- [Known gaps](#known-gaps)
+- [Changelog](#changelog)
+
+---
+
 ## Tech Stack
 
 | | |
