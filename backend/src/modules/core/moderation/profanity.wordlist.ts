@@ -1,0 +1,27 @@
+export const PROFANITY_WORDLIST = [
+  // DE/AT
+  'scheiße', 'scheisse', 'scheiß', 'scheiss',
+  'arschloch', 'arsch',
+  'wichser', 'wichsen',
+  'hurensohn', 'hure',
+  'fotze', 'fötze',
+  'fick', 'ficken', 'gefickt',
+  'verpiss', 'verpisst',
+  'drecksau', 'dreckskerl',
+  'nutte', 'bastard', 'mistkerl',
+  'blödmann', 'blödarsch',
+  'schwachkopf', 'spacko',
+  'schlampe',
+  'wichsvorlage',
+  // EN classics + common variants
+  'nigger', 'nigga', 'n1gger', 'n1gga',
+  'fuck', 'fuuck', 'fck', 'f4ck', 'fvck',
+  'cock', 'c0ck',
+  'cunt', 'c0nt',
+  'tits', 'titt',
+  'bitch', 'b1tch',
+  'asshole', 'a55hole',
+  'faggot', 'fag',
+  'whore',
+  'retard', 'retarded',
+];

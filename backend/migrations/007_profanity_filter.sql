@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profanity_filter BOOLEAN NOT NULL DEFAULT true;

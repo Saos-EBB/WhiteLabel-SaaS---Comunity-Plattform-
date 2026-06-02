@@ -1,0 +1,32 @@
+Was wir heute geschafft haben
+Docker Setup
+
+PostgreSQL + pgAdmin + NestJS alle in Docker
+Schema v4 eingespielt (23 Tabellen)
+.env korrekt konfiguriert
+
+Auth Module komplett gebaut
+
+Register, Login, Logout, Refresh Token
+JWT Access Token (15min) + Refresh Token (30 Tage)
+JWT Guard für geschützte Routes
+Email Verifizierung (Token generieren + Email schicken)
+Passwort Reset (Token generieren + Email schicken)
+Resend integriert und getestet
+
+
+Was noch offen ist / zu testen
+
+Password Reset komplett durchspielen — Token aus DB holen, reset-password Endpoint testen
+last_login beim Login in DB updaten
+Gebannte User beim Login blocken
+Email Verifizierung komplett testen
+
+
+Wo wir weitermachen
+
+Offene Auth-Punkte abschließen
+Profil Modul — Nickname, Geburtsdatum, Bio etc.
+Contact Requests + Chat
+Domain kaufen + Resend Domain verifizieren
+Frontend Entscheidung (React/Vue)

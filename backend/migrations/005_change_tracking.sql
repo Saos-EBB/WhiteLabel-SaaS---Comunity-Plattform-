@@ -1,0 +1,3 @@
+ALTER TABLE profiles
+  ADD COLUMN nickname_changed_at TIMESTAMPTZ NULL DEFAULT NULL,
+  ADD COLUMN gender_changed_at   TIMESTAMPTZ NULL DEFAULT NULL;

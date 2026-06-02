@@ -1,0 +1,352 @@
+import {
+    Injectable,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository, IsNull } from 'typeorm';
+import { BeefResolutionService } from './beef-resolution.service';
+import { User } from '../../core/auth/entities/user.entity';
+import { Beef, BeefStatus } from './entities/beef.entity';
+import { BeefVote } from './entities/beef-vote.entity';
+import { BeefComment } from './entities/beef-comment.entity';
+import { CreateBeefDto } from './dto/create-beef.dto';
+import { RespondBeefDto } from './dto/respond-beef.dto';
+import { VoteBeefDto } from './dto/vote-beef.dto';
+import { CommentBeefDto } from './dto/comment-beef.dto';
+import { CoinService } from '../coin/coin.service';
+import { NotificationsService } from '../../core/notifications/notifications.service';
+import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
+import { TypedEventBus, AppEvents } from '../../shared/events/app-events';
+
+@Injectable()
+export class BeefService {
+    constructor(
+        @InjectRepository(Beef)
+        private readonly beefRepo: Repository<Beef>,
+        @InjectRepository(BeefVote)
+        private readonly voteRepo: Repository<BeefVote>,
+        @InjectRepository(BeefComment)
+        private readonly commentRepo: Repository<BeefComment>,
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
+        private readonly coinService: CoinService,
+        private readonly notificationsService: NotificationsService,
+        private readonly typedEventBus: TypedEventBus,
+        private readonly dataSource: DataSource,
+        private readonly resolutionService: BeefResolutionService,
+        private readonly stateMachine: BeefStateMachineService,
+    ) { }
+
+    async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
+        if (initiatorId === dto.target_id)
+            throw new BadRequestException('Kein Self-Beef erlaubt');
+        const target = await this.userRepo.findOne({
+            where: { id: dto.target_id, deleted_at: IsNull() },
+        });
+        if (!target) throw new NotFoundException('User nicht gefunden');
+
+        // Check initiator not in exile
+        const initiator = await this.userRepo.findOne({ where: { id: initiatorId } });
+        if (initiator?.exile_until && initiator.exile_until > new Date()) {
+            await this.userRepo.update({ id: initiatorId }, { exile_until: null });
+        }
+
+        // Check target not in exile
+        if (target.exile_until && target.exile_until > new Date()) {
+            throw new BadRequestException('Target ist im Exil und kann nicht gebeeft werden.');
+        }
+
+        // Check no existing active beef between A-B (either direction)
+        const existing = await this.beefRepo
+            .createQueryBuilder('b')
+            .where(
+                `((b.initiator_id = :a AND b.target_id = :b) OR
+                  (b.initiator_id = :b AND b.target_id = :a))
+                 AND b.status IN ('pending_approval','waiting','active')`,
+                { a: initiatorId, b: dto.target_id }
+            )
+            .getOne();
+        if (existing) {
+            throw new ConflictException('Es läuft bereits ein Beef zwischen euch.');
+        }
+
+        const beef = this.beefRepo.create({
+            initiator_id: initiatorId,
+            target_id: dto.target_id,
+            tldr: dto.tldr,
+            chat_passage: dto.chat_passage,
+            status: BeefStatus.PENDING_APPROVAL,
+            duration_seconds: dto.duration_seconds ?? 86400,
+        });
+        const saved = await this.beefRepo.save(beef);
+        await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        return saved;
+    }
+
+    async getPending(): Promise<any[]> {
+        return this.beefRepo
+            .createQueryBuilder('b')
+            .leftJoin('profiles', 'ip', 'ip.user_id = b.initiator_id')
+            .leftJoin('profiles', 'tp', 'tp.user_id = b.target_id')
+            .where('b.status = :status', { status: BeefStatus.PENDING_APPROVAL })
+            .orderBy('b.created_at', 'ASC')
+            .select([
+                'b.id AS id',
+                'b.initiator_id AS initiator_id',
+                'b.target_id AS target_id',
+                'b.tldr AS tldr',
+                'b.chat_passage AS chat_passage',
+                'b.status AS status',
+                'b.created_at AS created_at',
+                'ip.nickname AS initiator_nickname',
+                'tp.nickname AS target_nickname',
+            ])
+            .getRawMany();
+    }
+
+    async respond(beefId: string, userId: string, dto: RespondBeefDto): Promise<Beef> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef) throw new NotFoundException('Beef nicht gefunden');
+        if (beef.target_id !== userId) throw new ForbiddenException();
+        if (beef.status !== BeefStatus.WAITING)
+            throw new BadRequestException('Beef nicht im Waiting-Status');
+        if (dto.response === 'chicken') {
+            await this.chickenBeef(beefId, 'manual');
+            return (await this.beefRepo.findOne({ where: { id: beefId } }))!;
+        }
+        this.stateMachine.transition(beef, BeefEvent.ACCEPT);
+        beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
+        const [acceptorProfile] = await this.dataSource.query<{ nickname: string }[]>(
+            'SELECT nickname FROM profiles WHERE user_id = $1 LIMIT 1',
+            [beef.target_id],
+        );
+        await this.notificationsService.notifyBeefAccepted(beef.initiator_id, beef.id, acceptorProfile?.nickname ?? '');
+        return this.beefRepo.save(beef);
+    }
+
+    async approve(beefId: string): Promise<Beef> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef) throw new NotFoundException();
+        if (beef.status !== BeefStatus.PENDING_APPROVAL)
+            throw new BadRequestException('Bereits verarbeitet');
+        beef.admin_approved = true;
+        this.stateMachine.transition(beef, BeefEvent.APPROVE);
+        const saved = await this.beefRepo.save(beef);
+        const [initiatorProfile] = await this.dataSource.query<{ nickname: string }[]>(
+            'SELECT nickname FROM profiles WHERE user_id = $1 LIMIT 1',
+            [beef.initiator_id],
+        );
+        await this.notificationsService.notifyBeefRequest(beef.target_id, beef.id, beef.tldr, initiatorProfile?.nickname ?? '');
+        return saved;
+    }
+
+    async listActive(): Promise<Beef[]> {
+        return this.beefRepo.find({
+            where: { status: BeefStatus.ACTIVE },
+            order: { created_at: 'DESC' },
+            take: 50,
+        });
+    }
+
+    async listPublic(userId: string): Promise<Beef[]> {
+        return this.beefRepo
+            .createQueryBuilder('b')
+            .where('b.status = :status', { status: BeefStatus.ACTIVE })
+            .andWhere('b.initiator_id != :userId AND b.target_id != :userId', { userId })
+            .orderBy('b.ends_at', 'ASC')
+            .getMany();
+    }
+
+    async getById(beefId: string, userId: string): Promise<any> {
+        const result = await this.beefRepo
+            .createQueryBuilder('b')
+            .leftJoin('profiles', 'ip', 'ip.user_id = b.initiator_id')
+            .leftJoin('profiles', 'tp', 'tp.user_id = b.target_id')
+            .where('b.id = :beefId', { beefId })
+            .select([
+                'b.id AS id',
+                'b.initiator_id AS initiator_id',
+                'b.target_id AS target_id',
+                'b.tldr AS tldr',
+                'b.chat_passage AS chat_passage',
+                'b.status AS status',
+                'b.winner_id AS winner_id',
+                'b.ends_at AS ends_at',
+                'b.duration_seconds AS duration_seconds',
+                'b.created_at AS created_at',
+                'ip.nickname AS initiator_nickname',
+                'tp.nickname AS target_nickname',
+            ])
+            .getRawOne();
+
+        if (!result) throw new NotFoundException('Beef nicht gefunden');
+
+        const votes = await this.voteRepo.find({ where: { beef_id: beefId } });
+        const initiatorCoins = votes
+            .filter(v => v.side === 'initiator')
+            .reduce((s, v) => s + v.coins_wagered, 0);
+        const targetCoins = votes
+            .filter(v => v.side === 'target')
+            .reduce((s, v) => s + v.coins_wagered, 0);
+        const userVote = votes.find(v => v.voter_id === userId) ?? null;
+
+        return {
+            ...result,
+            initiator_coins: initiatorCoins,
+            target_coins: targetCoins,
+            total_votes: votes.length,
+            user_vote: userVote ? { side: userVote.side, coins_wagered: userVote.coins_wagered } : null,
+        };
+    }
+
+    async getHighscore(): Promise<any[]> {
+        return this.beefRepo
+            .createQueryBuilder('b')
+            .innerJoin('profiles', 'p', 'p.user_id = b.winner_id')
+            .where('b.status = :status', { status: BeefStatus.CLOSED })
+            .andWhere('b.winner_id IS NOT NULL')
+            .select([
+                'b.winner_id AS user_id',
+                'p.nickname AS nickname',
+                'COUNT(b.id) AS wins',
+            ])
+            .groupBy('b.winner_id, p.nickname')
+            .orderBy('wins', 'DESC')
+            .limit(20)
+            .getRawMany()
+    }
+
+    async closeBeef(beefId: string, random: () => number = Math.random): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.ACTIVE) return;
+        this.stateMachine.transition(beef, BeefEvent.CLOSE);
+        await this.resolutionService.resolve(beef, random);
+    }
+
+    async chickenBeef(beefId: string, _reason: 'manual' | 'timeout'): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.WAITING) return;
+
+        this.stateMachine.transition(beef, BeefEvent.CHICKEN);
+        const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await this.dataSource.transaction(async (manager) => {
+            await manager.update(Beef, { id: beefId }, { status: beef.status });
+            await manager.increment(User, { id: beef.target_id }, 'chicken_count', 1);
+            // TODO: emit hidden.beef.exile event — Candidate 5 zone boundary
+            await manager.update(User, { id: beef.initiator_id }, { exile_until });
+            await manager.update(User, { id: beef.target_id },    { exile_until });
+        });
+    }
+
+    async vote(beefId: string, voterId: string, dto: VoteBeefDto): Promise<BeefVote> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.ACTIVE)
+            throw new BadRequestException('Beef nicht aktiv');
+        const existing = await this.voteRepo.findOne({
+            where: { beef_id: beefId, voter_id: voterId },
+        });
+        if (existing) throw new ConflictException('Bereits gevotet');
+        await this.coinService.spendCoins(voterId, dto.coins_wagered, 'spent_vote', beefId, `beef:${beefId}:vote:${voterId}`);
+        const vote = this.voteRepo.create({
+            beef_id: beefId,
+            voter_id: voterId,
+            side: dto.side,
+            coins_wagered: dto.coins_wagered,
+        });
+        const saved = await this.voteRepo.save(vote);
+        const allVotes = await this.voteRepo.find({ where: { beef_id: beefId } });
+        const iC = allVotes.filter(v => v.side === 'initiator').reduce((s, v) => s + v.coins_wagered, 0);
+        const tC = allVotes.filter(v => v.side === 'target').reduce((s, v) => s + v.coins_wagered, 0);
+        this.typedEventBus.emit(AppEvents.beefVote, {
+            beefId, initiatorCoins: iC, targetCoins: tC, totalVotes: allVotes.length,
+        });
+        return saved;
+    }
+
+    async addComment(beefId: string, userId: string, dto: CommentBeefDto): Promise<BeefComment> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.ACTIVE)
+            throw new BadRequestException('Beef nicht aktiv');
+        const comment = this.commentRepo.create({
+            beef_id: beefId,
+            user_id: userId,
+            content: dto.content,
+        });
+        const saved = await this.commentRepo.save(comment);
+        const count = await this.commentRepo.count({ where: { beef_id: beefId, user_id: userId } });
+        if (count <= 3) {
+            await this.coinService.addCoins(userId, 5, 'earned_comment', beefId, `beef:${beefId}:comment:${userId}:${count}`);
+        }
+        this.typedEventBus.emit(AppEvents.beefComment, {
+            beefId,
+            comment: {
+                id: saved.id, user_id: saved.user_id,
+                content: saved.content, created_at: saved.created_at,
+                nickname: null,
+            },
+        });
+        return saved;
+    }
+
+    async getComments(beefId: string): Promise<any[]> {
+        return this.commentRepo
+            .createQueryBuilder('c')
+            .leftJoin('profiles', 'p', 'p.user_id = c.user_id')
+            .where('c.beef_id = :beefId', { beefId })
+            .orderBy('c.created_at', 'ASC')
+            .select([
+                'c.id AS id',
+                'c.user_id AS user_id',
+                'c.content AS content',
+                'c.created_at AS created_at',
+                'p.nickname AS nickname',
+            ])
+            .getRawMany();
+    }
+
+    async getVotes(beefId: string): Promise<BeefVote[]> {
+        return this.voteRepo.find({ where: { beef_id: beefId } });
+    }
+
+    async getIncoming(userId: string): Promise<Beef[]> {
+        return this.beefRepo.find({
+            where: { target_id: userId, status: BeefStatus.WAITING },
+            order: { created_at: 'DESC' },
+        });
+    }
+
+    async getMyActive(userId: string): Promise<Beef[]> {
+        return this.beefRepo.find({
+            where: [
+                { initiator_id: userId, status: BeefStatus.ACTIVE },
+                { target_id: userId, status: BeefStatus.ACTIVE },
+            ],
+            order: { ends_at: 'ASC' },
+        });
+    }
+
+    async reject(beefId: string): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef) throw new NotFoundException();
+        if (beef.status !== BeefStatus.PENDING_APPROVAL)
+            throw new BadRequestException('Nur pending Beefs können abgelehnt werden');
+        await this.beefRepo.delete(beefId);
+    }
+
+    async leaveExile(userId: string): Promise<void> {
+        await this.userRepo.update(
+            { id: userId },
+            { exile_until: null }
+        );
+    }
+
+    async getExileStatus(userId: string): Promise<{ in_exile: boolean; exile_until: Date | null }> {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        const exile_until = user?.exile_until ?? null;
+        const in_exile = exile_until !== null && exile_until > new Date();
+        return { in_exile, exile_until };
+    }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE strikes ALTER COLUMN report_id DROP NOT NULL;
