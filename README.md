@@ -4,6 +4,44 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 
 ---
 
+## Contents
+
+- [Tech Stack](#tech-stack)
+- [Module Overview](#module-overview)
+- [Key Features](#key-features)
+  - [Authentication & Security](#authentication--security)
+  - [Ban System](#ban-system)
+  - [Real-time (WebSocket)](#real-time-websocket)
+  - [Stripe Payments](#stripe-payments)
+  - [GDPR](#gdpr)
+  - [Profile & Search](#profile--search)
+  - [Moderation & Profanity](#moderation--profanity)
+  - [System Settings](#system-settings)
+  - [Owner Role](#owner-role)
+  - [Multi-tenant / Licensing](#multi-tenant--licensing)
+- [Security](#security)
+- [API Reference](#api-reference)
+  - [Auth — `/auth`](#auth--auth)
+  - [Media — `/media`](#media--media)
+  - [Profile — `/profile`](#profile--profile)
+  - [Chat — `/chat`](#chat--chat)
+  - [Notifications — `/notifications`](#notifications--notifications)
+  - [Moderation — `/moderation`](#moderation--moderation)
+  - [Payment — `/payment`](#payment--payment)
+  - [Admin — `/admin`](#admin--admin)
+  - [Cities — `/cities`](#cities--cities)
+  - [System Settings — `/system-settings`](#system-settings--system-settings)
+  - [Setup — `/setup`](#setup--setup)
+  - [Support — `/support`](#support--support)
+  - [GDPR — `/gdpr`](#gdpr--gdpr)
+- [WebSocket Events](#websocket-events)
+- [Frontend](#frontend)
+- [Environment](#environment)
+- [Running Locally](#running-locally)
+- [Changelog](#changelog)
+
+---
+
 ## Tech Stack
 
 | | |
