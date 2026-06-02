@@ -435,7 +435,7 @@ export class ProfileService {
 
 
 
-    async getProfileByUserId(userId: string): Promise<{ nickname: string; photo_id: string | null }> {
+    async getProfileByUserId(userId: string): Promise<{ nickname: string; photo_id: string | null; photo_url: string | null }> {
         const profile = await this.profileRepo
             .createQueryBuilder('p')
             .innerJoin('p.user', 'u')
@@ -445,7 +445,17 @@ export class ProfileService {
             .getOne();
 
         if (!profile) throw new NotFoundException('Profil nicht gefunden');
-        return { nickname: profile.nickname, photo_id: profile.photo_id ?? null };
+
+        let photo_url: string | null = null;
+        if (profile.photo_id) {
+            const rows = await this.profileRepo.manager.query<{ file_url: string }[]>(
+                'SELECT file_url FROM media_uploads WHERE id = $1',
+                [profile.photo_id],
+            );
+            photo_url = rows[0]?.file_url ?? null;
+        }
+
+        return { nickname: profile.nickname, photo_id: profile.photo_id ?? null, photo_url };
     }
 
     async searchProfiles(
