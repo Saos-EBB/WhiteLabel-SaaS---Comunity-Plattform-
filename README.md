@@ -1,4 +1,3 @@
-**English** | [Deutsch](./README.de.md)
 
 # White-Label Community Platform
 
