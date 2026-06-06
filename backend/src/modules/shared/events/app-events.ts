@@ -34,15 +34,36 @@ export interface ContactRequestEvent {
     receiverId: string;
 }
 
+export interface BeefGameStateUpdateEvent {
+    beefId: string;
+    state: Record<string, any>;
+    gameType: string;
+    initiatorReady: boolean;
+    targetReady: boolean;
+}
+
+export interface BeefGameFinishedEvent {
+    beefId: string;
+    winnerId: string | null;
+}
+
+export interface BeefGameGoEvent {
+    beefId: string;
+    sentAt: number;
+}
+
 // ---------------------------------------------------------------------------
 // Event name constants
 // ---------------------------------------------------------------------------
 
 export const AppEvents = {
-    beefVote:       'hidden.beef.vote',
-    beefComment:    'hidden.beef.comment',
-    beefClosed:     'hidden.beef.closed',
-    contactRequest: 'contact_request.created',
+    beefVote:            'hidden.beef.vote',
+    beefComment:         'hidden.beef.comment',
+    beefClosed:          'hidden.beef.closed',
+    contactRequest:      'contact_request.created',
+    beefGameStateUpdate: 'hidden.beef.game.state_update',
+    beefGameFinished:    'hidden.beef.game.finished',
+    beefGameGo:          'hidden.beef.game.go',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -50,10 +71,13 @@ export const AppEvents = {
 // ---------------------------------------------------------------------------
 
 type EventPayloadMap = {
-    [AppEvents.beefVote]:       BeefVoteEvent;
-    [AppEvents.beefComment]:    BeefCommentEvent;
-    [AppEvents.beefClosed]:     BeefClosedEvent;
-    [AppEvents.contactRequest]: ContactRequestEvent;
+    [AppEvents.beefVote]:            BeefVoteEvent;
+    [AppEvents.beefComment]:         BeefCommentEvent;
+    [AppEvents.beefClosed]:          BeefClosedEvent;
+    [AppEvents.contactRequest]:      ContactRequestEvent;
+    [AppEvents.beefGameStateUpdate]: BeefGameStateUpdateEvent;
+    [AppEvents.beefGameFinished]:    BeefGameFinishedEvent;
+    [AppEvents.beefGameGo]:          BeefGameGoEvent;
 };
 
 // ---------------------------------------------------------------------------
