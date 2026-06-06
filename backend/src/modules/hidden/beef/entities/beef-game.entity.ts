@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Beef } from './beef.entity';
-import { User } from '../../../../core/auth/entities/user.entity';
+import { User } from '../../../core/auth/entities/user.entity';
 
 @Entity('beef_games')
 export class BeefGame {

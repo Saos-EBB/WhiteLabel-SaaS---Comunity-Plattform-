@@ -21,7 +21,8 @@ import { CommentBeefDto } from './dto/comment-beef.dto';
 import { CoinService } from '../coin/coin.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
-import { TypedEventBus, AppEvents, BeefGameFinishedEvent } from '../../shared/events/app-events';
+import { TypedEventBus, AppEvents } from '../../shared/events/app-events';
+import type { BeefGameFinishedEvent } from '../../shared/events/app-events';
 import { GameRegistry } from './games/game.registry';
 
 @Injectable()

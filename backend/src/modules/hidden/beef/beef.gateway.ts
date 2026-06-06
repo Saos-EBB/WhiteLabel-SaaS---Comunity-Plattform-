@@ -4,12 +4,8 @@ import {
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { OnEvent } from '@nestjs/event-emitter'
-import {
-  AppEvents,
-  BeefGameStateUpdateEvent,
-  BeefGameFinishedEvent,
-  BeefGameGoEvent,
-} from '../../shared/events/app-events'
+import { AppEvents } from '../../shared/events/app-events'
+import type { BeefGameStateUpdateEvent, BeefGameFinishedEvent, BeefGameGoEvent } from '../../shared/events/app-events'
 import { BeefGameService } from './beef-game.service'
 
 @WebSocketGateway({
