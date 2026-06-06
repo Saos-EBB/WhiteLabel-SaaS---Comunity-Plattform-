@@ -7,11 +7,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, IsNull } from 'typeorm';
+import { OnEvent } from '@nestjs/event-emitter';
 import { BeefResolutionService } from './beef-resolution.service';
 import { User } from '../../core/auth/entities/user.entity';
-import { Beef, BeefStatus } from './entities/beef.entity';
+import { Beef, BeefStatus, GameType } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
 import { BeefComment } from './entities/beef-comment.entity';
+import { BeefGame } from './entities/beef-game.entity';
 import { CreateBeefDto } from './dto/create-beef.dto';
 import { RespondBeefDto } from './dto/respond-beef.dto';
 import { VoteBeefDto } from './dto/vote-beef.dto';
@@ -19,7 +21,8 @@ import { CommentBeefDto } from './dto/comment-beef.dto';
 import { CoinService } from '../coin/coin.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
-import { TypedEventBus, AppEvents } from '../../shared/events/app-events';
+import { TypedEventBus, AppEvents, BeefGameFinishedEvent } from '../../shared/events/app-events';
+import { GameRegistry } from './games/game.registry';
 
 @Injectable()
 export class BeefService {
@@ -32,12 +35,15 @@ export class BeefService {
         private readonly commentRepo: Repository<BeefComment>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(BeefGame)
+        private readonly gameRepo: Repository<BeefGame>,
         private readonly coinService: CoinService,
         private readonly notificationsService: NotificationsService,
         private readonly typedEventBus: TypedEventBus,
         private readonly dataSource: DataSource,
         private readonly resolutionService: BeefResolutionService,
         private readonly stateMachine: BeefStateMachineService,
+        private readonly gameRegistry: GameRegistry,
     ) { }
 
     async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
@@ -73,6 +79,10 @@ export class BeefService {
             throw new ConflictException('Es läuft bereits ein Beef zwischen euch.');
         }
 
+        const gameType = dto.game_type ?? GameType.RPS;
+        if (!this.gameRegistry.has(gameType))
+            throw new BadRequestException(`Unbekannter Game-Typ: ${gameType}`);
+
         const beef = this.beefRepo.create({
             initiator_id: initiatorId,
             target_id: dto.target_id,
@@ -80,10 +90,19 @@ export class BeefService {
             chat_passage: dto.chat_passage,
             status: BeefStatus.PENDING_APPROVAL,
             duration_seconds: dto.duration_seconds ?? 86400,
+            game_type: gameType,
         });
         const saved = await this.beefRepo.save(beef);
         await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
         return saved;
+    }
+
+    @OnEvent(AppEvents.beefGameFinished)
+    async onGameFinished(payload: BeefGameFinishedEvent): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: payload.beefId } });
+        if (!beef) return;
+        this.stateMachine.transition(beef, BeefEvent.CLOSE);
+        await this.resolutionService.resolve(beef, payload.winnerId);
     }
 
     async getPending(): Promise<any[]> {
@@ -219,11 +238,22 @@ export class BeefService {
             .getRawMany()
     }
 
-    async closeBeef(beefId: string, random: () => number = Math.random): Promise<void> {
+    // Called by scheduler when ends_at is reached — transitions to game_pending and creates game record
+    async startGamePhase(beefId: string): Promise<void> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         if (!beef || beef.status !== BeefStatus.ACTIVE) return;
-        this.stateMachine.transition(beef, BeefEvent.CLOSE);
-        await this.resolutionService.resolve(beef, random);
+
+        this.stateMachine.transition(beef, BeefEvent.START_GAME);
+        beef.game_deadline_at = new Date(Date.now() + 30 * 60 * 1000);
+        await this.beefRepo.save(beef);
+
+        const handler = this.gameRegistry.get(beef.game_type);
+        const initialState = handler.createInitialState(beef.initiator_id, beef.target_id);
+        await this.gameRepo.save(this.gameRepo.create({
+            beef_id: beefId,
+            game_type: beef.game_type,
+            state: initialState,
+        }));
     }
 
     async chickenBeef(beefId: string, _reason: 'manual' | 'timeout'): Promise<void> {
@@ -268,7 +298,8 @@ export class BeefService {
 
     async addComment(beefId: string, userId: string, dto: CommentBeefDto): Promise<BeefComment> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
-        if (!beef || beef.status !== BeefStatus.ACTIVE)
+        const commentableStatuses = [BeefStatus.ACTIVE, BeefStatus.GAME_PENDING, BeefStatus.IN_GAME];
+        if (!beef || !commentableStatuses.includes(beef.status as BeefStatus))
             throw new BadRequestException('Beef nicht aktiv');
         const comment = this.commentRepo.create({
             beef_id: beefId,
