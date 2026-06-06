@@ -113,6 +113,20 @@ export default function BeefPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Pre-fill create form from URL params (from profile page "Beef starten" button)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const create = params.get('create')
+    const targetId = params.get('targetId')
+    const targetNickname = params.get('targetNickname')
+    if (create === '1' && targetId && targetNickname) {
+      setCreateForm(f => ({ ...f, targetUserId: targetId, targetNickname: decodeURIComponent(targetNickname) }))
+      setTab('create')
+      window.history.replaceState({}, '', '/beef')
+    }
+  }, [])
+
   // Handle Stripe coin-purchase redirect
   useEffect(() => {
     const params    = new URLSearchParams(window.location.search)

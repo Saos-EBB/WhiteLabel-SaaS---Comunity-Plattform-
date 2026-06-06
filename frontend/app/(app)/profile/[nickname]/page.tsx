@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { MapPin, Loader2, AlertCircle, Flag, Ban } from 'lucide-react'
+import { MapPin, Loader2, AlertCircle, Flag, Ban, Swords } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store/authStore'
+import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { blurText } from '@/lib/profanity'
 import { OnlineIndicator } from '@/components/ui/OnlineIndicator'
 import AudioPlayer from '@/components/ui/AudioPlayer'
@@ -89,6 +90,7 @@ export default function PublicProfilePage() {
 
   const router = useRouter()
   const accessToken = useAuthStore((s) => s.accessToken)
+  const isHidden = useHiddenStore((s) => s.isHidden)
   const isAdmin = getJwtRole(accessToken) === 'admin'
   const profanityFilter = useAuthStore((s) => (s.user as any)?.profanity_filter as boolean ?? true)
   const [adminChatLoading, setAdminChatLoading] = useState(false)
@@ -451,6 +453,17 @@ export default function PublicProfilePage() {
                 >
                   <Ban className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                   {t.publicProfile.block}
+                </button>
+              )}
+
+              {/* Beef starten — only in Hidden Zone, only on other profiles */}
+              {isHidden && conn.connectionStatus !== 'BLOCKED' && (
+                <button
+                  onClick={() => router.push(`/beef?create=1&targetId=${profile.userId}&targetNickname=${encodeURIComponent(profile.nickname)}`)}
+                  className="w-full py-3 rounded-full border-2 border-primary-fixed-dim text-primary-fixed-dim text-sm font-semibold hover:bg-primary-fixed-dim/10 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Swords className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                  Beef starten
                 </button>
               )}
             </div>
