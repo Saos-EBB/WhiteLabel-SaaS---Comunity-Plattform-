@@ -1,0 +1,48 @@
+import { Injectable } from '@nestjs/common';
+import { GameHandler, MoveResult } from './game-handler.interface';
+
+type RpsChoice = 'rock' | 'paper' | 'scissors';
+
+interface RpsState {
+    initiator_choice: RpsChoice | null;
+    target_choice: RpsChoice | null;
+    winner_id: string | null;
+}
+
+const BEATS: Record<RpsChoice, RpsChoice> = {
+    rock: 'scissors',
+    paper: 'rock',
+    scissors: 'paper',
+};
+
+@Injectable()
+export class RpsHandler implements GameHandler {
+    readonly gameType = 'rps';
+    readonly realtime = false;
+
+    createInitialState(_initiatorId: string, _targetId: string): RpsState {
+        return { initiator_choice: null, target_choice: null, winner_id: null };
+    }
+
+    applyMove(state: RpsState, move: { choice: RpsChoice }, playerId: string): MoveResult {
+        const next = { ...state };
+        if (playerId === 'initiator') next.initiator_choice = move.choice;
+        else next.target_choice = move.choice;
+
+        const finished = next.initiator_choice !== null && next.target_choice !== null;
+        return { newState: next, finished };
+    }
+
+    getWinner(state: RpsState, initiatorId: string, targetId: string): string | null {
+        const { initiator_choice: i, target_choice: t } = state;
+        if (!i || !t) return null;
+        if (i === t) return null;
+        return BEATS[i] === t ? initiatorId : targetId;
+    }
+
+    getPlayerToMove(state: RpsState, initiatorId: string, targetId: string): string | null {
+        if (!state.initiator_choice) return initiatorId;
+        if (!state.target_choice) return targetId;
+        return null;
+    }
+}
