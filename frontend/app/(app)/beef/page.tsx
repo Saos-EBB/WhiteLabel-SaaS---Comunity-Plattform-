@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
-import { Flame, Swords, Trophy, Users } from 'lucide-react'
+import { Flame, Swords, Trophy, Users, Plus, X, Search } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 
 type BeefStatus = 'pending_approval'|'waiting'|'active'|'closed'|'chickened'
@@ -23,7 +23,30 @@ interface Beef {
   created_at: string
 }
 
-type Tab = 'requests' | 'mine' | 'public' | 'highscore'
+type Tab = 'requests' | 'mine' | 'public' | 'highscore' | 'create'
+
+type GameType = 'rps' | 'tictactoe' | 'mastermind' | 'reaction'
+
+interface UserSearchResult {
+  user_id: string
+  nickname: string
+  photo_url: string | null
+}
+
+interface CreateBeefForm {
+  targetUserId: string
+  targetNickname: string
+  tldr: string
+  chatPassage: string
+  gameType: GameType
+}
+
+const GAME_OPTIONS: { value: GameType; label: string; desc: string; emoji: string }[] = [
+  { value: 'rps',        label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',      emoji: '✊' },
+  { value: 'tictactoe', label: 'Tic Tac Toe',          desc: 'Best of 3 — X vs O',                  emoji: '⬛' },
+  { value: 'mastermind', label: 'Mastermind',           desc: 'Knack den Code — 4 Farben, 10 Runden', emoji: '🎨' },
+  { value: 'reaction',  label: 'Reaktionstest',         desc: 'Wer drückt schneller auf GO!',         emoji: '⚡' },
+]
 
 export default function BeefPage() {
   const { t } = useTranslation()
@@ -43,6 +66,21 @@ export default function BeefPage() {
   const [highscore, setHighscore]       = useState<{
     user_id: string; nickname: string; wins: string
   }[]>([])
+
+  // CreateBeef state
+  const [createForm, setCreateForm]       = useState<CreateBeefForm>({
+    targetUserId: '',
+    targetNickname: '',
+    tldr: '',
+    chatPassage: '',
+    gameType: 'rps',
+  })
+  const [userSearch, setUserSearch]       = useState('')
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
+  const [searching, setSearching]         = useState(false)
+  const [creating, setCreating]           = useState(false)
+  const [createError, setCreateError]     = useState<string | null>(null)
+  const [createSuccess, setCreateSuccess] = useState(false)
 
   useEffect(() => {
     if (useHiddenStore.persist.hasHydrated()) setHydrated(true)
@@ -97,6 +135,41 @@ export default function BeefPage() {
     })
   }, [])
 
+  async function searchUsers(query: string) {
+    if (query.length < 2) { setSearchResults([]); return }
+    setSearching(true)
+    try {
+      const results = await fetchApi<UserSearchResult[]>(`/profile/search?q=${encodeURIComponent(query)}&limit=8`)
+      setSearchResults(Array.isArray(results) ? results : [])
+    } catch { setSearchResults([]) }
+    finally { setSearching(false) }
+  }
+
+  async function handleCreate() {
+    if (!createForm.targetUserId || !createForm.tldr.trim() || !createForm.chatPassage.trim() || creating) return
+    setCreating(true)
+    setCreateError(null)
+    try {
+      await fetchApi('/hidden/beef', {
+        method: 'POST',
+        body: JSON.stringify({
+          target_user_id: createForm.targetUserId,
+          tldr: createForm.tldr.trim(),
+          chat_passage: createForm.chatPassage.trim(),
+          game_type: createForm.gameType,
+        }),
+      })
+      setCreateSuccess(true)
+      setCreateForm({ targetUserId: '', targetNickname: '', tldr: '', chatPassage: '', gameType: 'rps' })
+      setUserSearch('')
+      setSearchResults([])
+      await load()
+      setTimeout(() => { setCreateSuccess(false); setTab('mine') }, 2000)
+    } catch (e: unknown) {
+      setCreateError(e instanceof Error ? e.message : 'Fehler beim Erstellen')
+    } finally { setCreating(false) }
+  }
+
   async function respond(beefId: string, response: 'fight' | 'chicken') {
     setResponding(beefId)
     try {
@@ -117,6 +190,7 @@ export default function BeefPage() {
     { key: 'mine',      label: t.beef.tabMine,      icon: <Flame size={15}/> },
     { key: 'public',    label: t.beef.tabPublic,    icon: <Users size={15}/> },
     { key: 'highscore', label: t.beef.tabHighscore, icon: <Trophy size={15}/> },
+    { key: 'create',    label: 'Beef starten',       icon: <Plus size={15}/> },
   ]
 
   return (
@@ -345,6 +419,169 @@ export default function BeefPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* CREATE TAB */}
+          {tab === 'create' && (
+            <div className="flex flex-col gap-5">
+
+              {/* Success banner */}
+              {createSuccess && (
+                <div className="bg-tertiary-container text-on-tertiary-container rounded-xl p-4 text-sm font-semibold text-center">
+                  🥊 Beef erstellt! Warte auf Genehmigung...
+                </div>
+              )}
+
+              {/* Target user search */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Gegner auswählen
+                </label>
+
+                {createForm.targetUserId ? (
+                  /* Selected user pill */
+                  <div className="flex items-center gap-3 bg-primary-fixed-dim/10 border border-primary-fixed-dim rounded-xl p-3">
+                    <span className="font-bold text-on-surface flex-1">{createForm.targetNickname}</span>
+                    <button
+                      onClick={() => setCreateForm(f => ({ ...f, targetUserId: '', targetNickname: '' }))}
+                      className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
+                    >
+                      <X size={16}/>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="flex items-center gap-2 bg-surface-container border border-outline-variant rounded-xl px-3 py-2">
+                      <Search size={16} className="text-on-surface-variant flex-shrink-0"/>
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={(e) => {
+                          setUserSearch(e.target.value)
+                          searchUsers(e.target.value)
+                        }}
+                        placeholder="Nickname suchen..."
+                        className="flex-1 bg-transparent text-on-surface text-sm outline-none placeholder:text-on-surface-variant"
+                      />
+                      {searching && (
+                        <div className="w-4 h-4 border-2 border-primary-fixed-dim border-t-transparent rounded-full animate-spin flex-shrink-0"/>
+                      )}
+                    </div>
+
+                    {searchResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-surface-container-high border border-outline-variant rounded-xl overflow-hidden z-10 shadow-lg">
+                        {searchResults.map((u) => (
+                          <button
+                            key={u.user_id}
+                            onClick={() => {
+                              setCreateForm(f => ({ ...f, targetUserId: u.user_id, targetNickname: u.nickname }))
+                              setUserSearch('')
+                              setSearchResults([])
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container transition-colors text-left"
+                          >
+                            {u.photo_url ? (
+                              <img
+                                src={u.photo_url.replace('http://localhost:3000', '')}
+                                alt={u.nickname}
+                                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-semibold text-on-surface-variant">
+                                  {(u.nickname || '?').charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            <span className="font-semibold text-on-surface text-sm">{u.nickname}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* TLDR */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Worum geht's? (TLDR)
+                </label>
+                <input
+                  type="text"
+                  value={createForm.tldr}
+                  onChange={(e) => setCreateForm(f => ({ ...f, tldr: e.target.value }))}
+                  maxLength={120}
+                  placeholder="z.B. Kevin hat den letzten Slice Pizza genommen"
+                  className="bg-surface-container border border-outline-variant rounded-xl px-4 py-3
+                    text-on-surface text-sm outline-none focus:border-primary-fixed-dim placeholder:text-on-surface-variant"
+                />
+                <span className="text-xs text-on-surface-variant text-right">{createForm.tldr.length}/120</span>
+              </div>
+
+              {/* Chat Passage */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Chat-Ausschnitt als Beweis
+                </label>
+                <textarea
+                  value={createForm.chatPassage}
+                  onChange={(e) => setCreateForm(f => ({ ...f, chatPassage: e.target.value }))}
+                  maxLength={1000}
+                  rows={5}
+                  placeholder={'[DeinNick]: Das war mein Pizza-Slice!\n[GegnerNick]: Nein, war meiner!'}
+                  className="bg-surface-container border border-outline-variant rounded-xl px-4 py-3
+                    text-on-surface text-sm outline-none focus:border-primary-fixed-dim resize-none
+                    placeholder:text-on-surface-variant font-mono"
+                />
+                <span className="text-xs text-on-surface-variant text-right">{createForm.chatPassage.length}/1000</span>
+              </div>
+
+              {/* Game type selection */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Mini-Game auswählen
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {GAME_OPTIONS.map((g) => (
+                    <button
+                      key={g.value}
+                      onClick={() => setCreateForm(f => ({ ...f, gameType: g.value }))}
+                      className={`flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all ${
+                        createForm.gameType === g.value
+                          ? 'border-primary-fixed-dim bg-primary-fixed-dim/10'
+                          : 'border-outline-variant bg-surface-container hover:border-outline'
+                      }`}
+                    >
+                      <span className="text-xl">{g.emoji}</span>
+                      <span className="font-bold text-on-surface text-xs">{g.label}</span>
+                      <span className="text-[10px] text-on-surface-variant leading-snug">{g.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error */}
+              {createError && (
+                <div className="bg-error-container text-on-error-container rounded-xl p-3 text-sm">
+                  {createError}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                onClick={handleCreate}
+                disabled={!createForm.targetUserId || !createForm.tldr.trim() || !createForm.chatPassage.trim() || creating}
+                className="w-full py-4 rounded-2xl bg-primary-fixed-dim text-on-primary-container
+                  font-bold text-sm disabled:opacity-40 transition-opacity"
+              >
+                {creating ? '...' : '🥊 Beef einreichen'}
+              </button>
+
+              <p className="text-xs text-on-surface-variant text-center">
+                Dein Beef wird nach Admin-Prüfung freigegeben.
+              </p>
             </div>
           )}
         </>
