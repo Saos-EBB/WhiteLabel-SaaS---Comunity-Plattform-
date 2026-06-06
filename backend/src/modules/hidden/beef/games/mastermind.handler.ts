@@ -8,33 +8,35 @@ type Color = typeof COLORS[number];
 
 interface Guess {
     code: Color[];
-    exact: number;   // right color, right position
-    partial: number; // right color, wrong position
+    exact: number;
+    partial: number;
+    submitted_at: number; // server timestamp ms
 }
 
 interface MastermindState {
-    // initiator sets code, target guesses (or vice-versa — both set codes, both guess)
-    initiator_code: Color[] | null;
-    target_code: Color[] | null;
+    secret_code: Color[];              // same code for both players
     initiator_guesses: Guess[];
     target_guesses: Guess[];
-    turn: 'initiator' | 'target';
-    phase: 'set_code' | 'guessing';
     winner_id: string | null;
+    round: number;                     // increments on tie, new code each round
+}
+
+function generateCode(): Color[] {
+    return Array.from({ length: CODE_LENGTH }, () => COLORS[Math.floor(Math.random() * COLORS.length)]);
 }
 
 function score(secret: Color[], guess: Color[]): { exact: number; partial: number } {
     let exact = 0;
-    const secretLeft: (Color | null)[] = [...secret];
-    const guessLeft: (Color | null)[] = [...guess];
+    const sl: (Color | null)[] = [...secret];
+    const gl: (Color | null)[] = [...guess];
     for (let i = 0; i < CODE_LENGTH; i++) {
-        if (secret[i] === guess[i]) { exact++; secretLeft[i] = null; guessLeft[i] = null; }
+        if (secret[i] === guess[i]) { exact++; sl[i] = null; gl[i] = null; }
     }
     let partial = 0;
     for (let i = 0; i < CODE_LENGTH; i++) {
-        if (guessLeft[i] === null) continue;
-        const j = secretLeft.indexOf(guessLeft[i] as Color);
-        if (j !== -1) { partial++; secretLeft[j] = null; }
+        if (gl[i] === null) continue;
+        const j = sl.indexOf(gl[i] as Color);
+        if (j !== -1) { partial++; sl[j] = null; }
     }
     return { exact, partial };
 }
@@ -44,72 +46,76 @@ export class MastermindHandler implements GameHandler {
     readonly gameType = 'mastermind';
     readonly realtime = false;
 
-    createInitialState(_initiatorId: string, _targetId: string): MastermindState {
+    createInitialState(_i: string, _t: string): MastermindState {
         return {
-            initiator_code: null,
-            target_code: null,
+            secret_code: generateCode(),
             initiator_guesses: [],
             target_guesses: [],
-            turn: 'initiator',
-            phase: 'set_code',
             winner_id: null,
+            round: 1,
         };
     }
 
-    applyMove(state: MastermindState, move: { code: Color[] }, playerId: string): MoveResult {
-        const role = playerId === 'initiator_placeholder' ? 'initiator' : state.turn;
-        const next: MastermindState = { ...state, initiator_guesses: [...state.initiator_guesses], target_guesses: [...state.target_guesses] };
+    // move = { code: Color[], role: 'initiator' | 'target', submitted_at: number }
+    applyMove(state: MastermindState, move: { code: Color[]; submitted_at: number }, playerId: string): MoveResult {
+        const role = playerId === 'initiator' ? 'initiator' : 'target';
+        const next: MastermindState = {
+            ...state,
+            initiator_guesses: [...state.initiator_guesses],
+            target_guesses: [...state.target_guesses],
+        };
 
-        if (state.phase === 'set_code') {
-            if (state.turn === 'initiator') {
-                next.initiator_code = move.code;
-                next.turn = 'target';
-            } else {
-                next.target_code = move.code;
-                next.phase = 'guessing';
-                next.turn = 'initiator';
-            }
-            return { newState: next, finished: false };
-        }
+        const { exact, partial } = score(state.secret_code, move.code);
+        const guess: Guess = { code: move.code, exact, partial, submitted_at: move.submitted_at };
 
-        // guessing phase — current turn player guesses opponent's code
-        if (state.turn === 'initiator') {
-            const secret = next.target_code!;
-            const { exact, partial } = score(secret, move.code);
-            next.initiator_guesses.push({ code: move.code, exact, partial });
-            next.turn = 'target';
-        } else {
-            const secret = next.initiator_code!;
-            const { exact, partial } = score(secret, move.code);
-            next.target_guesses.push({ code: move.code, exact, partial });
-            next.turn = 'initiator';
-        }
+        if (role === 'initiator') next.initiator_guesses.push(guess);
+        else next.target_guesses.push(guess);
 
         const iSolved = next.initiator_guesses.some(g => g.exact === CODE_LENGTH);
         const tSolved = next.target_guesses.some(g => g.exact === CODE_LENGTH);
         const iExhausted = next.initiator_guesses.length >= MAX_GUESSES;
         const tExhausted = next.target_guesses.length >= MAX_GUESSES;
-        const finished = iSolved || tSolved || (iExhausted && tExhausted);
 
-        return { newState: next, finished };
+        const bothDone = (iSolved || iExhausted) && (tSolved || tExhausted);
+        if (!bothDone) return { newState: next, finished: false };
+
+        // Both done — determine winner
+        if (iSolved && !tSolved) { next.winner_id = 'initiator'; return { newState: next, finished: true }; }
+        if (tSolved && !iSolved) { next.winner_id = 'target'; return { newState: next, finished: true }; }
+        if (!iSolved && !tSolved) {
+            // Neither solved — new round (No-Draw Rule)
+            return { newState: this.newRound(next), finished: false };
+        }
+
+        // Both solved — compare by submitted_at of correct guess
+        const iTime = next.initiator_guesses.find(g => g.exact === CODE_LENGTH)!.submitted_at;
+        const tTime = next.target_guesses.find(g => g.exact === CODE_LENGTH)!.submitted_at;
+        if (iTime < tTime) { next.winner_id = 'initiator'; return { newState: next, finished: true }; }
+        if (tTime < iTime) { next.winner_id = 'target'; return { newState: next, finished: true }; }
+
+        // Exact same ms — new round (No-Draw Rule, extremely rare)
+        return { newState: this.newRound(next), finished: false };
     }
 
     getWinner(state: MastermindState, initiatorId: string, targetId: string): string | null {
-        const iSolved = state.initiator_guesses.some(g => g.exact === CODE_LENGTH);
-        const tSolved = state.target_guesses.some(g => g.exact === CODE_LENGTH);
-        if (iSolved && !tSolved) return initiatorId;
-        if (tSolved && !iSolved) return targetId;
-        if (iSolved && tSolved) {
-            // whoever solved in fewer guesses
-            const iGuesses = state.initiator_guesses.findIndex(g => g.exact === CODE_LENGTH) + 1;
-            const tGuesses = state.target_guesses.findIndex(g => g.exact === CODE_LENGTH) + 1;
-            if (iGuesses < tGuesses) return initiatorId;
-            if (tGuesses < iGuesses) return targetId;
-        }
+        if (state.winner_id === 'initiator') return initiatorId;
+        if (state.winner_id === 'target') return targetId;
         return null;
     }
 
     getPlayerToMove(state: MastermindState, initiatorId: string, targetId: string): string | null {
-        return state.turn === 'initiator' ? initiatorId : targetId;
+        if (state.winner_id) return null;
+        // Both can move simultaneously — return null to indicate no single player
+        return null;
+    }
+
+    private newRound(state: MastermindState): MastermindState {
+        return {
+            secret_code: generateCode(),
+            initiator_guesses: [],
+            target_guesses: [],
+            winner_id: null,
+            round: state.round + 1,
+        };
     }
 }

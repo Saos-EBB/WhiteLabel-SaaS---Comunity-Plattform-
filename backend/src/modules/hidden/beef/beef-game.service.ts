@@ -53,8 +53,11 @@ export class BeefGameService {
             await this.beefRepo.save(beef);
 
             if (beef.game_type === 'reaction') {
-                // Reaction test: emit go signal immediately
-                this.eventBus.emit(AppEvents.beefGameGo, { beefId, sentAt: Date.now() });
+                // Random delay 200–5000ms before go signal (No-Draw Rule: same signal for both)
+                const delayMs = Math.floor(Math.random() * 4800) + 200;
+                setTimeout(() => {
+                    this.eventBus.emit(AppEvents.beefGameGo, { beefId, sentAt: Date.now() });
+                }, delayMs);
             }
 
             this.eventBus.emit(AppEvents.beefGameStateUpdate, {
