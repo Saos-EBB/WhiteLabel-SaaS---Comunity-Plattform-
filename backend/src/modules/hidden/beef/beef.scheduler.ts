@@ -3,14 +3,19 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { Beef, BeefStatus } from './entities/beef.entity';
+import { BeefGame } from './entities/beef-game.entity';
 import { BeefService } from './beef.service';
+import { BeefGameService } from './beef-game.service';
 
 @Injectable()
 export class BeefScheduler {
     constructor(
         @InjectRepository(Beef)
         private readonly beefRepo: Repository<Beef>,
+        @InjectRepository(BeefGame)
+        private readonly gameRepo: Repository<BeefGame>,
         private readonly beefService: BeefService,
+        private readonly beefGameService: BeefGameService,
     ) {}
 
     @Cron(CronExpression.EVERY_MINUTE)
@@ -22,7 +27,33 @@ export class BeefScheduler {
             },
         });
         for (const beef of expired) {
-            await this.beefService.closeBeef(beef.id);
+            await this.beefService.startGamePhase(beef.id);
+        }
+    }
+
+    @Cron(CronExpression.EVERY_MINUTE)
+    async handleExpiredReadyWindows(): Promise<void> {
+        const expired = await this.beefRepo.find({
+            where: {
+                status: BeefStatus.GAME_PENDING,
+                game_deadline_at: LessThan(new Date()),
+            },
+        });
+        for (const beef of expired) {
+            await this.beefGameService.handleReadyTimeout(beef.id);
+        }
+    }
+
+    @Cron(CronExpression.EVERY_MINUTE)
+    async handleExpiredMoveDeadlines(): Promise<void> {
+        const expiredGames = await this.gameRepo.find({
+            where: {
+                move_deadline_at: LessThan(new Date()),
+                winner_id: undefined,
+            },
+        });
+        for (const game of expiredGames) {
+            await this.beefGameService.handleMoveTimeout(game.beef_id);
         }
     }
 
