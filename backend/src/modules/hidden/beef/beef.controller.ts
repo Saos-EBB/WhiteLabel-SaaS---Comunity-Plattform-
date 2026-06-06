@@ -11,16 +11,21 @@ import {
     ParseUUIDPipe,
 } from '@nestjs/common';
 import { BeefService } from './beef.service';
+import { BeefGameService } from './beef-game.service';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { CreateBeefDto } from './dto/create-beef.dto';
 import { RespondBeefDto } from './dto/respond-beef.dto';
 import { VoteBeefDto } from './dto/vote-beef.dto';
 import { CommentBeefDto } from './dto/comment-beef.dto';
+import { GameMoveDto } from './dto/game-move.dto';
 
 @Controller('hidden/beef')
 @UseGuards(JwtGuard)
 export class BeefController {
-    constructor(private readonly beefService: BeefService) { }
+    constructor(
+        private readonly beefService: BeefService,
+        private readonly beefGameService: BeefGameService,
+    ) { }
 
     @Post()
     create(@Request() req: any, @Body() dto: CreateBeefDto) {
@@ -81,9 +86,23 @@ export class BeefController {
         return this.beefService.getById(id, req.user.sub);
     }
 
-    @Post(':id/close')
-    close(@Param('id', ParseUUIDPipe) id: string) {
-        return this.beefService.closeBeef(id);
+    @Post(':id/game/ready')
+    pressReady(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+        return this.beefGameService.pressReady(id, req.user.sub);
+    }
+
+    @Post(':id/game/move')
+    applyMove(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Request() req: any,
+        @Body() dto: GameMoveDto,
+    ) {
+        return this.beefGameService.applyMove(id, req.user.sub, dto.move);
+    }
+
+    @Get(':id/game')
+    getGame(@Param('id', ParseUUIDPipe) id: string) {
+        return this.beefGameService.getGame(id);
     }
 
     @Get()
