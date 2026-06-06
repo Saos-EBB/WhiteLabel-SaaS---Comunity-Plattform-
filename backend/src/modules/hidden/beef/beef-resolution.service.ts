@@ -39,9 +39,9 @@ export class BeefResolutionService {
         private readonly dataSource: DataSource,
     ) {}
 
-    async resolve(beef: Beef, random: () => number = Math.random): Promise<void> {
+    async resolve(beef: Beef, gameWinnerId: string | null, random: () => number = Math.random): Promise<void> {
         const votes = await this.voteRepo.find({ where: { beef_id: beef.id } });
-        const result = this.computeWinner(beef, votes);
+        const result = this.computeWinner(beef, votes, gameWinnerId);
 
         const badgeDurationMs = beef.duration_seconds * 4 * 1000;
         const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -101,6 +101,7 @@ export class BeefResolutionService {
     private computeWinner(
         beef: Pick<Beef, 'initiator_id' | 'target_id'>,
         votes: BeefVote[],
+        gameWinnerId: string | null,
     ): ResolutionResult {
         let initiatorCoins = 0;
         let targetCoins = 0;
@@ -111,7 +112,9 @@ export class BeefResolutionService {
 
         const totalPool = initiatorCoins + targetCoins;
 
-        if (initiatorCoins === targetCoins) {
+        // Winner comes from the game result, not vote totals.
+        // Correct bettors = those who bet on the winning side.
+        if (gameWinnerId === null) {
             return {
                 isTie: true,
                 winnerId: null,
@@ -121,9 +124,9 @@ export class BeefResolutionService {
             };
         }
 
-        const winningSide: 'initiator' | 'target' = initiatorCoins > targetCoins ? 'initiator' : 'target';
-        const winnerId = winningSide === 'initiator' ? beef.initiator_id : beef.target_id;
-        const loserId  = winningSide === 'initiator' ? beef.target_id   : beef.initiator_id;
+        const winnerId = gameWinnerId;
+        const loserId  = gameWinnerId === beef.initiator_id ? beef.target_id : beef.initiator_id;
+        const winningSide: 'initiator' | 'target' = gameWinnerId === beef.initiator_id ? 'initiator' : 'target';
 
         return {
             isTie: false,
