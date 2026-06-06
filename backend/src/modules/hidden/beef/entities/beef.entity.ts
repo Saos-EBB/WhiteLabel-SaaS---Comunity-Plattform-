@@ -62,6 +62,9 @@ export class Beef {
     @Column({ type: 'timestamptz', nullable: true })
     ends_at!: Date | null;
 
+    @Column({ type: 'int', default: 0 })
+    pot_coins!: number;
+
     @Column({ type: 'varchar', length: 30, default: GameType.RPS })
     game_type!: string;
 

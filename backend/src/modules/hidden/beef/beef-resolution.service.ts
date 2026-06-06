@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SystemSettingsService } from '../../core/system-settings/system-settings.service';
 import { Beef, BeefStatus } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
 import { Badge } from '../badge/entities/badge.entity';
@@ -14,6 +15,7 @@ export interface CoinDistribution {
     totalPool: number;
     winnerShare: number;
     lotteryPerWinner: number;
+    bettorPayouts: { voterId: string; amount: number }[];
 }
 
 export interface ResolutionResult {
@@ -37,12 +39,19 @@ export class BeefResolutionService {
         private readonly notificationsService: NotificationsService,
         private readonly eventEmitter: EventEmitter2,
         private readonly dataSource: DataSource,
+        private readonly systemSettings: SystemSettingsService,
     ) {}
 
     async resolve(beef: Beef, gameWinnerId: string | null, random: () => number = Math.random): Promise<void> {
         const votes = await this.voteRepo.find({ where: { beef_id: beef.id } });
-        const result = this.computeWinner(beef, votes, gameWinnerId);
 
+        const housePct   = await this.systemSettings.getNumber('beef.split.house_pct', 10);
+        const winnerPct  = await this.systemSettings.getNumber('beef.split.winner_pct', 30);
+        const bettorsPct = 100 - housePct - winnerPct;
+        const chunkPct   = await this.systemSettings.getNumber('beef.split.chunk_pct', 5);
+        const maxPerBettorPct = await this.systemSettings.getNumber('beef.split.max_per_bettor_pct', 20);
+
+        const result = this.computeWinner(beef, votes, gameWinnerId, winnerPct, bettorsPct, chunkPct, maxPerBettorPct);
         const badgeDurationMs = beef.duration_seconds * 4 * 1000;
         const exile_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -63,26 +72,11 @@ export class BeefResolutionService {
             } else {
                 const { winnerId, loserId, coinDistribution, correctVoters } = result;
 
-                if (coinDistribution.totalPool > 0) {
-                    if (coinDistribution.winnerShare > 0)
-                        await this.coinService.addCoins(winnerId!, coinDistribution.winnerShare, 'earned_win', beef.id, `beef:${beef.id}:winner:${winnerId}`);
+                if (coinDistribution.winnerShare > 0)
+                    await this.coinService.addCoins(winnerId!, coinDistribution.winnerShare, 'earned_win', beef.id, `beef:${beef.id}:winner:${winnerId}`);
 
-                    if (correctVoters.length > 0 && coinDistribution.lotteryPerWinner > 0) {
-                        const tickets: string[] = [];
-                        for (const v of correctVoters) {
-                            for (let i = 0; i < v.coins_wagered; i++) tickets.push(v.voter_id);
-                        }
-                        const lotteryWinners = new Set<string>();
-                        const maxWinners = Math.min(10, correctVoters.length);
-                        let attempts = 0;
-                        while (lotteryWinners.size < maxWinners && attempts < tickets.length * 3 + 100) {
-                            lotteryWinners.add(tickets[Math.floor(random() * tickets.length)]);
-                            attempts++;
-                        }
-                        for (const voterId of lotteryWinners) {
-                            await this.coinService.addCoins(voterId, coinDistribution.lotteryPerWinner, 'lottery_win', beef.id, `beef:${beef.id}:lottery:${voterId}`);
-                        }
-                    }
+                for (const { voterId, amount } of coinDistribution.bettorPayouts) {
+                    await this.coinService.addCoins(voterId, amount, 'earned_bet_win', beef.id, `beef:${beef.id}:bet:${voterId}`);
                 }
 
                 const expires_at = new Date(Date.now() + badgeDurationMs);
@@ -99,45 +93,67 @@ export class BeefResolutionService {
     }
 
     private computeWinner(
-        beef: Pick<Beef, 'initiator_id' | 'target_id'>,
+        beef: Pick<Beef, 'initiator_id' | 'target_id' | 'pot_coins'>,
         votes: BeefVote[],
         gameWinnerId: string | null,
+        winnerPct: number,
+        bettorsPct: number,
+        chunkPct: number,
+        maxPerBettorPct: number,
     ): ResolutionResult {
-        let initiatorCoins = 0;
-        let targetCoins = 0;
-        for (const v of votes) {
-            if (v.side === 'initiator') initiatorCoins += v.coins_wagered;
-            else targetCoins += v.coins_wagered;
-        }
+        let votePool = 0;
+        for (const v of votes) votePool += v.coins_wagered;
+        const totalPool = votePool + (beef.pot_coins ?? 0);
 
-        const totalPool = initiatorCoins + targetCoins;
+        const winnerShare   = Math.floor(totalPool * winnerPct / 100);
+        const bettorsPool   = Math.floor(totalPool * bettorsPct / 100);
+        const chunkSize     = Math.floor(totalPool * chunkPct / 100);
+        const maxPerBettor  = Math.floor(totalPool * maxPerBettorPct / 100);
 
-        // Winner comes from the game result, not vote totals.
-        // Correct bettors = those who bet on the winning side.
         if (gameWinnerId === null) {
             return {
                 isTie: true,
                 winnerId: null,
                 loserId: null,
-                coinDistribution: { totalPool, winnerShare: 0, lotteryPerWinner: 0 },
+                coinDistribution: { totalPool, winnerShare: 0, lotteryPerWinner: 0, bettorPayouts: [] },
                 correctVoters: [],
             };
         }
 
-        const winnerId = gameWinnerId;
-        const loserId  = gameWinnerId === beef.initiator_id ? beef.target_id : beef.initiator_id;
         const winningSide: 'initiator' | 'target' = gameWinnerId === beef.initiator_id ? 'initiator' : 'target';
+        const correctVoters = votes.filter(v => v.side === winningSide);
+        const loserId = gameWinnerId === beef.initiator_id ? beef.target_id : beef.initiator_id;
+
+        // Distribute bettorsPool in chunkSize chunks, max maxPerBettor per bettor
+        const bettorPayouts: { voterId: string; amount: number }[] = [];
+        if (correctVoters.length > 0 && chunkSize > 0) {
+            let remaining = bettorsPool;
+            const payoutMap = new Map<string, number>();
+            for (const v of correctVoters) payoutMap.set(v.voter_id, 0);
+
+            while (remaining >= chunkSize) {
+                let distributed = false;
+                for (const v of correctVoters) {
+                    const current = payoutMap.get(v.voter_id)!;
+                    if (current + chunkSize <= maxPerBettor && remaining >= chunkSize) {
+                        payoutMap.set(v.voter_id, current + chunkSize);
+                        remaining -= chunkSize;
+                        distributed = true;
+                    }
+                }
+                if (!distributed) break;
+            }
+            for (const [voterId, amount] of payoutMap.entries()) {
+                if (amount > 0) bettorPayouts.push({ voterId, amount });
+            }
+        }
 
         return {
             isTie: false,
-            winnerId,
+            winnerId: gameWinnerId,
             loserId,
-            coinDistribution: {
-                totalPool,
-                winnerShare: Math.floor(totalPool * 0.40),
-                lotteryPerWinner: Math.floor(totalPool * 0.05),
-            },
-            correctVoters: votes.filter(v => v.side === winningSide),
+            coinDistribution: { totalPool, winnerShare, lotteryPerWinner: chunkSize, bettorPayouts },
+            correctVoters,
         };
     }
 }

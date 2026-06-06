@@ -24,6 +24,7 @@ import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service
 import { TypedEventBus, AppEvents } from '../../shared/events/app-events';
 import type { BeefGameFinishedEvent } from '../../shared/events/app-events';
 import { GameRegistry } from './games/game.registry';
+import { SystemSettingsService } from '../../core/system-settings/system-settings.service';
 
 @Injectable()
 export class BeefService {
@@ -45,6 +46,7 @@ export class BeefService {
         private readonly resolutionService: BeefResolutionService,
         private readonly stateMachine: BeefStateMachineService,
         private readonly gameRegistry: GameRegistry,
+        private readonly systemSettings: SystemSettingsService,
     ) { }
 
     async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
@@ -94,7 +96,9 @@ export class BeefService {
             game_type: gameType,
         });
         const saved = await this.beefRepo.save(beef);
-        await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        const entryCost = await this.systemSettings.getNumber('beef.entry_cost', 50);
+        await this.coinService.spendCoins(initiatorId, entryCost, 'spent_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        await this.beefRepo.update({ id: saved.id }, { pot_coins: entryCost });
         return saved;
     }
 
@@ -137,6 +141,9 @@ export class BeefService {
             await this.chickenBeef(beefId, 'manual');
             return (await this.beefRepo.findOne({ where: { id: beefId } }))!;
         }
+        const entryCost = await this.systemSettings.getNumber('beef.entry_cost', 50);
+        await this.coinService.spendCoins(userId, entryCost, 'spent_beef_accept', beefId, `beef:${beefId}:accept:${userId}`);
+        await this.beefRepo.increment({ id: beefId }, 'pot_coins', entryCost);
         this.stateMachine.transition(beef, BeefEvent.ACCEPT);
         beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
         const [acceptorProfile] = await this.dataSource.query<{ nickname: string }[]>(
