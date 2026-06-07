@@ -104,9 +104,9 @@ export default function BeefPage() {
     gameType: 'rps',
     durationSeconds: 86400,
   })
-  const [userSearch, setUserSearch]       = useState('')
-  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
-  const [searching, setSearching]         = useState(false)
+  const [userSearch, setUserSearch]         = useState('')
+  const [searchResults, setSearchResults]   = useState<UserSearchResult[]>([])
+  const [partners, setPartners]             = useState<UserSearchResult[]>([])
   const [creating, setCreating]           = useState(false)
   const [createError, setCreateError]     = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState(false)
@@ -237,15 +237,18 @@ export default function BeefPage() {
     setCreateForm(f => ({ ...f, chatPassage: passage }))
   }, [selectedMsgIds, chatMessages, currentUserId, createForm.targetNickname])
 
-  async function searchUsers(query: string) {
-    if (query.length < 2) { setSearchResults([]); return }
-    setSearching(true)
-    try {
-      const results = await fetchApi<UserSearchResult[]>(`/profile/search?q=${encodeURIComponent(query)}&limit=8`)
-      setSearchResults(Array.isArray(results) ? results : [])
-    } catch { setSearchResults([]) }
-    finally { setSearching(false) }
+  function searchUsers(query: string) {
+    if (query.trim().length < 1) { setSearchResults([]); return }
+    const q = query.toLowerCase()
+    setSearchResults(partners.filter(p => p.nickname.toLowerCase().includes(q)))
   }
+
+  useEffect(() => {
+    if (!isHidden) return
+    fetchApi<UserSearchResult[]>('/chat/conversations/partners')
+      .then(r => setPartners(Array.isArray(r) ? r : []))
+      .catch(() => {})
+  }, [isHidden])
 
   async function handleCreate() {
     if (!createForm.targetUserId || !createForm.tldr.trim() || !createForm.chatPassage.trim() || creating) return
@@ -569,9 +572,6 @@ export default function BeefPage() {
                         placeholder="Nickname suchen..."
                         className="flex-1 bg-transparent text-on-surface text-sm outline-none placeholder:text-on-surface-variant"
                       />
-                      {searching && (
-                        <div className="w-4 h-4 border-2 border-primary-fixed-dim border-t-transparent rounded-full animate-spin flex-shrink-0"/>
-                      )}
                     </div>
 
                     {searchResults.length > 0 && (

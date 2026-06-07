@@ -163,6 +163,10 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-07 (3)
+- feat: Beef-Suche zeigt nur verknüpfte User — neuer Endpoint `GET /chat/conversations/partners`
+- refactor: Suche im Beef-Create-Tab ist jetzt lokal (kein API-Call beim Tippen)
+
 ### 2026-06-07 (2)
 - fix: Beef-Modal im Chat hat jetzt Schritt 3 (Spiel-Auswahl) — `game_type` wird mitgeschickt
 - fix: `target_user_id` → `target_id` in Beef-Create-Page korrigiert
