@@ -314,8 +314,9 @@ export function MastermindGame({
 
   // ── Fetch initial state ──────────────────────────────────────────────────
   useEffect(() => {
-    fetchApi<MmGameState>(`/hidden/beef/${beefId}/game`)
+    fetchApi<MmGameState & { game_type: string }>(`/hidden/beef/${beefId}/game`)
       .then((gs) => {
+        if (gs.game_type !== 'mastermind') return
         if (gs.initiator) setInitiatorState(gs.initiator)
         if (gs.target) setTargetState(gs.target)
       })
@@ -324,15 +325,13 @@ export function MastermindGame({
 
   // ── Socket listeners ─────────────────────────────────────────────────────
   useEffect(() => {
-    function onMove(data: {
-      initiator: MmPlayerState
-      target: MmPlayerState
-    }) {
+    function onBoardUpdate(data: MmGameState & { game_type: string }) {
+      if (data.game_type !== 'mastermind') return
       setInitiatorState(data.initiator)
       setTargetState(data.target)
     }
-    socket.on('game:mm_move', onMove)
-    return () => { socket.off('game:mm_move', onMove) }
+    socket.on('game:board_update', onBoardUpdate)
+    return () => { socket.off('game:board_update', onBoardUpdate) }
   }, [socket])
 
   // Track dragover color for visual feedback

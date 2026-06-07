@@ -44,7 +44,7 @@ function score(secret: Color[], guess: Color[]): { exact: number; partial: numbe
 @Injectable()
 export class MastermindHandler implements GameHandler {
     readonly gameType = 'mastermind';
-    readonly realtime = false;
+    readonly realtime = true; // both players guess simultaneously
 
     createInitialState(_i: string, _t: string): MastermindState {
         return {
@@ -56,8 +56,9 @@ export class MastermindHandler implements GameHandler {
         };
     }
 
-    // move = { code: Color[], role: 'initiator' | 'target', submitted_at: number }
-    applyMove(state: MastermindState, move: { code: Color[]; submitted_at: number }, playerId: string): MoveResult {
+    // move = { guess: Color[]; submitted_at?: number }
+    // submitted_at is injected server-side by BeefGameService; optional for tests
+    applyMove(state: MastermindState, move: { guess: Color[]; submitted_at?: number }, playerId: string): MoveResult {
         const role = playerId === 'initiator' ? 'initiator' : 'target';
         const next: MastermindState = {
             ...state,
@@ -65,8 +66,9 @@ export class MastermindHandler implements GameHandler {
             target_guesses: [...state.target_guesses],
         };
 
-        const { exact, partial } = score(state.secret_code, move.code);
-        const guess: Guess = { code: move.code, exact, partial, submitted_at: move.submitted_at };
+        const submittedAt = move.submitted_at ?? Date.now();
+        const { exact, partial } = score(state.secret_code, move.guess);
+        const guess: Guess = { code: move.guess, exact, partial, submitted_at: submittedAt };
 
         if (role === 'initiator') next.initiator_guesses.push(guess);
         else next.target_guesses.push(guess);
@@ -103,10 +105,21 @@ export class MastermindHandler implements GameHandler {
         return null;
     }
 
-    getPlayerToMove(state: MastermindState, initiatorId: string, targetId: string): string | null {
+    getPlayerToMove(state: MastermindState, _initiatorId: string, _targetId: string): string | null {
         if (state.winner_id) return null;
-        // Both can move simultaneously — return null to indicate no single player
-        return null;
+        return null; // both move simultaneously
+    }
+
+    shapeBoardUpdate(state: MastermindState, _initiatorId: string, _targetId: string, _finished: boolean): Record<string, any> {
+        const toPlayerState = (guesses: Guess[]) => ({
+            guesses: guesses.map(g => ({ guess: g.code, exact: g.exact, partial: g.partial })),
+            solved: guesses.some(g => g.exact === CODE_LENGTH),
+            attempts: guesses.length,
+        });
+        return {
+            initiator: toPlayerState(state.initiator_guesses),
+            target: toPlayerState(state.target_guesses),
+        };
     }
 
     private newRound(state: MastermindState): MastermindState {

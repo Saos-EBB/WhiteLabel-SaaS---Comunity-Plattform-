@@ -49,4 +49,11 @@ export class ReactionHandler implements GameHandler {
     getPlayerToMove(_state: ReactionState, _initiatorId: string, _targetId: string): string | null {
         return null;
     }
+
+    shapeBoardUpdate(state: ReactionState, _initiatorId: string, _targetId: string, _finished: boolean): Record<string, any> {
+        return {
+            initiator_reacted: state.initiator_reaction_ms !== null,
+            target_reacted: state.target_reaction_ms !== null,
+        };
+    }
 }

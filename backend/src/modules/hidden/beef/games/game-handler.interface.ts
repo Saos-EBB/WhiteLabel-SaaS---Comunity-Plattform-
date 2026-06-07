@@ -11,4 +11,6 @@ export interface GameHandler {
     applyMove(state: Record<string, any>, move: Record<string, any>, playerId: string): MoveResult;
     getWinner(state: Record<string, any>, initiatorId: string, targetId: string): string | null;
     getPlayerToMove(state: Record<string, any>, initiatorId: string, targetId: string): string | null;
+    /** Returns a frontend-ready board snapshot safe to broadcast to all clients in the room. */
+    shapeBoardUpdate(state: Record<string, any>, initiatorId: string, targetId: string, finished: boolean): Record<string, any>;
 }

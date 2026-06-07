@@ -163,6 +163,14 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-08 (2)
+- fix: Spiel-Züge werden jetzt via `game:board_update` Socket-Event in Echtzeit verteilt — RPS, TicTacToe und Mastermind zeigen den Spielstand nach jedem Zug live an
+- fix: TicTacToe `move.index` → `move.position` (Feld-Name-Mismatch zwischen Frontend und Backend behoben)
+- fix: Mastermind `move.code` → `move.guess` + `realtime = true` (Züge waren geblockt)
+- fix: RPS `realtime = true` war korrekt — Board-Update fehlte; jetzt enthüllt der Gegner bei beiden Einreichungen
+- fix: `getGame`-Endpoint gibt jetzt den aktuellen Spielstand zurück (für Reload-Fälle)
+- feat: Blur-Effekt hinter dem Game-Overlay (`backdrop-blur-md`)
+
 ### 2026-06-08
 - fix: Migration 035 — `game_pending` + `in_game` zum `chk_beef_status` DB-Constraint hinzugefügt (Scheduler konnte Beefs nie in die Game-Phase überführen)
 - fix: `GET /hidden/beef/:id` gibt jetzt `game_type`, `game_deadline_at`, `pot_coins` zurück — Game-Overlay konnte nie rendern weil `game_type` null war

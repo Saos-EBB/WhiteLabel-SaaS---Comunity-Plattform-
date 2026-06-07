@@ -71,31 +71,33 @@ export function RpsGame({
 
   // ── Load current game state ──────────────────────────────────────────────
   useEffect(() => {
-    fetchApi<RpsGameState>(`/hidden/beef/${beefId}/game`)
+    fetchApi<{ game_type: string; round: number; both_submitted: boolean; initiator_choice: RpsChoice | null; target_choice: RpsChoice | null; round_winner: string | null }>(`/hidden/beef/${beefId}/game`)
       .then((gs) => {
+        if (gs.game_type !== 'rps') return
         setRound(gs.round ?? 1)
-        if (gs.my_choice) setMyChoice(gs.my_choice)
-        // If both have chosen, show revealed state
-        if (gs.round_result) {
+        if (gs.both_submitted) {
           setRevealed({
-            initiatorChoice: gs.round_result.initiator_choice,
-            targetChoice: gs.round_result.target_choice,
-            roundWinner: gs.round_result.round_winner,
+            initiatorChoice: gs.initiator_choice,
+            targetChoice: gs.target_choice,
+            roundWinner: gs.round_winner,
           })
         }
       })
       .catch(() => { /* WS will update */ })
   }, [beefId])
 
-  // ── Socket: round result (both submitted) ────────────────────────────────
+  // ── Socket: board update ─────────────────────────────────────────────────
   useEffect(() => {
-    function onMove(data: {
+    function onBoardUpdate(data: {
+      game_type: string
       round: number
+      both_submitted: boolean
       initiator_choice: RpsChoice | null
       target_choice: RpsChoice | null
       round_winner: string | null
-      both_submitted: boolean
     }) {
+      if (data.game_type !== 'rps') return
+      setRound(data.round)
       if (data.both_submitted) {
         setRevealed({
           initiatorChoice: data.initiator_choice,
@@ -104,29 +106,13 @@ export function RpsGame({
         })
         setOpponentChose(false)
       } else {
-        // One side submitted — flag opponent chose if it's not us
-        const submitterId = data.initiator_choice && !data.target_choice
-          ? initiatorId
-          : targetId
-        if (submitterId !== currentUserId) setOpponentChose(true)
+        setOpponentChose(true)
       }
     }
 
-    function onNewRound(data: { round: number }) {
-      setRound(data.round)
-      setMyChoice(null)
-      setRevealed(null)
-      setOpponentChose(false)
-    }
-
-    socket.on('game:rps_move', onMove)
-    socket.on('game:rps_new_round', onNewRound)
-
-    return () => {
-      socket.off('game:rps_move', onMove)
-      socket.off('game:rps_new_round', onNewRound)
-    }
-  }, [socket, currentUserId, initiatorId, targetId])
+    socket.on('game:board_update', onBoardUpdate)
+    return () => { socket.off('game:board_update', onBoardUpdate) }
+  }, [socket])
 
   // ── Submit choice ────────────────────────────────────────────────────────
   async function handleChoice(choice: RpsChoice) {
@@ -139,6 +125,7 @@ export function RpsGame({
         body: JSON.stringify({ move: { choice } }),
       })
       setMyChoice(choice)
+      setOpponentChose(false) // reset; board_update will re-set if opponent already chose
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Fehler')
     } finally {

@@ -73,8 +73,9 @@ export function TicTacToeGame({
 
   // ── Fetch initial state ──────────────────────────────────────────────────
   useEffect(() => {
-    fetchApi<TttGameState>(`/hidden/beef/${beefId}/game`)
+    fetchApi<TttGameState & { game_type: string }>(`/hidden/beef/${beefId}/game`)
       .then((gs) => {
+        if (gs.game_type !== 'tictactoe') return
         if (gs.board) setBoard(gs.board)
         if (gs.current_turn) setCurrentTurn(gs.current_turn)
         setInitiatorWins(gs.initiator_wins ?? 0)
@@ -88,15 +89,8 @@ export function TicTacToeGame({
 
   // ── Socket listeners ─────────────────────────────────────────────────────
   useEffect(() => {
-    function onMove(data: {
-      board: Cell[]
-      current_turn: string
-      game_winner: string | null
-      is_draw: boolean
-      initiator_wins: number
-      target_wins: number
-      game_number: number
-    }) {
+    function onBoardUpdate(data: TttGameState & { game_type: string }) {
+      if (data.game_type !== 'tictactoe') return
       setBoard(data.board)
       setCurrentTurn(data.current_turn)
       setGameWinner(data.game_winner)
@@ -106,8 +100,8 @@ export function TicTacToeGame({
       setGameNumber(data.game_number)
     }
 
-    socket.on('game:ttt_move', onMove)
-    return () => { socket.off('game:ttt_move', onMove) }
+    socket.on('game:board_update', onBoardUpdate)
+    return () => { socket.off('game:board_update', onBoardUpdate) }
   }, [socket])
 
   // ── Place move ───────────────────────────────────────────────────────────

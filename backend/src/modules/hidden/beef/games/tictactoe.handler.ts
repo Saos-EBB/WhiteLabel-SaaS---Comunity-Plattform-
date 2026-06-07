@@ -35,7 +35,7 @@ export class TicTacToeHandler implements GameHandler {
         return { board: Array(9).fill(null), turn: 'initiator', scores: { initiator: 0, target: 0 }, game_number: 1, winner_id: null };
     }
 
-    applyMove(state: TicTacToeState, move: { index: number }, _playerId: string): MoveResult {
+    applyMove(state: TicTacToeState, move: { position: number }, _playerId: string): MoveResult {
         const next: TicTacToeState = {
             board: [...state.board],
             turn: state.turn === 'initiator' ? 'target' : 'initiator',
@@ -43,7 +43,7 @@ export class TicTacToeHandler implements GameHandler {
             game_number: state.game_number,
             winner_id: null,
         };
-        next.board[move.index] = state.turn === 'initiator' ? 'X' : 'O';
+        next.board[move.position] = state.turn === 'initiator' ? 'X' : 'O';
 
         const boardResult = checkBoardWinner(next.board);
 
@@ -79,5 +79,19 @@ export class TicTacToeHandler implements GameHandler {
     getPlayerToMove(state: TicTacToeState, initiatorId: string, targetId: string): string | null {
         if (state.winner_id) return null;
         return state.turn === 'initiator' ? initiatorId : targetId;
+    }
+
+    shapeBoardUpdate(state: TicTacToeState, initiatorId: string, targetId: string, finished: boolean): Record<string, any> {
+        const currentTurn = state.turn === 'initiator' ? initiatorId : targetId;
+        const gameWinner = finished ? this.getWinner(state, initiatorId, targetId) : null;
+        return {
+            board: state.board,
+            current_turn: currentTurn,
+            initiator_wins: state.scores.initiator,
+            target_wins: state.scores.target,
+            game_number: state.game_number,
+            game_winner: gameWinner,
+            is_draw: false,
+        };
     }
 }

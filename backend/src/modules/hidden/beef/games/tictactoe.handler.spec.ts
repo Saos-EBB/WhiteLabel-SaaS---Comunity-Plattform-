@@ -6,10 +6,10 @@ describe('TicTacToeHandler', () => {
     const T = 'target-id';
 
     function playMoves(moves: { idx: number; role: 'initiator' | 'target' }[]) {
-        let state = h.createInitialState(I, T);
+        let state: any = h.createInitialState(I, T);
         let finished = false;
         for (const m of moves) {
-            ({ newState: state, finished } = h.applyMove(state, { index: m.idx }, m.role));
+            ({ newState: state, finished } = h.applyMove(state, { position: m.idx }, m.role));
         }
         return { state, finished };
     }
@@ -53,6 +53,6 @@ describe('TicTacToeHandler', () => {
         const { state, finished } = playMoves(moves);
         expect(finished).toBe(false);
         expect(state.scores).toEqual({ initiator: 0, target: 0 });
-        expect(state.board.every(c => c === null)).toBe(true);
+        expect(state.board.every((c: any) => c === null)).toBe(true);
     });
 });

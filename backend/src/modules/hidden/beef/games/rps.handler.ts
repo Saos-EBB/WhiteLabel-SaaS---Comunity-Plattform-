@@ -18,7 +18,7 @@ const BEATS: Record<RpsChoice, RpsChoice> = {
 @Injectable()
 export class RpsHandler implements GameHandler {
     readonly gameType = 'rps';
-    readonly realtime = false;
+    readonly realtime = true; // simultaneous — both players submit independently
 
     createInitialState(_initiatorId: string, _targetId: string): RpsState {
         return { initiator_choice: null, target_choice: null, winner_id: null };
@@ -44,5 +44,16 @@ export class RpsHandler implements GameHandler {
         if (!state.initiator_choice) return initiatorId;
         if (!state.target_choice) return targetId;
         return null;
+    }
+
+    shapeBoardUpdate(state: RpsState, initiatorId: string, targetId: string, _finished: boolean): Record<string, any> {
+        const both = state.initiator_choice !== null && state.target_choice !== null;
+        return {
+            both_submitted: both,
+            initiator_choice: both ? state.initiator_choice : null,
+            target_choice: both ? state.target_choice : null,
+            round_winner: both ? this.getWinner(state, initiatorId, targetId) : null,
+            round: 1,
+        };
     }
 }

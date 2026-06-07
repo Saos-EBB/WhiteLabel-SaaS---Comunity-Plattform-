@@ -102,8 +102,22 @@ export class BeefGameService {
         if (handler.realtime === false && playerToMove !== userId)
             throw new BadRequestException('Nicht dein Zug');
 
-        const { newState, finished } = handler.applyMove(game.state, move, role);
+        // Inject server-side timestamp for mastermind (prevents client time manipulation)
+        const sanitizedMove = beef.game_type === 'mastermind'
+            ? { ...move, submitted_at: Date.now() }
+            : move;
+
+        const { newState, finished } = handler.applyMove(game.state, sanitizedMove, role);
         game.state = newState;
+
+        // Always broadcast the new board state to all room members
+        const board = handler.shapeBoardUpdate(newState, beef.initiator_id, beef.target_id, finished);
+        this.eventBus.emit(AppEvents.beefGameBoardUpdate, {
+            beefId,
+            gameType: beef.game_type,
+            board,
+            finished,
+        });
 
         if (finished) {
             const winnerId = handler.getWinner(newState, beef.initiator_id, beef.target_id);
@@ -141,20 +155,22 @@ export class BeefGameService {
         await this.applyMove(beefId, userId, { received_at_ms: receivedAtMs });
     }
 
-    async getGame(beefId: string): Promise<{
-        state: 'waiting' | 'in_game' | 'finished';
-        game_type: string;
-        initiator_ready: boolean;
-        target_ready: boolean;
-        move_deadline_at: Date | null;
-        winner_id: string | null;
-    } | null> {
+    async getGame(beefId: string): Promise<Record<string, any> | null> {
         const game = await this.gameRepo.findOne({ where: { beef_id: beefId } });
         if (!game) return null;
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef) return null;
+
         const state: 'waiting' | 'in_game' | 'finished' =
             game.winner_id !== null ? 'finished' :
             (game.initiator_ready && game.target_ready) ? 'in_game' :
             'waiting';
+
+        const handler = this.registry.get(game.game_type);
+        const board = game.state
+            ? handler.shapeBoardUpdate(game.state, beef.initiator_id, beef.target_id, state === 'finished')
+            : {};
+
         return {
             state,
             game_type: game.game_type,
@@ -162,6 +178,7 @@ export class BeefGameService {
             target_ready: game.target_ready,
             move_deadline_at: game.move_deadline_at,
             winner_id: game.winner_id,
+            ...board,
         };
     }
 

@@ -263,7 +263,7 @@ export function GameOverlay({
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-surface">
+    <div className="fixed inset-0 z-50 flex flex-col bg-surface/85 backdrop-blur-md">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
         <span className="font-bold text-on-surface text-sm uppercase tracking-widest">

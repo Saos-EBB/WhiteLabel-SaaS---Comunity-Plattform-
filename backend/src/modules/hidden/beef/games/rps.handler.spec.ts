@@ -18,28 +18,28 @@ describe('RpsHandler', () => {
     });
 
     it('finished when both chose', () => {
-        let s = h.createInitialState(I, T);
+        let s: any = h.createInitialState(I, T);
         ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
         const { finished } = h.applyMove(s, { choice: 'scissors' }, 'target');
         expect(finished).toBe(true);
     });
 
     it('rock beats scissors → initiator wins', () => {
-        let s = h.createInitialState(I, T);
+        let s: any = h.createInitialState(I, T);
         ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
         ({ newState: s } = h.applyMove(s, { choice: 'scissors' }, 'target'));
         expect(h.getWinner(s, I, T)).toBe(I);
     });
 
     it('paper beats rock → target wins', () => {
-        let s = h.createInitialState(I, T);
+        let s: any = h.createInitialState(I, T);
         ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
         ({ newState: s } = h.applyMove(s, { choice: 'paper' }, 'target'));
         expect(h.getWinner(s, I, T)).toBe(T);
     });
 
     it('same choice → null winner (tie round)', () => {
-        let s = h.createInitialState(I, T);
+        let s: any = h.createInitialState(I, T);
         ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
         ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'target'));
         expect(h.getWinner(s, I, T)).toBeNull();

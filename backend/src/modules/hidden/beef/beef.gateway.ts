@@ -5,7 +5,7 @@ import {
 import { Server, Socket } from 'socket.io'
 import { OnEvent } from '@nestjs/event-emitter'
 import { AppEvents } from '../../shared/events/app-events'
-import type { BeefGameStateUpdateEvent, BeefGameFinishedEvent, BeefGameGoEvent } from '../../shared/events/app-events'
+import type { BeefGameStateUpdateEvent, BeefGameFinishedEvent, BeefGameGoEvent, BeefGameBoardUpdateEvent } from '../../shared/events/app-events'
 import { BeefGameService } from './beef-game.service'
 
 @WebSocketGateway({
@@ -72,6 +72,14 @@ export class HiddenBeefGateway {
   @OnEvent(AppEvents.beefGameGo)
   onGameGo(payload: BeefGameGoEvent) {
     this.server.to(`beef:${payload.beefId}`).emit('game:go', { sent_at: payload.sentAt })
+  }
+
+  @OnEvent(AppEvents.beefGameBoardUpdate)
+  onGameBoardUpdate(payload: BeefGameBoardUpdateEvent) {
+    this.server.to(`beef:${payload.beefId}`).emit('game:board_update', {
+      game_type: payload.gameType,
+      ...payload.board,
+    })
   }
 
   @OnEvent(AppEvents.beefGameFinished)
