@@ -153,6 +153,15 @@ async function main() {
         console.log('DEMO_MEDIA_PATH nicht gesetzt — Media wird uebersprungen');
     }
 
+    // Constraint auf media_uploads.file_url erfordert https://.
+    // Im lokalen Dev-Betrieb (BACKEND_URL=http://...) wird sie temporaer entfernt.
+    const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const needsConstraintDrop = !backendUrl.startsWith('https://');
+    if (needsConstraintDrop && demoMediaPath) {
+        await ds.query(`ALTER TABLE media_uploads DROP CONSTRAINT IF EXISTS chk_media_file_url`);
+        console.log('  INFO  chk_media_file_url temporaer entfernt (http-URL in dev)');
+    }
+
     let created = 0;
     let skipped = 0;
 
@@ -271,6 +280,17 @@ async function main() {
 
         console.log(`  OK    ${u.nickname} (${u.email}) → ${userId}`);
         created++;
+    }
+
+    // Constraint wiederherstellen (nur wenn BACKEND_URL https:// ist)
+    if (needsConstraintDrop && demoMediaPath) {
+        if (backendUrl.startsWith('https://')) {
+            await ds.query(`ALTER TABLE media_uploads ADD CONSTRAINT chk_media_file_url CHECK (file_url ~ '^https://')`);
+            console.log('  INFO  chk_media_file_url wiederhergestellt');
+        } else {
+            console.log('  WARN  chk_media_file_url bleibt entfernt — BACKEND_URL ist kein https://');
+            console.log('        Manuell wiederherstellen: ALTER TABLE media_uploads ADD CONSTRAINT chk_media_file_url CHECK (file_url ~ \'^https://\')');
+        }
     }
 
     await ds.destroy();

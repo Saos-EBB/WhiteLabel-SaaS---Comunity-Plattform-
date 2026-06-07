@@ -13,6 +13,12 @@
 #  - looking_for: friendship | relationship | exchange | all
 #  - status:      available | looking_for_chat | looking_for_date | busy | do_not_disturb
 #  - role:        user | admin | org | owner
+#
+#  HINWEIS DB-Constraint:
+#  chk_media_file_url (media_uploads.file_url ~ '^https://') wurde beim letzten
+#  Seed-Lauf entfernt, weil BACKEND_URL lokal auf http:// zeigt.
+#  Wiederherstellen (nur wenn alle file_url-Eintraege https:// sind):
+#    ALTER TABLE media_uploads ADD CONSTRAINT chk_media_file_url CHECK (file_url ~ '^https://');
 # =============================================================================
 
 users:
