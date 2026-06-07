@@ -163,6 +163,9 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-07 (4)
+- fix: Online-Status-Punkt im Chat-Header war immer grau — falsches Feldnamen-Format (snake_case statt camelCase) beim Profil-Fetch korrigiert
+
 ### 2026-06-07 (3)
 - feat: Beef-Suche zeigt nur verknüpfte User — neuer Endpoint `GET /chat/conversations/partners`
 - refactor: Suche im Beef-Create-Tab ist jetzt lokal (kein API-Call beim Tippen)

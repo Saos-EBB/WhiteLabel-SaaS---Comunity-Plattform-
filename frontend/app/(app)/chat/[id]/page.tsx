@@ -297,12 +297,12 @@ export default function ConversationPage() {
           .then(async (p) => {
             setPartnerNickname(p.nickname)
             partnerNicknameRef.current = p.nickname
-            const pub = await fetchApi<{ is_online: boolean; status_message: string | null; photoUrl: string | null }>(
+            const pub = await fetchApi<{ isOnline: boolean; statusMessage: string | null; photoUrl: string | null }>(
               `/profile/${encodeURIComponent(p.nickname)}`
             ).catch(() => null)
             if (pub) {
-              setPartnerIsOnline(pub.is_online)
-              setPartnerStatusMessage(pub.status_message ?? null)
+              setPartnerIsOnline(pub.isOnline)
+              setPartnerStatusMessage(pub.statusMessage ?? null)
               setPartnerPhotoUrl(pub.photoUrl ?? null)
             }
           })
@@ -325,12 +325,12 @@ export default function ConversationPage() {
   useEffect(() => {
     if (!partnerNickname) return
     const interval = setInterval(async () => {
-      const pub = await fetchApi<{ is_online: boolean; status_message: string | null }>(
+      const pub = await fetchApi<{ isOnline: boolean; statusMessage: string | null }>(
         `/profile/${encodeURIComponent(partnerNickname)}`
       ).catch(() => null)
       if (pub) {
-        setPartnerIsOnline(pub.is_online)
-        setPartnerStatusMessage(pub.status_message ?? null)
+        setPartnerIsOnline(pub.isOnline)
+        setPartnerStatusMessage(pub.statusMessage ?? null)
       }
     }, 30_000)
     return () => clearInterval(interval)
