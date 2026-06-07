@@ -74,7 +74,7 @@ export class BeefService {
             .where(
                 `((b.initiator_id = :a AND b.target_id = :b) OR
                   (b.initiator_id = :b AND b.target_id = :a))
-                 AND b.status IN ('pending_approval','waiting','active')`,
+                 AND b.status IN ('pending_approval','waiting','active','game_pending','in_game')`,
                 { a: initiatorId, b: dto.target_id }
             )
             .getOne();
@@ -208,6 +208,9 @@ export class BeefService {
                 'b.winner_id AS winner_id',
                 'b.ends_at AS ends_at',
                 'b.duration_seconds AS duration_seconds',
+                'b.game_type AS game_type',
+                'b.game_deadline_at AS game_deadline_at',
+                'b.pot_coins AS pot_coins',
                 'b.created_at AS created_at',
                 'ip.nickname AS initiator_nickname',
                 'tp.nickname AS target_nickname',
@@ -267,6 +270,15 @@ export class BeefService {
             game_type: beef.game_type,
             state: initialState,
         }));
+
+        // Notify connected clients so the game overlay opens automatically
+        this.typedEventBus.emit(AppEvents.beefGameStateUpdate, {
+            beefId,
+            state: 'waiting',
+            gameType: beef.game_type,
+            initiatorReady: false,
+            targetReady: false,
+        });
     }
 
     async chickenBeef(beefId: string, _reason: 'manual' | 'timeout'): Promise<void> {
@@ -367,6 +379,10 @@ export class BeefService {
             where: [
                 { initiator_id: userId, status: BeefStatus.ACTIVE },
                 { target_id: userId, status: BeefStatus.ACTIVE },
+                { initiator_id: userId, status: BeefStatus.GAME_PENDING },
+                { target_id: userId, status: BeefStatus.GAME_PENDING },
+                { initiator_id: userId, status: BeefStatus.IN_GAME },
+                { target_id: userId, status: BeefStatus.IN_GAME },
             ],
             order: { ends_at: 'ASC' },
         });

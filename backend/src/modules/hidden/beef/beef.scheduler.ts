@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, IsNull } from 'typeorm';
 import { Beef, BeefStatus } from './entities/beef.entity';
 import { BeefGame } from './entities/beef-game.entity';
 import { BeefService } from './beef.service';
@@ -49,7 +49,7 @@ export class BeefScheduler {
         const expiredGames = await this.gameRepo.find({
             where: {
                 move_deadline_at: LessThan(new Date()),
-                winner_id: undefined,
+                winner_id: IsNull(),
             },
         });
         for (const game of expiredGames) {

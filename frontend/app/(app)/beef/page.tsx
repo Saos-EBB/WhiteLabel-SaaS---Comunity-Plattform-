@@ -9,7 +9,7 @@ import { fetchApi } from '@/lib/api'
 import { Flame, Swords, Trophy, Users, Plus, X, Search } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
 
-type BeefStatus = 'pending_approval'|'waiting'|'active'|'closed'|'chickened'
+type BeefStatus = 'pending_approval'|'waiting'|'active'|'game_pending'|'in_game'|'closed'|'chickened'
 
 interface Beef {
   id: string
@@ -426,9 +426,11 @@ export default function BeefPage() {
                 </div>
               ) : myBeefs.map(beef => (
                 <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
-                  <div className="bg-surface-container border-2 border-primary-fixed-dim
-                    rounded-2xl p-5 flex flex-col gap-3 hover:border-primary-fixed-dim
-                    transition-colors cursor-pointer">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-colors ${
+                    beef.status === 'game_pending' || beef.status === 'in_game'
+                      ? 'bg-surface-container border-2 border-yellow-400 hover:border-yellow-300'
+                      : 'bg-surface-container border-2 border-primary-fixed-dim hover:border-primary-fixed-dim'
+                  }`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-primary-fixed-dim font-bold
@@ -437,13 +439,19 @@ export default function BeefPage() {
                         </span>
                         <p className="font-bold text-on-surface">{beef.tldr}</p>
                       </div>
-                      {beef.ends_at && (
+                      {(beef.status === 'game_pending' || beef.status === 'in_game') ? (
+                        <span className="text-xs font-bold text-yellow-400
+                          bg-yellow-400/10 border border-yellow-400/30
+                          px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                          {beef.status === 'in_game' ? '🎮 Spielt!' : '🎮 Spiel wartet'}
+                        </span>
+                      ) : beef.ends_at ? (
                         <span className="text-xs text-on-surface-variant
                           bg-surface-container-high px-2 py-0.5 rounded-full
                           whitespace-nowrap flex-shrink-0">
                           {t.beef.running}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="bg-surface-container-low rounded-xl p-3
                       border-l-2 border-primary-fixed-dim">

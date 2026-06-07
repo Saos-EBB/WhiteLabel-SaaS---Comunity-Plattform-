@@ -163,6 +163,16 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-08
+- fix: Migration 035 — `game_pending` + `in_game` zum `chk_beef_status` DB-Constraint hinzugefügt (Scheduler konnte Beefs nie in die Game-Phase überführen)
+- fix: `GET /hidden/beef/:id` gibt jetzt `game_type`, `game_deadline_at`, `pot_coins` zurück — Game-Overlay konnte nie rendern weil `game_type` null war
+- fix: `getMyActive` zeigt jetzt auch Beefs in `game_pending` + `in_game` — Beefs verschwanden nach Timer-Ablauf aus der Liste
+- fix: Spiel-Moves (RPS, TicTacToe, Mastermind) korrekt in `{ move: {...} }` gewrappt — alle Game-Aktionen warfen 400-Fehler
+- fix: Game-Lifecycle-Events (`waiting`/`in_game`/`finished`) korrekt typisiert und emittiert — Overlay blieb ewig auf "Warten"
+- fix: `startGamePhase` emittiert jetzt Socket-Event damit das Overlay sich automatisch öffnet
+- fix: Scheduler `winner_id: IsNull()` statt `undefined` — beendete Spiele wurden erneut verarbeitet
+- fix: Konflikt-Check bei Beef-Erstellung schließt jetzt auch `game_pending`/`in_game` Beefs ein
+
 ### 2026-06-07 (4)
 - fix: Online-Status-Punkt im Chat-Header war immer grau — falsches Feldnamen-Format (snake_case statt camelCase) beim Profil-Fetch korrigiert
 

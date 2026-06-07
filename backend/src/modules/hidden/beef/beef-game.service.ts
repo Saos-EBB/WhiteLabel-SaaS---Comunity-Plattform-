@@ -62,7 +62,7 @@ export class BeefGameService {
 
             this.eventBus.emit(AppEvents.beefGameStateUpdate, {
                 beefId,
-                state: game.state,
+                state: 'in_game',
                 gameType: game.game_type,
                 initiatorReady: game.initiator_ready,
                 targetReady: game.target_ready,
@@ -71,7 +71,7 @@ export class BeefGameService {
             await this.gameRepo.save(game);
             this.eventBus.emit(AppEvents.beefGameStateUpdate, {
                 beefId,
-                state: game.state,
+                state: 'waiting',
                 gameType: game.game_type,
                 initiatorReady: game.initiator_ready,
                 targetReady: game.target_ready,
@@ -118,7 +118,7 @@ export class BeefGameService {
 
             this.eventBus.emit(AppEvents.beefGameStateUpdate, {
                 beefId,
-                state: game.state,
+                state: 'in_game',
                 gameType: game.game_type,
                 initiatorReady: game.initiator_ready,
                 targetReady: game.target_ready,
@@ -141,8 +141,28 @@ export class BeefGameService {
         await this.applyMove(beefId, userId, { received_at_ms: receivedAtMs });
     }
 
-    async getGame(beefId: string): Promise<BeefGame | null> {
-        return this.gameRepo.findOne({ where: { beef_id: beefId } });
+    async getGame(beefId: string): Promise<{
+        state: 'waiting' | 'in_game' | 'finished';
+        game_type: string;
+        initiator_ready: boolean;
+        target_ready: boolean;
+        move_deadline_at: Date | null;
+        winner_id: string | null;
+    } | null> {
+        const game = await this.gameRepo.findOne({ where: { beef_id: beefId } });
+        if (!game) return null;
+        const state: 'waiting' | 'in_game' | 'finished' =
+            game.winner_id !== null ? 'finished' :
+            (game.initiator_ready && game.target_ready) ? 'in_game' :
+            'waiting';
+        return {
+            state,
+            game_type: game.game_type,
+            initiator_ready: game.initiator_ready,
+            target_ready: game.target_ready,
+            move_deadline_at: game.move_deadline_at,
+            winner_id: game.winner_id,
+        };
     }
 
     async handleMoveTimeout(beefId: string): Promise<void> {

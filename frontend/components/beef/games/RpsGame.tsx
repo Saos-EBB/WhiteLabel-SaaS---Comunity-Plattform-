@@ -136,7 +136,7 @@ export function RpsGame({
     try {
       await fetchApi(`/hidden/beef/${beefId}/game/move`, {
         method: 'POST',
-        body: JSON.stringify({ choice }),
+        body: JSON.stringify({ move: { choice } }),
       })
       setMyChoice(choice)
     } catch (e: unknown) {

@@ -117,7 +117,7 @@ export function TicTacToeGame({
     try {
       await fetchApi(`/hidden/beef/${beefId}/game/move`, {
         method: 'POST',
-        body: JSON.stringify({ position: index }),
+        body: JSON.stringify({ move: { position: index } }),
       })
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Fehler')

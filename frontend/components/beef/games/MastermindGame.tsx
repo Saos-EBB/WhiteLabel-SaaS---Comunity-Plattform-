@@ -375,7 +375,7 @@ export function MastermindGame({
     try {
       await fetchApi(`/hidden/beef/${beefId}/game/move`, {
         method: 'POST',
-        body: JSON.stringify({ guess: currentSlots }),
+        body: JSON.stringify({ move: { guess: currentSlots } }),
       })
       setCurrentSlots(Array(CODE_LENGTH).fill(null))
     } catch (e: unknown) {

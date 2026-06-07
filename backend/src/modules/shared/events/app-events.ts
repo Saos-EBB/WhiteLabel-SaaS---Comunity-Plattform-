@@ -36,7 +36,8 @@ export interface ContactRequestEvent {
 
 export interface BeefGameStateUpdateEvent {
     beefId: string;
-    state: Record<string, any>;
+    /** Lifecycle status: 'waiting' | 'in_game' | 'finished' — NOT the JSONB game state */
+    state: 'waiting' | 'in_game' | 'finished';
     gameType: string;
     initiatorReady: boolean;
     targetReady: boolean;
