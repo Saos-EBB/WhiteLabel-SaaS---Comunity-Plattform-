@@ -41,6 +41,21 @@ interface CreateBeefForm {
   gameType: GameType
 }
 
+interface ConvMeta {
+  id: string
+  user_a_id: string
+  user_b_id: string
+}
+
+interface ChatMessage {
+  id: string
+  sender_id: string
+  content: string | null
+  type: string
+  is_deleted: boolean
+  sent_at: string
+}
+
 const GAME_OPTIONS: { value: GameType; label: string; desc: string; emoji: string }[] = [
   { value: 'rps',        label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',      emoji: '✊' },
   { value: 'tictactoe', label: 'Tic Tac Toe',          desc: 'Best of 3 — X vs O',                  emoji: '⬛' },
@@ -51,8 +66,9 @@ const GAME_OPTIONS: { value: GameType; label: string; desc: string; emoji: strin
 export default function BeefPage() {
   const { t } = useTranslation()
   const router   = useRouter()
-  const isHidden = useHiddenStore((s) => s.isHidden)
-  const token    = useAuthStore((s) => s.accessToken)
+  const isHidden     = useHiddenStore((s) => s.isHidden)
+  const token        = useAuthStore((s) => s.accessToken)
+  const currentUserId = useAuthStore((s) => s.user?.id ?? '')
 
   const [hydrated, setHydrated] = useState(false)
   const [tab, setTab]                   = useState<Tab>('requests')
@@ -81,6 +97,12 @@ export default function BeefPage() {
   const [creating, setCreating]           = useState(false)
   const [createError, setCreateError]     = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState(false)
+
+  // Chat-Ausschnitt Picker
+  const [chatMessages, setChatMessages]     = useState<ChatMessage[]>([])
+  const [selectedMsgIds, setSelectedMsgIds] = useState<Set<string>>(new Set())
+  const [loadingChat, setLoadingChat]       = useState(false)
+  const [noConversation, setNoConversation] = useState(false)
 
   useEffect(() => {
     if (useHiddenStore.persist.hasHydrated()) setHydrated(true)
@@ -149,6 +171,59 @@ export default function BeefPage() {
     })
   }, [])
 
+  // Chatverlauf laden sobald Gegner ausgewählt
+  useEffect(() => {
+    if (!createForm.targetUserId) {
+      setChatMessages([])
+      setSelectedMsgIds(new Set())
+      setNoConversation(false)
+      setCreateForm(f => ({ ...f, chatPassage: '' }))
+      return
+    }
+
+    let cancelled = false
+    setLoadingChat(true)
+    setNoConversation(false)
+    setChatMessages([])
+    setSelectedMsgIds(new Set())
+    setCreateForm(f => ({ ...f, chatPassage: '' }))
+
+    fetchApi<ConvMeta[]>('/chat/conversations')
+      .then(convs => {
+        if (cancelled) return undefined
+        const conv = Array.isArray(convs)
+          ? convs.find(c => c.user_a_id === createForm.targetUserId || c.user_b_id === createForm.targetUserId)
+          : undefined
+        if (!conv) { setNoConversation(true); setLoadingChat(false); return undefined }
+        return fetchApi<ChatMessage[]>(`/chat/conversations/${conv.id}/messages`)
+      })
+      .then(msgs => {
+        if (cancelled || !msgs) return
+        setChatMessages(msgs.filter(m => !m.is_deleted && m.content && m.type === 'text'))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingChat(false) })
+
+    return () => { cancelled = true }
+  }, [createForm.targetUserId])
+
+  // Ausgewählte Nachrichten → chatPassage formatieren
+  useEffect(() => {
+    if (selectedMsgIds.size === 0) {
+      setCreateForm(f => ({ ...f, chatPassage: '' }))
+      return
+    }
+    const targetNick = createForm.targetNickname
+    const passage = chatMessages
+      .filter(m => selectedMsgIds.has(m.id))
+      .map(m => {
+        const nick = m.sender_id === currentUserId ? 'Du' : targetNick
+        return `[${nick}]: ${m.content}`
+      })
+      .join('\n')
+    setCreateForm(f => ({ ...f, chatPassage: passage }))
+  }, [selectedMsgIds, chatMessages, currentUserId, createForm.targetNickname])
+
   async function searchUsers(query: string) {
     if (query.length < 2) { setSearchResults([]); return }
     setSearching(true)
@@ -177,6 +252,8 @@ export default function BeefPage() {
       setCreateForm({ targetUserId: '', targetNickname: '', tldr: '', chatPassage: '', gameType: 'rps' })
       setUserSearch('')
       setSearchResults([])
+      setChatMessages([])
+      setSelectedMsgIds(new Set())
       await load()
       setTimeout(() => { setCreateSuccess(false); setTab('mine') }, 2000)
     } catch (e: unknown) {
@@ -534,22 +611,83 @@ export default function BeefPage() {
                 <span className="text-xs text-on-surface-variant text-right">{createForm.tldr.length}/120</span>
               </div>
 
-              {/* Chat Passage */}
+              {/* Chat Passage Picker */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
                   Chat-Ausschnitt als Beweis
                 </label>
-                <textarea
-                  value={createForm.chatPassage}
-                  onChange={(e) => setCreateForm(f => ({ ...f, chatPassage: e.target.value }))}
-                  maxLength={1000}
-                  rows={5}
-                  placeholder={'[DeinNick]: Das war mein Pizza-Slice!\n[GegnerNick]: Nein, war meiner!'}
-                  className="bg-surface-container border border-outline-variant rounded-xl px-4 py-3
-                    text-on-surface text-sm outline-none focus:border-primary-fixed-dim resize-none
-                    placeholder:text-on-surface-variant font-mono"
-                />
-                <span className="text-xs text-on-surface-variant text-right">{createForm.chatPassage.length}/1000</span>
+
+                {!createForm.targetUserId ? (
+                  <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
+                    text-center text-sm text-on-surface-variant">
+                    Erst einen Gegner auswählen
+                  </div>
+                ) : loadingChat ? (
+                  <div className="flex justify-center py-6">
+                    <div className="w-5 h-5 border-2 border-primary-fixed-dim border-t-transparent rounded-full animate-spin"/>
+                  </div>
+                ) : noConversation ? (
+                  <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
+                    text-center text-sm text-on-surface-variant">
+                    Kein Chat mit <span className="font-bold text-on-surface">{createForm.targetNickname}</span> vorhanden
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
+                    text-center text-sm text-on-surface-variant">
+                    Keine Textnachrichten im Chat
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-on-surface-variant">
+                      Tippe auf Nachrichten um sie auszuwählen
+                      {selectedMsgIds.size > 0 && (
+                        <span className="ml-1 font-semibold text-primary-fixed-dim">
+                          ({selectedMsgIds.size} ausgewählt)
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex flex-col gap-1 max-h-64 overflow-y-auto rounded-xl border border-outline-variant bg-surface-container p-2">
+                      {chatMessages.map(msg => {
+                        const isMe = msg.sender_id === currentUserId
+                        const nick = isMe ? 'Du' : createForm.targetNickname
+                        const selected = selectedMsgIds.has(msg.id)
+                        return (
+                          <button
+                            key={msg.id}
+                            type="button"
+                            onClick={() => setSelectedMsgIds(prev => {
+                              const next = new Set(prev)
+                              if (next.has(msg.id)) next.delete(msg.id)
+                              else next.add(msg.id)
+                              return next
+                            })}
+                            className={`text-left px-3 py-2 rounded-lg border-2 transition-all text-sm ${
+                              selected
+                                ? 'border-primary-fixed-dim bg-primary-fixed-dim/10'
+                                : 'border-transparent hover:border-outline-variant bg-transparent'
+                            }`}
+                          >
+                            <span className={`text-[10px] font-bold mr-2 ${isMe ? 'text-primary-fixed-dim' : 'text-on-surface-variant'}`}>
+                              {nick}
+                            </span>
+                            <span className="text-on-surface">{msg.content}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {selectedMsgIds.size > 0 && (
+                      <div className="bg-surface-container-low border border-outline-variant rounded-xl p-3">
+                        <p className="text-[10px] text-on-surface-variant mb-1 font-semibold uppercase tracking-widest">
+                          Vorschau Passage
+                        </p>
+                        <p className="text-xs text-on-surface font-mono whitespace-pre-line leading-relaxed">
+                          {createForm.chatPassage}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Game type selection */}
