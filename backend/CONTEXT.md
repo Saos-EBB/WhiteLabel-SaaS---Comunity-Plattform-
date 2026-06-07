@@ -44,6 +44,14 @@ The mini-game that resolves a Beef. Each game is implemented as a **Game Handler
 
 **Realtime Game** — a Game Handler with `realtime: true`. Moves travel over the `/hidden-beef` WebSocket namespace instead of REST. Currently: Reaction Test only.
 
+**No-Draw Rule** — no Beef Game may end in a draw. If a draw occurs within a game, play continues until a winner is determined (extra round, new code, etc.).
+
+**RPS (Rock-Paper-Scissors)** — extensible move set (e.g. Lizard, Spock can be added later). Both choices hidden until both submitted. No draw possible due to No-Draw Rule → re-play until winner.
+
+**TicTacToe** — Best of 3 series. A drawn board counts as an extra game (No-Draw Rule). Initiator = X, Target = O.
+
+**Mastermind** — Single shared secret code (same code for both players). Both guess simultaneously. Fastest correct solve wins. If both solve in same number of guesses → new game with new code.
+
 ---
 
 ## Betting Phase
