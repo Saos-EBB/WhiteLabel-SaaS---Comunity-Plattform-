@@ -19,7 +19,7 @@ export class CreateBeefDto {
 
     @IsOptional()
     @IsNumber()
-    @Min(900)
+    @Min(60) // TODO: DELETE BEFORE SHIPMENT — restore to Min(900)
     @Max(172800)
     duration_seconds?: number;
 

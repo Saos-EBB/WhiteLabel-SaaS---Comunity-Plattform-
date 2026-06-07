@@ -39,6 +39,7 @@ interface CreateBeefForm {
   tldr: string
   chatPassage: string
   gameType: GameType
+  durationSeconds: number
 }
 
 interface ConvMeta {
@@ -55,6 +56,17 @@ interface ChatMessage {
   is_deleted: boolean
   sent_at: string
 }
+
+// TODO: DELETE BEFORE SHIPMENT — remove the first entry (60 s dev option)
+const DURATION_OPTIONS = [
+  { label: '1 Min (DEV)', value: 60 },
+  { label: '15 Min',      value: 900 },
+  { label: '1 Stunde',    value: 3600 },
+  { label: '6 Stunden',   value: 21600 },
+  { label: '12 Stunden',  value: 43200 },
+  { label: '24 Stunden',  value: 86400 },
+  { label: '48 Stunden',  value: 172800 },
+]
 
 const GAME_OPTIONS: { value: GameType; label: string; desc: string; emoji: string }[] = [
   { value: 'rps',        label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',      emoji: '✊' },
@@ -90,6 +102,7 @@ export default function BeefPage() {
     tldr: '',
     chatPassage: '',
     gameType: 'rps',
+    durationSeconds: 86400,
   })
   const [userSearch, setUserSearch]       = useState('')
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
@@ -242,14 +255,15 @@ export default function BeefPage() {
       await fetchApi('/hidden/beef', {
         method: 'POST',
         body: JSON.stringify({
-          target_user_id: createForm.targetUserId,
+          target_id: createForm.targetUserId,
           tldr: createForm.tldr.trim(),
           chat_passage: createForm.chatPassage.trim(),
           game_type: createForm.gameType,
+          duration_seconds: createForm.durationSeconds,
         }),
       })
       setCreateSuccess(true)
-      setCreateForm({ targetUserId: '', targetNickname: '', tldr: '', chatPassage: '', gameType: 'rps' })
+      setCreateForm({ targetUserId: '', targetNickname: '', tldr: '', chatPassage: '', gameType: 'rps', durationSeconds: 86400 })
       setUserSearch('')
       setSearchResults([])
       setChatMessages([])
@@ -609,6 +623,29 @@ export default function BeefPage() {
                     text-on-surface text-sm outline-none focus:border-primary-fixed-dim placeholder:text-on-surface-variant"
                 />
                 <span className="text-xs text-on-surface-variant text-right">{createForm.tldr.length}/120</span>
+              </div>
+
+              {/* Duration */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Dauer des Beefs
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {DURATION_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setCreateForm(f => ({ ...f, durationSeconds: opt.value }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        createForm.durationSeconds === opt.value
+                          ? 'border-primary-fixed-dim bg-primary-fixed-dim/20 text-on-surface'
+                          : 'border-outline-variant text-on-surface-variant hover:border-outline'
+                      } ${opt.value === 60 ? 'border-dashed opacity-70' : ''}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Chat Passage Picker */}

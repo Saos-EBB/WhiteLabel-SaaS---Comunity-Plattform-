@@ -165,6 +165,8 @@ export default function ConversationPage() {
   const ownNickname     = useAuthStore((s) => (s.user as any)?.nickname as string | undefined)
 
   const DURATION_OPTIONS = [
+    // TODO: DELETE BEFORE SHIPMENT — dev/demo only
+    { label: '1 Min (DEV)',  value: 60 },
     { label: '15 Min',     value: 900 },
     { label: '1 Stunde',   value: 3600 },
     { label: '6 Stunden',  value: 21600 },
@@ -179,9 +181,17 @@ export default function ConversationPage() {
   const [beefDuration, setBeefDuration]     = useState(86400)
   const [rangeStart, setRangeStart]         = useState<number | null>(null)
   const [rangeEnd, setRangeEnd]             = useState<number | null>(null)
-  const [beefStep, setBeefStep]             = useState<'tldr' | 'passage'>('tldr')
+  const [beefStep, setBeefStep]             = useState<'tldr' | 'passage' | 'game'>('tldr')
+  const [beefGame, setBeefGame]             = useState<'rps' | 'tictactoe' | 'mastermind' | 'reaction'>('rps')
   const [beefSubmitting, setBeefSubmitting] = useState(false)
   const [beefError, setBeefError]           = useState<string | null>(null)
+
+  const GAME_OPTIONS = [
+    { value: 'rps'        as const, label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',       emoji: '✊' },
+    { value: 'tictactoe'  as const, label: 'Tic Tac Toe',          desc: 'Best of 3 — X vs O',                   emoji: '⬛' },
+    { value: 'mastermind' as const, label: 'Mastermind',           desc: 'Knack den Code — 4 Farben, 10 Runden',  emoji: '🎨' },
+    { value: 'reaction'   as const, label: 'Reaktionstest',         desc: 'Wer drückt schneller auf GO!',          emoji: '⚡' },
+  ]
 
   const [messages, setMessages] = useState<LocalMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -470,6 +480,7 @@ export default function ConversationPage() {
     setRangeStart(null)
     setRangeEnd(null)
     setBeefStep('tldr')
+    setBeefGame('rps')
     setBeefError(null)
     setBeefDuration(86400)
   }
@@ -509,6 +520,7 @@ export default function ConversationPage() {
           tldr: beefTldr.trim(),
           chat_passage,
           duration_seconds: beefDuration,
+          game_type: beefGame,
         }),
       })
       closeBeef()
@@ -1002,21 +1014,60 @@ export default function ConversationPage() {
                     })}
                   </div>
 
-                  {beefError && (
-                    <p className="text-error text-xs text-center flex-shrink-0">{beefError}</p>
-                  )}
-
                   <button
-                    onClick={handleBeefSubmit}
-                    disabled={rangeStart === null || beefSubmitting}
+                    onClick={() => setBeefStep('game')}
+                    disabled={rangeStart === null}
                     className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity flex-shrink-0"
                   >
-                    {beefSubmitting ? 'Sende...' : `🥊 Beef starten${selectedCount > 0 ? ` (${selectedCount} Msg)` : ''}`}
+                    {`Weiter → Spiel wählen${selectedCount > 0 ? ` (${selectedCount} Msg)` : ''}`}
                   </button>
 
                 </div>
               )
             })()}
+
+            {/* Step 3: Game picker */}
+            {beefStep === 'game' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between flex-shrink-0">
+                  <button onClick={() => setBeefStep('passage')}
+                    className="text-xs text-on-surface-variant hover:text-on-surface">
+                    ← zurück
+                  </button>
+                  <span className="text-xs text-on-surface-variant">Mini-Game auswählen</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {GAME_OPTIONS.map((g) => (
+                    <button
+                      key={g.value}
+                      onClick={() => setBeefGame(g.value)}
+                      className={`flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all ${
+                        beefGame === g.value
+                          ? 'border-primary-fixed-dim bg-primary-fixed-dim/20'
+                          : 'border-outline-variant bg-surface-container-low hover:border-outline'
+                      }`}
+                    >
+                      <span className="text-xl">{g.emoji}</span>
+                      <span className="font-bold text-on-surface text-xs">{g.label}</span>
+                      <span className="text-[10px] text-on-surface-variant leading-snug">{g.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {beefError && (
+                  <p className="text-error text-xs text-center">{beefError}</p>
+                )}
+
+                <button
+                  onClick={handleBeefSubmit}
+                  disabled={beefSubmitting}
+                  className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
+                >
+                  {beefSubmitting ? 'Sende...' : '🥊 Beef starten'}
+                </button>
+              </div>
+            )}
 
           </div>
         </div>

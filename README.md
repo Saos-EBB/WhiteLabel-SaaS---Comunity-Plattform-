@@ -163,6 +163,15 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-07 (2)
+- fix: Beef-Modal im Chat hat jetzt Schritt 3 (Spiel-Auswahl) — `game_type` wird mitgeschickt
+- fix: `target_user_id` → `target_id` in Beef-Create-Page korrigiert
+- fix: Migration 034 — `spent_beef_open` + `spent_beef_accept` zu `chk_coin_tx_type` Constraint hinzugefügt
+- fix: Beef-Service rollback — wenn `spendCoins` fehlschlägt wird der Beef-Record wieder gelöscht
+- feat: 1-Min DEV-Dauer in beiden Beef-Create-Flows (TODO: Delete Before Shipment)
+- feat: Duration-Picker in Beef-Create-Tab (`/beef`) ergänzt
+- chore: Cities-Tabelle mit 206 Städten befüllt
+
 ### 2026-06-07
 - Beef Game System komplett implementiert: RPS, TicTacToe (Best-of-3), Mastermind (shared code + time-based), Reaction (random delay 0.2–5s)
 - Entry Cost: Coins verbrennen beim Beef erstellen in einen Pot; 10/30/60 Split via SystemSettings

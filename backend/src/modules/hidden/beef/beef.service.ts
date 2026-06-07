@@ -97,7 +97,12 @@ export class BeefService {
         });
         const saved = await this.beefRepo.save(beef);
         const entryCost = await this.systemSettings.getNumber('beef.entry_cost', 50);
-        await this.coinService.spendCoins(initiatorId, entryCost, 'spent_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        try {
+            await this.coinService.spendCoins(initiatorId, entryCost, 'spent_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        } catch (err) {
+            await this.beefRepo.delete({ id: saved.id });
+            throw err;
+        }
         await this.beefRepo.update({ id: saved.id }, { pot_coins: entryCost });
         return saved;
     }
