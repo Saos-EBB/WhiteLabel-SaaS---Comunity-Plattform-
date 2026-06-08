@@ -44,6 +44,7 @@ Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backen
 - [Config](#config)
   - [`config/public.config.ts`](#configpublicconfigts)
   - [`useConnectionAction`](#useconnectionaction--hooksuseconnectionactionts)
+- [Dev Tools](#dev-tools)
 - [Key notes](#key-notes)
 - [Known gaps](#known-gaps)
 - [Changelog](#changelog)
@@ -673,6 +674,36 @@ const conn = useConnectionAction(targetUserId, initialStatus, initialRequestId, 
 | `unblock()` | `() => Promise<boolean>` | DELETE `/profile/me/block/:userId` |
 
 Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a real UUID. Used by Discover and the public profile page.
+
+---
+
+## Dev Tools
+
+Both tools are **dev-only** — they render `null` in production (`process.env.NODE_ENV === 'production'`).
+
+### `DevColorPalette` — `components/DevColorPalette.tsx`
+
+Floating panel (🎨 Colors, bottom-right) for live theme editing. Mounted globally in the `(app)` layout.
+
+| Feature | Description |
+|---|---|
+| Color picker | All 17 CSS custom properties (`--color-*`) shown as editable swatches; changes apply instantly via `document.documentElement.style.setProperty` |
+| Element picker | 🖱 pick mode — crosshair cursor; hover highlights elements with a dashed outline; click captures computed `backgroundColor`, `color`, `borderColor` and highlights any matching CSS vars in the palette |
+| Theme presets | One-click switch between `dark`, `light`, `underground-brick`, `underground-neon` |
+| Custom themes | Save the current palette under a name (stored in `localStorage['dev-color-themes']`); load or delete saved themes |
+| Export | Copies the full palette as a `.my-theme { … }` CSS block to the clipboard |
+| Reset | Removes all inline `style` overrides from `<html>`, reverting to the active CSS-class theme |
+
+### `DevQuickFight` — `components/beef/DevQuickFight.tsx`
+
+Floating panel (⚡ DEV, bottom-right) for instant beef game creation without going through the normal approval flow. Mounted on the `/beef` page.
+
+| Field | Description |
+|---|---|
+| Target User ID | UUID of the opponent |
+| Game Type | `tictactoe` / `rps` / `mastermind` / `reaction` |
+
+Posts to `POST /hidden/beef/dev/quick-fight` (backend returns 404 in production) and redirects to the created beef's detail page.
 
 ---
 

@@ -520,6 +520,12 @@ All hidden zone routes require JWT. Zone access is enforced client-side only (no
 | `mastermind` | `{ guess: string[] }` (4-element color code array) |
 | `reaction` | No REST move — use `game:reaction_click` on the `/hidden-beef` socket instead |
 
+**Dev endpoints (return 404 in production):**
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/hidden/beef/dev/quick-fight` | Bypasses approval/waiting/active flow; creates a beef directly in `game_pending`. Body: `{ targetUserId, gameType }`. Used by the frontend `DevQuickFight` panel. |
+
 **Game handlers** (`src/modules/hidden/beef/games/`):
 
 | Handler | Notes |
