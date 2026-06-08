@@ -97,9 +97,17 @@ export class BeefGameService {
         if (ready.has(beef.initiator_id) && ready.has(beef.target_id)) {
             this.reactionReadyPlayers.delete(beefId);
             const delayMs = Math.floor(Math.random() * 4800) + 200;
-            setTimeout(() => {
-                this.eventBus.emit(AppEvents.beefGameGo, { beefId, sentAt: Date.now() });
-            }, delayMs);
+            setTimeout(() => void (async () => {
+                const sentAt = Date.now();
+                // Persist go_sent_at BEFORE broadcasting so the handler can
+                // calculate reaction time on the first click that arrives.
+                const game = await this.gameRepo.findOne({ where: { beef_id: beefId } });
+                if (game) {
+                    game.state = { ...game.state, go_sent_at: sentAt };
+                    await this.gameRepo.save(game);
+                }
+                this.eventBus.emit(AppEvents.beefGameGo, { beefId, sentAt });
+            })(), delayMs);
         }
     }
 
