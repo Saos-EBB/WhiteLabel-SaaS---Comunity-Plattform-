@@ -18,6 +18,9 @@ const GAME_DEADLINE_SECONDS = 30 * 60; // 30 minutes
 
 @Injectable()
 export class BeefGameService {
+    // Tracks which players have signalled game:reaction_ready for a given beef.
+    // Both must be present before the GO signal is scheduled.
+    private readonly reactionReadyPlayers = new Map<string, Set<string>>();
     constructor(
         @InjectRepository(BeefGame)
         private readonly gameRepo: Repository<BeefGame>,
@@ -53,13 +56,8 @@ export class BeefGameService {
             this.stateMachine.transition(beef, BeefEvent.BEGIN_FIGHT);
             await this.beefRepo.save(beef);
 
-            if (beef.game_type === 'reaction') {
-                // Random delay 200–5000ms before go signal (No-Draw Rule: same signal for both)
-                const delayMs = Math.floor(Math.random() * 4800) + 200;
-                setTimeout(() => {
-                    this.eventBus.emit(AppEvents.beefGameGo, { beefId, sentAt: Date.now() });
-                }, delayMs);
-            }
+            // For reaction: GO is NOT scheduled here. It fires via markReactionReady()
+            // once both ReactionGame components have mounted and registered their listeners.
 
             this.eventBus.emit(AppEvents.beefGameStateUpdate, {
                 beefId,
@@ -77,6 +75,28 @@ export class BeefGameService {
                 initiatorReady: game.initiator_ready,
                 targetReady: game.target_ready,
             });
+        }
+    }
+
+    async markReactionReady(beefId: string, userId: string): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.IN_GAME || beef.game_type !== 'reaction') return;
+        const isInitiator = beef.initiator_id === userId;
+        const isTarget = beef.target_id === userId;
+        if (!isInitiator && !isTarget) return;
+
+        if (!this.reactionReadyPlayers.has(beefId)) {
+            this.reactionReadyPlayers.set(beefId, new Set());
+        }
+        this.reactionReadyPlayers.get(beefId)!.add(userId);
+
+        const ready = this.reactionReadyPlayers.get(beefId)!;
+        if (ready.has(beef.initiator_id) && ready.has(beef.target_id)) {
+            this.reactionReadyPlayers.delete(beefId);
+            const delayMs = Math.floor(Math.random() * 4800) + 200;
+            setTimeout(() => {
+                this.eventBus.emit(AppEvents.beefGameGo, { beefId, sentAt: Date.now() });
+            }, delayMs);
         }
     }
 

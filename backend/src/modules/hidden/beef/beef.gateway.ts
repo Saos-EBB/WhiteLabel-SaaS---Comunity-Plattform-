@@ -1,9 +1,11 @@
 import {
   WebSocketGateway, WebSocketServer,
   SubscribeMessage, ConnectedSocket, MessageBody,
+  OnGatewayConnection,
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { OnEvent } from '@nestjs/event-emitter'
+import { JwtService } from '@nestjs/jwt'
 import { AppEvents } from '../../shared/events/app-events'
 import type { BeefGameStateUpdateEvent, BeefGameFinishedEvent, BeefGameGoEvent, BeefGameBoardUpdateEvent } from '../../shared/events/app-events'
 import { BeefGameService } from './beef-game.service'
@@ -15,11 +17,30 @@ import { BeefGameService } from './beef-game.service'
     credentials: true,
   },
 })
-export class HiddenBeefGateway {
+export class HiddenBeefGateway implements OnGatewayConnection {
   @WebSocketServer()
   server!: Server
 
-  constructor(private readonly beefGameService: BeefGameService) {}
+  constructor(
+    private readonly beefGameService: BeefGameService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  private extractUserId(client: Socket): string | null {
+    try {
+      const token = (client.handshake.auth?.token ?? client.handshake.query?.token) as string
+      const payload = this.jwtService.verify<{ sub: string }>(token)
+      return payload.sub
+    } catch {
+      return null
+    }
+  }
+
+  handleConnection(client: Socket) {
+    const userId = this.extractUserId(client)
+    if (!userId) { client.disconnect(); return }
+    client.data.userId = userId
+  }
 
   @SubscribeMessage('join_beef')
   handleJoin(@ConnectedSocket() client: Socket, @MessageBody() beefId: string) {
@@ -31,13 +52,26 @@ export class HiddenBeefGateway {
     client.leave(`beef:${beefId}`)
   }
 
-  // Reaction test: client sends click, server records receipt time
+  // Reaction: component mounted and listener registered — mark this player ready-for-go
+  @SubscribeMessage('game:reaction_ready')
+  async handleReactionReady(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { beefId: string },
+  ) {
+    const userId = client.data.userId as string
+    if (!userId || !payload?.beefId) return
+    await this.beefGameService.markReactionReady(payload.beefId, userId)
+  }
+
+  // Reaction: click event — userId resolved from authenticated socket, never from payload
   @SubscribeMessage('game:reaction_click')
   async handleReactionClick(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { beefId: string; userId: string },
+    @MessageBody() payload: { beefId: string },
   ) {
-    await this.beefGameService.applyReactionClick(payload.beefId, payload.userId, Date.now())
+    const userId = client.data.userId as string
+    if (!userId || !payload?.beefId) return
+    await this.beefGameService.applyReactionClick(payload.beefId, userId, Date.now())
   }
 
   @OnEvent(AppEvents.beefVote)

@@ -28,7 +28,7 @@ export class ReactionHandler implements GameHandler {
         if (!next.go_sent_at) return { newState: next, finished: false };
 
         const reactionMs = move.received_at_ms - next.go_sent_at;
-        if (playerId === 'initiator_placeholder') {
+        if (playerId === 'initiator') {
             next.initiator_reaction_ms = reactionMs;
         } else {
             next.target_reaction_ms = reactionMs;

@@ -70,7 +70,7 @@ export function ReactionGame({
     cancelAnimationFrame(rafRef.current)
   }
 
-  // ── Socket: GO! signal ───────────────────────────────────────────────────
+  // ── Socket: GO! signal + reaction_ready handshake ────────────────────────
   useEffect(() => {
     function onGo(_data: { sent_at: string }) {
       setPhase('go')
@@ -78,7 +78,6 @@ export function ReactionGame({
     }
 
     function onResult(data: ReactionResult) {
-      // Collect results
       if (data.user_id === currentUserId) {
         setMyTime(data.reaction_ms)
         setPhase('done')
@@ -88,15 +87,18 @@ export function ReactionGame({
       }
     }
 
+    // Register listener FIRST, THEN tell server this component is mounted and ready.
+    // The server only fires game:go once BOTH players have sent game:reaction_ready.
     socket.on('game:go', onGo)
     socket.on('game:reaction_result', onResult)
+    if (iAmParticipant) socket.emit('game:reaction_ready', { beefId })
 
     return () => {
       socket.off('game:go', onGo)
       socket.off('game:reaction_result', onResult)
       stopCounter()
     }
-  }, [socket, iAmParticipant, currentUserId, startCounter])
+  }, [socket, iAmParticipant, currentUserId, startCounter, beefId])
 
   // ── Handle click ─────────────────────────────────────────────────────────
   function handleClick() {
@@ -105,8 +107,7 @@ export function ReactionGame({
     stopCounter()
     setMyTime(elapsed)
     setPhase('done')
-    // Emit click event to server
-    socket.emit('game:reaction_click')
+    socket.emit('game:reaction_click', { beefId })
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
