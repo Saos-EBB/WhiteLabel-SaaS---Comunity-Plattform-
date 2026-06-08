@@ -163,6 +163,13 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-08 (6)
+- fix: ReactionGame funktioniert jetzt vollständig — 3 Bugs behoben: (1) GO-Signal kommt jetzt erst nachdem beide Komponenten gemounted sind (`game:reaction_ready` Handshake), (2) `initiator_reaction_ms` wurde nie gesetzt (`initiator_placeholder` → `initiator`), (3) Click-Event hatte keine Payload (jetzt `{ beefId }`) + `go_sent_at` wird vor dem GO-Signal in den Game-State geschrieben
+- fix: `/hidden-beef` WebSocket authentifiziert jetzt den JWT aus dem Handshake — unauthentifizierte Verbindungen werden getrennt; `userId` kommt vom Token, nie vom Client
+- feat: TicTacToe Turn-Timer auf 25s erhöht; Timeout löst jetzt einen zufälligen Zug aus statt Forfeit — 25s In-Memory-Timer pro Zug, BeefScheduler als Restart-Fallback
+- feat: RPS zu Rock/Paper/Schere/Eidechse/Spock (5 Optionen) erweitert — korrektes Win-Matrix mit je 2 Gewinnern pro Wahl; 28 Unit Tests für alle 25 Kombinationen
+- feat: Mastermind sendet rollenspezifische Board-Payloads — Spieler sehen nur eigene Rateversuche + Pins; Gegner-Board kommt nur als Versuchsanzahl (keine Rows/Feedback über die Leitung); Zuschauer sehen beide Boards; `MAX_GUESSES` Frontend 10→8 (Sync mit Backend)
+
 ### 2026-06-08 (5)
 - feat: TicTacToe zeigt Runden-Ergebnis-Banner (wer hat gewonnen / Unentschieden) für 2.5s zwischen den Runden bevor das Spielfeld zurückgesetzt wird
 - fix: GameOverlay startet den 5s-Countdown jetzt nur einmal (beim Übergang von "waiting" → "in_game"), nicht bei jedem Board-Update
