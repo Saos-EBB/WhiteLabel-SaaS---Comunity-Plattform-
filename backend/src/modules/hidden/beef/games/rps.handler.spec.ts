@@ -1,9 +1,16 @@
 import { RpsHandler } from './rps.handler';
 
-describe('RpsHandler', () => {
+describe('RpsHandler (RPSLS)', () => {
     const h = new RpsHandler();
     const I = 'initiator-id';
     const T = 'target-id';
+
+    function play(i: string, t: string) {
+        let s: any = h.createInitialState(I, T);
+        ({ newState: s } = h.applyMove(s, { choice: i }, 'initiator'));
+        ({ newState: s } = h.applyMove(s, { choice: t }, 'target'));
+        return h.getWinner(s, I, T);
+    }
 
     it('creates empty state', () => {
         const s = h.createInitialState(I, T);
@@ -24,24 +31,37 @@ describe('RpsHandler', () => {
         expect(finished).toBe(true);
     });
 
-    it('rock beats scissors → initiator wins', () => {
-        let s: any = h.createInitialState(I, T);
-        ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
-        ({ newState: s } = h.applyMove(s, { choice: 'scissors' }, 'target'));
-        expect(h.getWinner(s, I, T)).toBe(I);
-    });
+    // ── 5 ties ───────────────────────────────────────────────────────────────
+    it.each([['rock'], ['paper'], ['scissors'], ['lizard'], ['spock']])(
+        '%s vs %s → tie',
+        (choice) => expect(play(choice, choice)).toBeNull(),
+    );
 
-    it('paper beats rock → target wins', () => {
-        let s: any = h.createInitialState(I, T);
-        ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
-        ({ newState: s } = h.applyMove(s, { choice: 'paper' }, 'target'));
-        expect(h.getWinner(s, I, T)).toBe(T);
-    });
+    // ── Win pairs: initiator wins ─────────────────────────────────────────────
+    it.each([
+        ['rock',     'lizard'],
+        ['rock',     'scissors'],
+        ['paper',    'rock'],
+        ['paper',    'spock'],
+        ['scissors', 'paper'],
+        ['scissors', 'lizard'],
+        ['lizard',   'spock'],
+        ['lizard',   'paper'],
+        ['spock',    'scissors'],
+        ['spock',    'rock'],
+    ])('%s beats %s → initiator wins', (i, t) => expect(play(i, t)).toBe(I));
 
-    it('same choice → null winner (tie round)', () => {
-        let s: any = h.createInitialState(I, T);
-        ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'initiator'));
-        ({ newState: s } = h.applyMove(s, { choice: 'rock' }, 'target'));
-        expect(h.getWinner(s, I, T)).toBeNull();
-    });
+    // ── Loss pairs: target wins ───────────────────────────────────────────────
+    it.each([
+        ['lizard',   'rock'],
+        ['scissors', 'rock'],
+        ['rock',     'paper'],
+        ['spock',    'paper'],
+        ['paper',    'scissors'],
+        ['lizard',   'scissors'],
+        ['spock',    'lizard'],
+        ['paper',    'lizard'],
+        ['scissors', 'spock'],
+        ['rock',     'spock'],
+    ])('%s loses to %s → target wins', (i, t) => expect(play(i, t)).toBe(T));
 });

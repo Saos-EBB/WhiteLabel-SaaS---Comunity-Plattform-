@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GameHandler, MoveResult } from './game-handler.interface';
 
-type RpsChoice = 'rock' | 'paper' | 'scissors';
+type RpsChoice = 'rock' | 'paper' | 'scissors' | 'lizard' | 'spock';
 
 interface RpsState {
     initiator_choice: RpsChoice | null;
@@ -9,10 +9,13 @@ interface RpsState {
     winner_id: string | null;
 }
 
-const BEATS: Record<RpsChoice, RpsChoice> = {
-    rock: 'scissors',
-    paper: 'rock',
-    scissors: 'paper',
+// Each choice beats exactly 2 others (RPSLS rules).
+const BEATS: Record<RpsChoice, [RpsChoice, RpsChoice]> = {
+    rock:     ['lizard',  'scissors'],
+    paper:    ['rock',    'spock'],
+    scissors: ['paper',   'lizard'],
+    lizard:   ['spock',   'paper'],
+    spock:    ['scissors','rock'],
 };
 
 @Injectable()
@@ -37,7 +40,7 @@ export class RpsHandler implements GameHandler {
         const { initiator_choice: i, target_choice: t } = state;
         if (!i || !t) return null;
         if (i === t) return null;
-        return BEATS[i] === t ? initiatorId : targetId;
+        return BEATS[i].includes(t) ? initiatorId : targetId;
     }
 
     getPlayerToMove(state: RpsState, initiatorId: string, targetId: string): string | null {

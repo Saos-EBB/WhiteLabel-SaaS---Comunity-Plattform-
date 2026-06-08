@@ -6,7 +6,7 @@ import { fetchApi } from '@/lib/api'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type RpsChoice = 'rock' | 'paper' | 'scissors'
+type RpsChoice = 'rock' | 'paper' | 'scissors' | 'lizard' | 'spock'
 
 interface RpsRoundResult {
   initiator_choice: RpsChoice | null
@@ -41,6 +41,8 @@ const CHOICES: { value: RpsChoice; emoji: string; label: string }[] = [
   { value: 'rock',     emoji: '✊', label: 'Stein' },
   { value: 'paper',    emoji: '✋', label: 'Papier' },
   { value: 'scissors', emoji: '✌️',  label: 'Schere' },
+  { value: 'lizard',   emoji: '🦎', label: 'Eidechse' },
+  { value: 'spock',    emoji: '🖖', label: 'Spock' },
 ]
 
 // ─── Component ───────────────────────────────────────────────────────────────
