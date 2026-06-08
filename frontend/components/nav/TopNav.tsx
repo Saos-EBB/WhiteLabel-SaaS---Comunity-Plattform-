@@ -34,7 +34,7 @@ export default function TopNav() {
     : baseNavLinks
 
   return (
-    <header className="sticky top-0 z-50 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant">
+    <header className="sticky top-0 z-50 bg-surface-container-low/80 backdrop-blur-md border-b border-outline-variant md:hidden">
       <nav
         className="mx-auto flex h-16 max-w-screen-lg items-center px-4"
         aria-label="Main navigation"

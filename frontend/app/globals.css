@@ -85,6 +85,19 @@
   --color-error-container:           #4a0030;
 }
 
+/* ── Desktop: angular design ─────────────────────────────────────────────── */
+/* Mobile stays rounded; desktop gets sharp edges as visual contrast          */
+@media (min-width: 768px) {
+  .rounded-sm  { border-radius: 2px !important; }
+  .rounded     { border-radius: 2px !important; }
+  .rounded-md  { border-radius: 3px !important; }
+  .rounded-lg  { border-radius: 4px !important; }
+  .rounded-xl  { border-radius: 5px !important; }
+  .rounded-2xl { border-radius: 6px !important; }
+  .rounded-3xl { border-radius: 8px !important; }
+  /* rounded-full intentionally left circular (avatars, status dots) */
+}
+
 /* Smooth theme transition */
 html, body {
   background-color: var(--color-background);
