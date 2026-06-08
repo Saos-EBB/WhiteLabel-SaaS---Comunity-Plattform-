@@ -7,6 +7,7 @@ import BottomNav from '@/components/nav/BottomNav'
 import AuthProvider from '@/components/AuthProvider'
 import ToastNotification from '@/components/ui/ToastNotification'
 import { HiddenEntryOverlay } from '@/components/HiddenEntryOverlay'
+import { DevColorPalette } from '@/components/DevColorPalette'
 import { useTranslation } from '@/lib/i18n'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -28,7 +29,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </footer>
         <BottomNav />
         <ToastNotification />
-<HiddenEntryOverlay />
+        <HiddenEntryOverlay />
+        <DevColorPalette />
       </div>
     </AuthProvider>
   )
