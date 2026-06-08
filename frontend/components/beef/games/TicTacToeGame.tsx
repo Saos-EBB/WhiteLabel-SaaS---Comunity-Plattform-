@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Socket } from 'socket.io-client'
 import { fetchApi } from '@/lib/api'
 
-const TURN_MS = 15_000
+const TURN_MS = 25_000
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

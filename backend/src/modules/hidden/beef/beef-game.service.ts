@@ -21,6 +21,9 @@ export class BeefGameService {
     // Tracks which players have signalled game:reaction_ready for a given beef.
     // Both must be present before the GO signal is scheduled.
     private readonly reactionReadyPlayers = new Map<string, Set<string>>();
+
+    // Per-beef in-memory turn timers for TicTacToe (25 s → random placement).
+    private readonly tttTurnTimers = new Map<string, ReturnType<typeof setTimeout>>();
     constructor(
         @InjectRepository(BeefGame)
         private readonly gameRepo: Repository<BeefGame>,
@@ -116,6 +119,9 @@ export class BeefGameService {
         if (game.move_deadline_at && game.move_deadline_at < new Date())
             throw new BadRequestException('Move-Deadline abgelaufen');
 
+        // Cancel any pending auto-placement timer for this beef
+        if (beef.game_type === 'tictactoe') this.clearTttTimer(beefId);
+
         const handler = this.registry.get(beef.game_type);
         const role = isInitiator ? 'initiator' : 'target';
         const playerToMove = handler.getPlayerToMove(game.state, beef.initiator_id, beef.target_id);
@@ -152,9 +158,16 @@ export class BeefGameService {
             await this.gameRepo.save(game);
             setTimeout(() => void this.advanceToNextRound(beefId, beef.initiator_id, beef.target_id), 2500);
         } else {
-            const timeoutSec = await this.systemSettings.getNumber('game.move_timeout_seconds', 180);
+            // TicTacToe uses a 25 s in-memory timer for random placement on expiry.
+            // Other games use the configurable systemSettings timeout (backstop only for TicTacToe).
+            const timeoutSec = beef.game_type === 'tictactoe'
+                ? 25
+                : await this.systemSettings.getNumber('game.move_timeout_seconds', 180);
             game.move_deadline_at = new Date(Date.now() + timeoutSec * 1000);
             await this.gameRepo.save(game);
+            if (beef.game_type === 'tictactoe') {
+                this.scheduleTttTimer(beefId, beef.initiator_id, beef.target_id);
+            }
         }
 
         return game;
@@ -207,9 +220,16 @@ export class BeefGameService {
         const game = await this.gameRepo.findOne({ where: { beef_id: beefId } });
         if (!game || !game.move_deadline_at || game.move_deadline_at > new Date()) return;
 
+        // TicTacToe: random placement (backstop for server restarts — in-memory timer
+        // handles the normal 25 s path; this cron only fires if the timer was lost).
+        if (beef.game_type === 'tictactoe') {
+            await this.applyRandomTttMove(beefId, beef.initiator_id, beef.target_id);
+            return;
+        }
+
+        // Other games: player who was supposed to move forfeits
         const handler = this.registry.get(beef.game_type);
         const playerToMove = handler.getPlayerToMove(game.state, beef.initiator_id, beef.target_id);
-        // player who was supposed to move loses → other player wins
         const winnerId = playerToMove === beef.initiator_id ? beef.target_id : beef.initiator_id;
 
         game.winner_id = winnerId;
@@ -236,6 +256,49 @@ export class BeefGameService {
             board: resetBoard,
             finished: false,
         });
+        this.scheduleTttTimer(beefId, initiatorId, targetId);
+    }
+
+    // ── TicTacToe per-turn timer ────────────────────────────────────────────
+
+    private clearTttTimer(beefId: string): void {
+        const t = this.tttTurnTimers.get(beefId);
+        if (t !== undefined) { clearTimeout(t); this.tttTurnTimers.delete(beefId); }
+    }
+
+    private scheduleTttTimer(beefId: string, initiatorId: string, targetId: string): void {
+        this.clearTttTimer(beefId);
+        const timer = setTimeout(() => {
+            void this.applyRandomTttMove(beefId, initiatorId, targetId);
+        }, 25_000);
+        this.tttTurnTimers.set(beefId, timer);
+    }
+
+    private async applyRandomTttMove(beefId: string, initiatorId: string, targetId: string): Promise<void> {
+        this.clearTttTimer(beefId);
+
+        const beef = await this.beefRepo.findOne({ where: { id: beefId } });
+        if (!beef || beef.status !== BeefStatus.IN_GAME || beef.game_type !== 'tictactoe') return;
+
+        const game = await this.gameRepo.findOne({ where: { beef_id: beefId } });
+        if (!game || game.winner_id || !game.state) return;
+
+        const state = game.state as { board: (string | null)[]; turn: 'initiator' | 'target'; round_over: boolean; winner_id: string | null };
+        if (state.round_over || state.winner_id) return;
+
+        const emptyCells = (state.board as (string | null)[])
+            .map((cell, i) => (cell === null ? i : -1))
+            .filter((i) => i !== -1);
+        if (emptyCells.length === 0) return;
+
+        const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        const playerToMove = state.turn === 'initiator' ? initiatorId : targetId;
+
+        // Clear deadline so applyMove doesn't reject the move as expired
+        game.move_deadline_at = null;
+        await this.gameRepo.save(game);
+
+        await this.applyMove(beefId, playerToMove, { position: randomCell });
     }
 
     async handleReadyTimeout(beefId: string): Promise<void> {
