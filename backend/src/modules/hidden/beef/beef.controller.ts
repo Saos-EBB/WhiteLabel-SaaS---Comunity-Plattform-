@@ -9,7 +9,9 @@ import {
     Request,
     UseGuards,
     ParseUUIDPipe,
+    NotFoundException,
 } from '@nestjs/common';
+import { GameType } from './entities/beef.entity';
 import { BeefService } from './beef.service';
 import { BeefGameService } from './beef-game.service';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
@@ -79,6 +81,16 @@ export class BeefController {
     @Get('highscore')
     getHighscore() {
         return this.beefService.getHighscore();
+    }
+
+    @Post('dev/quick-fight')
+    devQuickFight(@Request() req: any, @Body() body: { targetUserId: string; gameType?: string }) {
+        if (process.env.NODE_ENV === 'production') throw new NotFoundException();
+        return this.beefService.devQuickFight(
+            req.user.sub,
+            body.targetUserId,
+            (body.gameType as GameType) ?? GameType.TICTACTOE,
+        );
     }
 
     @Get(':id')

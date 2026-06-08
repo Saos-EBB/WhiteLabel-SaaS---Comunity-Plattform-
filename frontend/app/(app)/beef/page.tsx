@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
 import { Flame, Swords, Trophy, Users, Plus, X, Search } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
+import { DevQuickFight } from '@/components/beef/DevQuickFight'
 
 type BeefStatus = 'pending_approval'|'waiting'|'active'|'game_pending'|'in_game'|'closed'|'chickened'
 
@@ -476,18 +477,26 @@ export default function BeefPage() {
                 </div>
               ) : publicBeefs.map(beef => (
                 <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
-                  <div className="bg-surface-container border border-outline-variant
-                    rounded-2xl p-5 flex flex-col gap-3 hover:border-outline
-                    transition-colors cursor-pointer">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-3 transition-colors cursor-pointer ${
+                    beef.status === 'game_pending' || beef.status === 'in_game'
+                      ? 'bg-surface-container border border-yellow-400/40 hover:border-yellow-400'
+                      : 'bg-surface-container border border-outline-variant hover:border-outline'
+                  }`}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-bold text-on-surface">{beef.tldr}</p>
-                      {beef.ends_at && (
+                      {(beef.status === 'game_pending' || beef.status === 'in_game') ? (
+                        <span className="text-xs font-bold text-yellow-400
+                          bg-yellow-400/10 border border-yellow-400/30
+                          px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                          {beef.status === 'in_game' ? '🎮 Live!' : '🎮 Startet...'}
+                        </span>
+                      ) : beef.ends_at ? (
                         <span className="text-xs text-on-surface-variant
                           bg-surface-container-high px-2 py-0.5 rounded-full
                           whitespace-nowrap flex-shrink-0">
                           {t.beef.running}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="bg-surface-container-low rounded-xl p-3
                       border-l-2 border-outline-variant">
@@ -783,6 +792,8 @@ export default function BeefPage() {
           )}
         </>
       )}
+
+      <DevQuickFight />
     </div>
   )
 }

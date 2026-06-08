@@ -95,6 +95,8 @@ export function TicTacToeGame({
   useEffect(() => {
     function onBoardUpdate(data: TttGameState & { game_type: string }) {
       if (data.game_type !== 'tictactoe') return
+      turnStartRef.current = Date.now()
+      setTurnTimeLeft(TURN_MS)
       setBoard(data.board)
       setCurrentTurn(data.current_turn)
       setGameWinner(data.game_winner)

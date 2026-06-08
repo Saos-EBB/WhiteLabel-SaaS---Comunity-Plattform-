@@ -186,7 +186,9 @@ export class BeefService {
     async listPublic(userId: string): Promise<Beef[]> {
         return this.beefRepo
             .createQueryBuilder('b')
-            .where('b.status = :status', { status: BeefStatus.ACTIVE })
+            .where('b.status IN (:...statuses)', {
+                statuses: [BeefStatus.ACTIVE, BeefStatus.GAME_PENDING, BeefStatus.IN_GAME],
+            })
             .andWhere('b.initiator_id != :userId AND b.target_id != :userId', { userId })
             .orderBy('b.ends_at', 'ASC')
             .getMany();
@@ -412,5 +414,52 @@ export class BeefService {
         const exile_until = user?.exile_until ?? null;
         const in_exile = exile_until !== null && exile_until > new Date();
         return { in_exile, exile_until };
+    }
+
+    // DEV ONLY — skip approval/waiting/active, jump straight to game_pending
+    async devQuickFight(initiatorId: string, targetUserId: string, gameType: GameType): Promise<{ beefId: string }> {
+        // Close any running beef between these two first
+        await this.beefRepo
+            .createQueryBuilder()
+            .update(Beef)
+            .set({ status: BeefStatus.CLOSED })
+            .where(
+                `((initiator_id = :a AND target_id = :b) OR (initiator_id = :b AND target_id = :a))
+                 AND status IN ('pending_approval','waiting','active','game_pending','in_game')`,
+                { a: initiatorId, b: targetUserId },
+            )
+            .execute();
+
+        const beef = this.beefRepo.create({
+            initiator_id: initiatorId,
+            target_id: targetUserId,
+            tldr: '[DEV] Quick Fight',
+            chat_passage: 'Dev mode — kein echter Beef',
+            status: BeefStatus.GAME_PENDING,
+            admin_approved: true,
+            duration_seconds: 300,
+            game_type: gameType,
+            ends_at: new Date(Date.now() + 300_000),
+            game_deadline_at: new Date(Date.now() + 30 * 60_000),
+        });
+        const saved = await this.beefRepo.save(beef);
+
+        const handler = this.gameRegistry.get(gameType);
+        const initialState = handler.createInitialState(initiatorId, targetUserId);
+        await this.gameRepo.save(this.gameRepo.create({
+            beef_id: saved.id,
+            game_type: gameType,
+            state: initialState,
+        }));
+
+        this.typedEventBus.emit(AppEvents.beefGameStateUpdate, {
+            beefId: saved.id,
+            state: 'waiting',
+            gameType,
+            initiatorReady: false,
+            targetReady: false,
+        });
+
+        return { beefId: saved.id };
     }
 }
