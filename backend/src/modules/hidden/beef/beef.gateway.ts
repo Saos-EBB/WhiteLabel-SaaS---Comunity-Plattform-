@@ -109,11 +109,41 @@ export class HiddenBeefGateway implements OnGatewayConnection {
   }
 
   @OnEvent(AppEvents.beefGameBoardUpdate)
-  onGameBoardUpdate(payload: BeefGameBoardUpdateEvent) {
-    this.server.to(`beef:${payload.beefId}`).emit('game:board_update', {
-      game_type: payload.gameType,
-      ...payload.board,
-    })
+  async onGameBoardUpdate(payload: BeefGameBoardUpdateEvent) {
+    if (payload.gameType !== 'mastermind') {
+      this.server.to(`beef:${payload.beefId}`).emit('game:board_update', {
+        game_type: payload.gameType,
+        ...payload.board,
+      })
+      return
+    }
+
+    // Mastermind: emit role-specific payloads so each player cannot see the
+    // opponent's guess rows or pin feedback over the wire.
+    const { initiatorId, targetId, board } = payload
+    const sockets = await this.server.in(`beef:${payload.beefId}`).fetchSockets()
+
+    for (const s of sockets) {
+      const uid = (s.data as any).userId as string | undefined
+      let personalBoard: Record<string, any>
+
+      if (uid === initiatorId) {
+        personalBoard = {
+          initiator: board.initiator,
+          target: { guesses: [], solved: board.target.solved, attempts: board.target.attempts, redacted: true },
+        }
+      } else if (uid === targetId) {
+        personalBoard = {
+          initiator: { guesses: [], solved: board.initiator.solved, attempts: board.initiator.attempts, redacted: true },
+          target: board.target,
+        }
+      } else {
+        // Spectator: full visibility
+        personalBoard = { initiator: board.initiator, target: board.target }
+      }
+
+      s.emit('game:board_update', { game_type: 'mastermind', ...personalBoard })
+    }
   }
 
   @OnEvent(AppEvents.beefGameFinished)

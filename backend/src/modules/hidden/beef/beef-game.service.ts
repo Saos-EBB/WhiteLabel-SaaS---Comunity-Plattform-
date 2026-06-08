@@ -137,13 +137,17 @@ export class BeefGameService {
         const { newState, finished } = handler.applyMove(game.state, sanitizedMove, role);
         game.state = newState;
 
-        // Always broadcast the new board state to all room members
         const board = handler.shapeBoardUpdate(newState, beef.initiator_id, beef.target_id, finished);
         this.eventBus.emit(AppEvents.beefGameBoardUpdate, {
             beefId,
             gameType: beef.game_type,
             board,
             finished,
+            // Mastermind needs player IDs so the gateway can redact per-socket
+            ...(beef.game_type === 'mastermind' && {
+                initiatorId: beef.initiator_id,
+                targetId: beef.target_id,
+            }),
         });
 
         if (finished) {

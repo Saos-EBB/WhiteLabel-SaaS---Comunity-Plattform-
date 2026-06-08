@@ -59,6 +59,9 @@ export interface BeefGameBoardUpdateEvent {
     /** Pre-shaped per game type, safe to broadcast to all room members. */
     board: Record<string, any>;
     finished: boolean;
+    /** Present for mastermind only — used by gateway for per-role redaction. */
+    initiatorId?: string;
+    targetId?: string;
 }
 
 // ---------------------------------------------------------------------------

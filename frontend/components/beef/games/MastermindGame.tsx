@@ -18,6 +18,7 @@ interface MmPlayerState {
   guesses: MmGuessRow[]
   solved: boolean
   attempts: number
+  redacted?: boolean
 }
 
 interface MmGameState {
@@ -47,7 +48,7 @@ const COLORS: { value: MmColor; bg: string; border: string }[] = [
   { value: 'O', bg: 'bg-orange-500', border: 'border-orange-600' },
 ]
 
-const MAX_GUESSES = 10
+const MAX_GUESSES = 8
 const CODE_LENGTH = 4
 
 function colorClass(c: MmColor | null, variant: 'bg' | 'border' = 'bg'): string {
@@ -205,34 +206,50 @@ function PlayerBoard({
         )}
       </div>
 
-      {/* Past guesses */}
-      <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto">
-        {playerState.guesses.map((row, ri) => (
-          <div key={ri} className="flex items-center gap-2">
-            <div className="flex gap-1">
-              {row.guess.map((c, ci) => (
+      {/* Past guesses — or redacted opponent view */}
+      {playerState.redacted ? (
+        <div className="flex flex-col items-center justify-center py-4 gap-2">
+          <span className="text-2xl font-bold text-on-surface tabular-nums">
+            {playerState.attempts}
+          </span>
+          <span className="text-xs text-on-surface-variant">
+            {playerState.attempts === 1 ? 'Versuch' : 'Versuche'}
+          </span>
+          {playerState.solved && (
+            <span className="text-xs font-bold text-primary-fixed-dim bg-primary-fixed-dim/10 px-2 py-0.5 rounded-full mt-1">
+              ✓ Gelöst!
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto">
+          {playerState.guesses.map((row, ri) => (
+            <div key={ri} className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {row.guess.map((c, ci) => (
+                  <div
+                    key={ci}
+                    className={`w-7 h-7 rounded-lg ${colorClass(c, 'bg')} ${colorClass(c, 'border')} border-2`}
+                  />
+                ))}
+              </div>
+              <Pins exact={row.exact} partial={row.partial} />
+            </div>
+          ))}
+
+          {/* Empty remaining rows */}
+          {Array(Math.max(0, MAX_GUESSES - playerState.guesses.length)).fill(null).map((_, ri) => (
+            <div key={`empty-${ri}`} className="flex gap-1">
+              {Array(CODE_LENGTH).fill(null).map((__, ci) => (
                 <div
                   key={ci}
-                  className={`w-7 h-7 rounded-lg ${colorClass(c, 'bg')} ${colorClass(c, 'border')} border-2`}
+                  className="w-7 h-7 rounded-lg border border-outline-variant/30 bg-surface-container-low"
                 />
               ))}
             </div>
-            <Pins exact={row.exact} partial={row.partial} />
-          </div>
-        ))}
-
-        {/* Empty remaining rows */}
-        {Array(Math.max(0, MAX_GUESSES - playerState.guesses.length)).fill(null).map((_, ri) => (
-          <div key={`empty-${ri}`} className="flex gap-1">
-            {Array(CODE_LENGTH).fill(null).map((__, ci) => (
-              <div
-                key={ci}
-                className="w-7 h-7 rounded-lg border border-outline-variant/30 bg-surface-container-low"
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Input row (only for active player) */}
       {isMe && !playerState.solved && (
