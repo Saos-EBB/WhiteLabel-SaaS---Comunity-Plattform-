@@ -163,6 +163,12 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-08 (4)
+- feat: 5-Minuten-Kommentar-Fenster nach Beef-Ende — `comment_window_until` Spalte (Migration 036), Kommentare bleiben für 5 min nach Spielende offen, dann schließt sich der Bereich automatisch
+- feat: Beefers werden nach dem Schließen des WinnerScreens direkt zur Profilseite (Exil) redirected
+- refactor: `useCountdown` aus der Beef-Seite extrahiert als eigenen Hook (`lib/hooks/useCountdown.ts`) — wird jetzt in Beef-Seite und WinnerScreen wiederverwendet
+- fix: WinnerScreen nutzt jetzt `useCountdown` statt manuellem `setInterval`/`secondsLeft`
+
 ### 2026-06-08 (3)
 - refactor: Game-Overlay sperrt den Bildschirm nicht mehr — wird jetzt inline auf der Beef-Seite gerendert (kein `fixed inset-0` mehr)
 - feat: TicTacToe 15-Sekunden-Timer pro Zug mit Millisekunden-Anzeige und Fortschrittsbalken (wird rot unter 5s)

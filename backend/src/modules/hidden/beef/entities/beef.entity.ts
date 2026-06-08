@@ -71,6 +71,9 @@ export class Beef {
     @Column({ type: 'timestamptz', nullable: true })
     game_deadline_at!: Date | null;
 
+    @Column({ type: 'timestamptz', nullable: true })
+    comment_window_until!: Date | null;
+
     @CreateDateColumn()
     created_at!: Date;
 }

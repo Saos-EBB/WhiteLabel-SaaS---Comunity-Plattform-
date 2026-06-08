@@ -211,6 +211,7 @@ export class BeefService {
                 'b.game_type AS game_type',
                 'b.game_deadline_at AS game_deadline_at',
                 'b.pot_coins AS pot_coins',
+                'b.comment_window_until AS comment_window_until',
                 'b.created_at AS created_at',
                 'ip.nickname AS initiator_nickname',
                 'tp.nickname AS target_nickname',
@@ -324,7 +325,10 @@ export class BeefService {
     async addComment(beefId: string, userId: string, dto: CommentBeefDto): Promise<BeefComment> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         const commentableStatuses = [BeefStatus.ACTIVE, BeefStatus.GAME_PENDING, BeefStatus.IN_GAME];
-        if (!beef || !commentableStatuses.includes(beef.status as BeefStatus))
+        const inCommentWindow = beef?.status === BeefStatus.CLOSED &&
+            beef.comment_window_until != null &&
+            beef.comment_window_until > new Date();
+        if (!beef || (!commentableStatuses.includes(beef.status as BeefStatus) && !inCommentWindow))
             throw new BadRequestException('Beef nicht aktiv');
         const comment = this.commentRepo.create({
             beef_id: beefId,

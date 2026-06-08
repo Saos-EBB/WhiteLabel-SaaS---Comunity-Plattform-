@@ -1,0 +1,1 @@
+ALTER TABLE beefs ADD COLUMN IF NOT EXISTS comment_window_until TIMESTAMPTZ;

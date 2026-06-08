@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Trophy } from 'lucide-react'
+import { useCountdown } from '@/lib/hooks/useCountdown'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,10 +18,6 @@ export interface WinnerScreenProps {
   currentUserId: string | null
   onClose: () => void
 }
-
-// ─── Auto-close countdown (5 min = 300 s) ────────────────────────────────────
-
-const AUTO_CLOSE_SECONDS = 300
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
 
@@ -82,22 +79,13 @@ export function WinnerScreen({
   currentUserId,
   onClose,
 }: WinnerScreenProps) {
-  const [secondsLeft, setSecondsLeft] = useState(AUTO_CLOSE_SECONDS)
+  // Stable deadline: 5 min from first render
+  const [closesAt] = useState(() => new Date(Date.now() + 5 * 60 * 1000).toISOString())
+  const countdown = useCountdown(closesAt)
 
-  // Auto-close after 5 minutes
   useEffect(() => {
-    const iv = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(iv)
-          onClose()
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => clearInterval(iv)
-  }, [onClose])
+    if (countdown === 'Vorbei') onClose()
+  }, [countdown, onClose])
 
   // ── Derived values ───────────────────────────────────────────────────────
   const winnerNickname =
@@ -114,9 +102,6 @@ export function WinnerScreen({
   const betterCoins  = Math.floor(potCoins * 0.60)
 
   const isWinner = currentUserId === winnerId
-
-  const minutesLeft = Math.floor(secondsLeft / 60)
-  const secsLeft    = secondsLeft % 60
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -179,7 +164,7 @@ export function WinnerScreen({
       {/* Auto-close info */}
       <div className="mt-auto flex flex-col items-center gap-3">
         <p className="text-xs text-on-surface-variant">
-          Schließt automatisch in {minutesLeft}:{String(secsLeft).padStart(2, '0')}
+          Schließt automatisch in {countdown}
         </p>
         <button
           onClick={onClose}

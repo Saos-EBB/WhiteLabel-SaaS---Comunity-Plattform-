@@ -58,6 +58,7 @@ export class BeefResolutionService {
         await this.dataSource.transaction(async (manager) => {
             beef.status = BeefStatus.CLOSED;
             beef.winner_id = result.winnerId;
+            beef.comment_window_until = new Date(Date.now() + 5 * 60 * 1000);
             await manager.save(beef);
 
             await manager.update(User, { id: beef.initiator_id }, { exile_until });

@@ -10,6 +10,7 @@ import { fetchApi } from '@/lib/api'
 import { connectHiddenBeef, disconnectHiddenBeef } from '@/lib/socket'
 import { GameOverlay } from '@/components/beef/GameOverlay'
 import type { GameType } from '@/components/beef/GameOverlay'
+import { useCountdown } from '@/lib/hooks/useCountdown'
 
 interface BeefDetail {
   id: string
@@ -30,6 +31,8 @@ interface BeefDetail {
   game_type: GameType | null
   game_deadline_at: string | null
   pot_coins: number
+  // 5-min post-game comment window
+  comment_window_until: string | null
 }
 
 interface Comment {
@@ -49,24 +52,6 @@ function parsePassage(raw: string): { nickname: string; content: string }[] {
   })
 }
 
-function useCountdown(endsAt: string | null) {
-  const [remaining, setRemaining] = useState('')
-  useEffect(() => {
-    if (!endsAt) return
-    function update() {
-      const diff = new Date(endsAt!).getTime() - Date.now()
-      if (diff <= 0) { setRemaining('Vorbei'); return }
-      const h = Math.floor(diff / 3600000)
-      const m = Math.floor((diff % 3600000) / 60000)
-      const s = Math.floor((diff % 60000) / 1000)
-      setRemaining(h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`)
-    }
-    update()
-    const iv = setInterval(update, 1000)
-    return () => clearInterval(iv)
-  }, [endsAt])
-  return remaining
-}
 
 export default function LiveBeefPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -93,6 +78,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
   const [showGameOverlay, setShowGameOverlay]      = useState(false)
 
   const countdown = useCountdown(beef?.ends_at ?? null)
+  const commentWindowCountdown = useCountdown(beef?.comment_window_until ?? null)
 
   const load = useCallback(async () => {
     if (!isHidden) return
@@ -237,6 +223,9 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
   const isInGame      = beef.status === 'in_game'
   const isClosed      = beef.status === 'closed'
   const isGamePhase   = isGamePending || isInGame
+  const isCommentWindowOpen = isClosed &&
+    !!beef.comment_window_until &&
+    new Date(beef.comment_window_until) > new Date()
   const totalCoins    = beef.initiator_coins + beef.target_coins
   const initPct       = totalCoins > 0 ? Math.round(beef.initiator_coins / totalCoins * 100) : 50
 
@@ -408,7 +397,11 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
           targetPhotoUrl={targetPhotoUrl}
           currentUserId={currentUserId}
           socket={connectHiddenBeef()}
-          onClose={() => setShowGameOverlay(false)}
+          onClose={() => {
+            setShowGameOverlay(false)
+            // Participants are sent to exile after the game resolves
+            if (isParticipant && isClosed) router.push('/profile')
+          }}
         />
       )}
 
@@ -507,26 +500,39 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
           </div>
         )}
 
-        {/* Comment input — visible during active, game_pending, and in_game */}
-        {(isActive || isGamePhase) && (
-          <div className="flex gap-2 mt-1">
-            <input
-              type="text"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleComment()}
-              maxLength={500}
-              placeholder="Kommentar..."
-              className="flex-1 bg-surface-container-low border border-outline-variant
-                rounded-lg px-4 py-2.5 text-on-surface text-sm outline-none
-                focus:border-primary-fixed-dim"
-            />
-            <button onClick={handleComment} disabled={!comment.trim() || sending}
-              className="p-2.5 rounded-lg bg-primary-fixed-dim text-on-primary-container
-                disabled:opacity-40 transition-opacity">
-              <Send size={18}/>
-            </button>
-          </div>
+        {/* Comment input — active / game phase / 5-min post-game window */}
+        {(isActive || isGamePhase || isCommentWindowOpen) && (
+          <>
+            {isCommentWindowOpen && (
+              <div className="flex items-center justify-center gap-2 bg-surface-container-high
+                border border-outline-variant rounded-xl px-3 py-2 mt-1">
+                <span className="text-xs text-on-surface-variant">
+                  🕐 Kommentare schließen in
+                </span>
+                <span className="text-xs font-mono font-bold text-primary-fixed-dim">
+                  {commentWindowCountdown}
+                </span>
+              </div>
+            )}
+            <div className="flex gap-2 mt-1">
+              <input
+                type="text"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleComment()}
+                maxLength={500}
+                placeholder="Kommentar..."
+                className="flex-1 bg-surface-container-low border border-outline-variant
+                  rounded-lg px-4 py-2.5 text-on-surface text-sm outline-none
+                  focus:border-primary-fixed-dim"
+              />
+              <button onClick={handleComment} disabled={!comment.trim() || sending}
+                className="p-2.5 rounded-lg bg-primary-fixed-dim text-on-primary-container
+                  disabled:opacity-40 transition-opacity">
+                <Send size={18}/>
+              </button>
+            </div>
+          </>
         )}
       </div>
 
