@@ -1,4 +1,7 @@
-import { IsString, IsUUID, MaxLength, MinLength, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsUUID, MaxLength, MinLength, IsOptional, IsNumber, Min, Max, IsIn } from 'class-validator';
+import { GameType } from '../entities/beef.entity';
+
+const VALID_GAME_TYPES = Object.values(GameType);
 
 export class CreateBeefDto {
     @IsUUID()
@@ -16,7 +19,11 @@ export class CreateBeefDto {
 
     @IsOptional()
     @IsNumber()
-    @Min(900)
+    @Min(60) // TODO: DELETE BEFORE SHIPMENT — restore to Min(900)
     @Max(172800)
     duration_seconds?: number;
+
+    @IsOptional()
+    @IsIn(VALID_GAME_TYPES)
+    game_type?: string;
 }

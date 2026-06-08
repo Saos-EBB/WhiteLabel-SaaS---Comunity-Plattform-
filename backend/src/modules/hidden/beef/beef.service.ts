@@ -7,11 +7,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, IsNull } from 'typeorm';
+import { OnEvent } from '@nestjs/event-emitter';
 import { BeefResolutionService } from './beef-resolution.service';
 import { User } from '../../core/auth/entities/user.entity';
-import { Beef, BeefStatus } from './entities/beef.entity';
+import { Beef, BeefStatus, GameType } from './entities/beef.entity';
 import { BeefVote } from './entities/beef-vote.entity';
 import { BeefComment } from './entities/beef-comment.entity';
+import { BeefGame } from './entities/beef-game.entity';
 import { CreateBeefDto } from './dto/create-beef.dto';
 import { RespondBeefDto } from './dto/respond-beef.dto';
 import { VoteBeefDto } from './dto/vote-beef.dto';
@@ -20,6 +22,9 @@ import { CoinService } from '../coin/coin.service';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
 import { TypedEventBus, AppEvents } from '../../shared/events/app-events';
+import type { BeefGameFinishedEvent } from '../../shared/events/app-events';
+import { GameRegistry } from './games/game.registry';
+import { SystemSettingsService } from '../../core/system-settings/system-settings.service';
 
 @Injectable()
 export class BeefService {
@@ -32,12 +37,16 @@ export class BeefService {
         private readonly commentRepo: Repository<BeefComment>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(BeefGame)
+        private readonly gameRepo: Repository<BeefGame>,
         private readonly coinService: CoinService,
         private readonly notificationsService: NotificationsService,
         private readonly typedEventBus: TypedEventBus,
         private readonly dataSource: DataSource,
         private readonly resolutionService: BeefResolutionService,
         private readonly stateMachine: BeefStateMachineService,
+        private readonly gameRegistry: GameRegistry,
+        private readonly systemSettings: SystemSettingsService,
     ) { }
 
     async create(initiatorId: string, dto: CreateBeefDto): Promise<Beef> {
@@ -65,13 +74,17 @@ export class BeefService {
             .where(
                 `((b.initiator_id = :a AND b.target_id = :b) OR
                   (b.initiator_id = :b AND b.target_id = :a))
-                 AND b.status IN ('pending_approval','waiting','active')`,
+                 AND b.status IN ('pending_approval','waiting','active','game_pending','in_game')`,
                 { a: initiatorId, b: dto.target_id }
             )
             .getOne();
         if (existing) {
             throw new ConflictException('Es läuft bereits ein Beef zwischen euch.');
         }
+
+        const gameType = dto.game_type ?? GameType.RPS;
+        if (!this.gameRegistry.has(gameType))
+            throw new BadRequestException(`Unbekannter Game-Typ: ${gameType}`);
 
         const beef = this.beefRepo.create({
             initiator_id: initiatorId,
@@ -80,10 +93,26 @@ export class BeefService {
             chat_passage: dto.chat_passage,
             status: BeefStatus.PENDING_APPROVAL,
             duration_seconds: dto.duration_seconds ?? 86400,
+            game_type: gameType,
         });
         const saved = await this.beefRepo.save(beef);
-        await this.coinService.addCoins(initiatorId, 50, 'earned_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        const entryCost = await this.systemSettings.getNumber('beef.entry_cost', 50);
+        try {
+            await this.coinService.spendCoins(initiatorId, entryCost, 'spent_beef_open', saved.id, `beef:${saved.id}:open:${initiatorId}`);
+        } catch (err) {
+            await this.beefRepo.delete({ id: saved.id });
+            throw err;
+        }
+        await this.beefRepo.update({ id: saved.id }, { pot_coins: entryCost });
         return saved;
+    }
+
+    @OnEvent(AppEvents.beefGameFinished)
+    async onGameFinished(payload: BeefGameFinishedEvent): Promise<void> {
+        const beef = await this.beefRepo.findOne({ where: { id: payload.beefId } });
+        if (!beef) return;
+        this.stateMachine.transition(beef, BeefEvent.CLOSE);
+        await this.resolutionService.resolve(beef, payload.winnerId);
     }
 
     async getPending(): Promise<any[]> {
@@ -117,6 +146,9 @@ export class BeefService {
             await this.chickenBeef(beefId, 'manual');
             return (await this.beefRepo.findOne({ where: { id: beefId } }))!;
         }
+        const entryCost = await this.systemSettings.getNumber('beef.entry_cost', 50);
+        await this.coinService.spendCoins(userId, entryCost, 'spent_beef_accept', beefId, `beef:${beefId}:accept:${userId}`);
+        await this.beefRepo.increment({ id: beefId }, 'pot_coins', entryCost);
         this.stateMachine.transition(beef, BeefEvent.ACCEPT);
         beef.ends_at = new Date(Date.now() + beef.duration_seconds * 1000);
         const [acceptorProfile] = await this.dataSource.query<{ nickname: string }[]>(
@@ -154,7 +186,9 @@ export class BeefService {
     async listPublic(userId: string): Promise<Beef[]> {
         return this.beefRepo
             .createQueryBuilder('b')
-            .where('b.status = :status', { status: BeefStatus.ACTIVE })
+            .where('b.status IN (:...statuses)', {
+                statuses: [BeefStatus.ACTIVE, BeefStatus.GAME_PENDING, BeefStatus.IN_GAME],
+            })
             .andWhere('b.initiator_id != :userId AND b.target_id != :userId', { userId })
             .orderBy('b.ends_at', 'ASC')
             .getMany();
@@ -176,6 +210,10 @@ export class BeefService {
                 'b.winner_id AS winner_id',
                 'b.ends_at AS ends_at',
                 'b.duration_seconds AS duration_seconds',
+                'b.game_type AS game_type',
+                'b.game_deadline_at AS game_deadline_at',
+                'b.pot_coins AS pot_coins',
+                'b.comment_window_until AS comment_window_until',
                 'b.created_at AS created_at',
                 'ip.nickname AS initiator_nickname',
                 'tp.nickname AS target_nickname',
@@ -219,11 +257,31 @@ export class BeefService {
             .getRawMany()
     }
 
-    async closeBeef(beefId: string, random: () => number = Math.random): Promise<void> {
+    // Called by scheduler when ends_at is reached — transitions to game_pending and creates game record
+    async startGamePhase(beefId: string): Promise<void> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
         if (!beef || beef.status !== BeefStatus.ACTIVE) return;
-        this.stateMachine.transition(beef, BeefEvent.CLOSE);
-        await this.resolutionService.resolve(beef, random);
+
+        this.stateMachine.transition(beef, BeefEvent.START_GAME);
+        beef.game_deadline_at = new Date(Date.now() + 30 * 60 * 1000);
+        await this.beefRepo.save(beef);
+
+        const handler = this.gameRegistry.get(beef.game_type);
+        const initialState = handler.createInitialState(beef.initiator_id, beef.target_id);
+        await this.gameRepo.save(this.gameRepo.create({
+            beef_id: beefId,
+            game_type: beef.game_type,
+            state: initialState,
+        }));
+
+        // Notify connected clients so the game overlay opens automatically
+        this.typedEventBus.emit(AppEvents.beefGameStateUpdate, {
+            beefId,
+            state: 'waiting',
+            gameType: beef.game_type,
+            initiatorReady: false,
+            targetReady: false,
+        });
     }
 
     async chickenBeef(beefId: string, _reason: 'manual' | 'timeout'): Promise<void> {
@@ -268,7 +326,11 @@ export class BeefService {
 
     async addComment(beefId: string, userId: string, dto: CommentBeefDto): Promise<BeefComment> {
         const beef = await this.beefRepo.findOne({ where: { id: beefId } });
-        if (!beef || beef.status !== BeefStatus.ACTIVE)
+        const commentableStatuses = [BeefStatus.ACTIVE, BeefStatus.GAME_PENDING, BeefStatus.IN_GAME];
+        const inCommentWindow = beef?.status === BeefStatus.CLOSED &&
+            beef.comment_window_until != null &&
+            beef.comment_window_until > new Date();
+        if (!beef || (!commentableStatuses.includes(beef.status as BeefStatus) && !inCommentWindow))
             throw new BadRequestException('Beef nicht aktiv');
         const comment = this.commentRepo.create({
             beef_id: beefId,
@@ -323,6 +385,10 @@ export class BeefService {
             where: [
                 { initiator_id: userId, status: BeefStatus.ACTIVE },
                 { target_id: userId, status: BeefStatus.ACTIVE },
+                { initiator_id: userId, status: BeefStatus.GAME_PENDING },
+                { target_id: userId, status: BeefStatus.GAME_PENDING },
+                { initiator_id: userId, status: BeefStatus.IN_GAME },
+                { target_id: userId, status: BeefStatus.IN_GAME },
             ],
             order: { ends_at: 'ASC' },
         });
@@ -348,5 +414,52 @@ export class BeefService {
         const exile_until = user?.exile_until ?? null;
         const in_exile = exile_until !== null && exile_until > new Date();
         return { in_exile, exile_until };
+    }
+
+    // DEV ONLY — skip approval/waiting/active, jump straight to game_pending
+    async devQuickFight(initiatorId: string, targetUserId: string, gameType: GameType): Promise<{ beefId: string }> {
+        // Close any running beef between these two first
+        await this.beefRepo
+            .createQueryBuilder()
+            .update(Beef)
+            .set({ status: BeefStatus.CLOSED })
+            .where(
+                `((initiator_id = :a AND target_id = :b) OR (initiator_id = :b AND target_id = :a))
+                 AND status IN ('pending_approval','waiting','active','game_pending','in_game')`,
+                { a: initiatorId, b: targetUserId },
+            )
+            .execute();
+
+        const beef = this.beefRepo.create({
+            initiator_id: initiatorId,
+            target_id: targetUserId,
+            tldr: '[DEV] Quick Fight',
+            chat_passage: 'Dev mode — kein echter Beef',
+            status: BeefStatus.GAME_PENDING,
+            admin_approved: true,
+            duration_seconds: 300,
+            game_type: gameType,
+            ends_at: new Date(Date.now() + 300_000),
+            game_deadline_at: new Date(Date.now() + 30 * 60_000),
+        });
+        const saved = await this.beefRepo.save(beef);
+
+        const handler = this.gameRegistry.get(gameType);
+        const initialState = handler.createInitialState(initiatorId, targetUserId);
+        await this.gameRepo.save(this.gameRepo.create({
+            beef_id: saved.id,
+            game_type: gameType,
+            state: initialState,
+        }));
+
+        this.typedEventBus.emit(AppEvents.beefGameStateUpdate, {
+            beefId: saved.id,
+            state: 'waiting',
+            gameType,
+            initiatorReady: false,
+            targetReady: false,
+        });
+
+        return { beefId: saved.id };
     }
 }

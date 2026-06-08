@@ -34,15 +34,49 @@ export interface ContactRequestEvent {
     receiverId: string;
 }
 
+export interface BeefGameStateUpdateEvent {
+    beefId: string;
+    /** Lifecycle status: 'waiting' | 'in_game' | 'finished' — NOT the JSONB game state */
+    state: 'waiting' | 'in_game' | 'finished';
+    gameType: string;
+    initiatorReady: boolean;
+    targetReady: boolean;
+}
+
+export interface BeefGameFinishedEvent {
+    beefId: string;
+    winnerId: string | null;
+}
+
+export interface BeefGameGoEvent {
+    beefId: string;
+    sentAt: number;
+}
+
+export interface BeefGameBoardUpdateEvent {
+    beefId: string;
+    gameType: string;
+    /** Pre-shaped per game type, safe to broadcast to all room members. */
+    board: Record<string, any>;
+    finished: boolean;
+    /** Present for mastermind only — used by gateway for per-role redaction. */
+    initiatorId?: string;
+    targetId?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Event name constants
 // ---------------------------------------------------------------------------
 
 export const AppEvents = {
-    beefVote:       'hidden.beef.vote',
-    beefComment:    'hidden.beef.comment',
-    beefClosed:     'hidden.beef.closed',
-    contactRequest: 'contact_request.created',
+    beefVote:              'hidden.beef.vote',
+    beefComment:           'hidden.beef.comment',
+    beefClosed:            'hidden.beef.closed',
+    contactRequest:        'contact_request.created',
+    beefGameStateUpdate:   'hidden.beef.game.state_update',
+    beefGameFinished:      'hidden.beef.game.finished',
+    beefGameGo:            'hidden.beef.game.go',
+    beefGameBoardUpdate:   'hidden.beef.game.board_update',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -50,10 +84,14 @@ export const AppEvents = {
 // ---------------------------------------------------------------------------
 
 type EventPayloadMap = {
-    [AppEvents.beefVote]:       BeefVoteEvent;
-    [AppEvents.beefComment]:    BeefCommentEvent;
-    [AppEvents.beefClosed]:     BeefClosedEvent;
-    [AppEvents.contactRequest]: ContactRequestEvent;
+    [AppEvents.beefVote]:              BeefVoteEvent;
+    [AppEvents.beefComment]:           BeefCommentEvent;
+    [AppEvents.beefClosed]:            BeefClosedEvent;
+    [AppEvents.contactRequest]:        ContactRequestEvent;
+    [AppEvents.beefGameStateUpdate]:   BeefGameStateUpdateEvent;
+    [AppEvents.beefGameFinished]:      BeefGameFinishedEvent;
+    [AppEvents.beefGameGo]:            BeefGameGoEvent;
+    [AppEvents.beefGameBoardUpdate]:   BeefGameBoardUpdateEvent;
 };
 
 // ---------------------------------------------------------------------------

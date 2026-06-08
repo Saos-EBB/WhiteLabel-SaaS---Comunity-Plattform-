@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useAuthStore } from '@/lib/store/authStore'
 import { fetchApi } from '@/lib/api'
-import { Flame, Swords, Trophy, Users } from 'lucide-react'
+import { Flame, Swords, Trophy, Users, Plus, X, Search } from 'lucide-react'
 import { useTranslation } from '@/lib/i18n'
+import { DevQuickFight } from '@/components/beef/DevQuickFight'
 
-type BeefStatus = 'pending_approval'|'waiting'|'active'|'closed'|'chickened'
+type BeefStatus = 'pending_approval'|'waiting'|'active'|'game_pending'|'in_game'|'closed'|'chickened'
 
 interface Beef {
   id: string
@@ -23,13 +24,64 @@ interface Beef {
   created_at: string
 }
 
-type Tab = 'requests' | 'mine' | 'public' | 'highscore'
+type Tab = 'requests' | 'mine' | 'public' | 'highscore' | 'create'
+
+type GameType = 'rps' | 'tictactoe' | 'mastermind' | 'reaction'
+
+interface UserSearchResult {
+  user_id: string
+  nickname: string
+  photo_url: string | null
+}
+
+interface CreateBeefForm {
+  targetUserId: string
+  targetNickname: string
+  tldr: string
+  chatPassage: string
+  gameType: GameType
+  durationSeconds: number
+}
+
+interface ConvMeta {
+  id: string
+  user_a_id: string
+  user_b_id: string
+}
+
+interface ChatMessage {
+  id: string
+  sender_id: string
+  content: string | null
+  type: string
+  is_deleted: boolean
+  sent_at: string
+}
+
+// TODO: DELETE BEFORE SHIPMENT — remove the first entry (60 s dev option)
+const DURATION_OPTIONS = [
+  { label: '1 Min (DEV)', value: 60 },
+  { label: '15 Min',      value: 900 },
+  { label: '1 Stunde',    value: 3600 },
+  { label: '6 Stunden',   value: 21600 },
+  { label: '12 Stunden',  value: 43200 },
+  { label: '24 Stunden',  value: 86400 },
+  { label: '48 Stunden',  value: 172800 },
+]
+
+const GAME_OPTIONS: { value: GameType; label: string; desc: string; emoji: string }[] = [
+  { value: 'rps',        label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',      emoji: '✊' },
+  { value: 'tictactoe', label: 'Tic Tac Toe',          desc: 'Best of 3 — X vs O',                  emoji: '⬛' },
+  { value: 'mastermind', label: 'Mastermind',           desc: 'Knack den Code — 4 Farben, 10 Runden', emoji: '🎨' },
+  { value: 'reaction',  label: 'Reaktionstest',         desc: 'Wer drückt schneller auf GO!',         emoji: '⚡' },
+]
 
 export default function BeefPage() {
   const { t } = useTranslation()
   const router   = useRouter()
-  const isHidden = useHiddenStore((s) => s.isHidden)
-  const token    = useAuthStore((s) => s.accessToken)
+  const isHidden     = useHiddenStore((s) => s.isHidden)
+  const token        = useAuthStore((s) => s.accessToken)
+  const currentUserId = useAuthStore((s) => s.user?.id ?? '')
 
   const [hydrated, setHydrated] = useState(false)
   const [tab, setTab]                   = useState<Tab>('requests')
@@ -43,6 +95,28 @@ export default function BeefPage() {
   const [highscore, setHighscore]       = useState<{
     user_id: string; nickname: string; wins: string
   }[]>([])
+
+  // CreateBeef state
+  const [createForm, setCreateForm]       = useState<CreateBeefForm>({
+    targetUserId: '',
+    targetNickname: '',
+    tldr: '',
+    chatPassage: '',
+    gameType: 'rps',
+    durationSeconds: 86400,
+  })
+  const [userSearch, setUserSearch]         = useState('')
+  const [searchResults, setSearchResults]   = useState<UserSearchResult[]>([])
+  const [partners, setPartners]             = useState<UserSearchResult[]>([])
+  const [creating, setCreating]           = useState(false)
+  const [createError, setCreateError]     = useState<string | null>(null)
+  const [createSuccess, setCreateSuccess] = useState(false)
+
+  // Chat-Ausschnitt Picker
+  const [chatMessages, setChatMessages]     = useState<ChatMessage[]>([])
+  const [selectedMsgIds, setSelectedMsgIds] = useState<Set<string>>(new Set())
+  const [loadingChat, setLoadingChat]       = useState(false)
+  const [noConversation, setNoConversation] = useState(false)
 
   useEffect(() => {
     if (useHiddenStore.persist.hasHydrated()) setHydrated(true)
@@ -75,6 +149,20 @@ export default function BeefPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Pre-fill create form from URL params (from profile page "Beef starten" button)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const create = params.get('create')
+    const targetId = params.get('targetId')
+    const targetNickname = params.get('targetNickname')
+    if (create === '1' && targetId && targetNickname) {
+      setCreateForm(f => ({ ...f, targetUserId: targetId, targetNickname: decodeURIComponent(targetNickname) }))
+      setTab('create')
+      window.history.replaceState({}, '', '/beef')
+    }
+  }, [])
+
   // Handle Stripe coin-purchase redirect
   useEffect(() => {
     const params    = new URLSearchParams(window.location.search)
@@ -97,6 +185,100 @@ export default function BeefPage() {
     })
   }, [])
 
+  // Chatverlauf laden sobald Gegner ausgewählt
+  useEffect(() => {
+    if (!createForm.targetUserId) {
+      setChatMessages([])
+      setSelectedMsgIds(new Set())
+      setNoConversation(false)
+      setCreateForm(f => ({ ...f, chatPassage: '' }))
+      return
+    }
+
+    let cancelled = false
+    setLoadingChat(true)
+    setNoConversation(false)
+    setChatMessages([])
+    setSelectedMsgIds(new Set())
+    setCreateForm(f => ({ ...f, chatPassage: '' }))
+
+    fetchApi<ConvMeta[]>('/chat/conversations')
+      .then(convs => {
+        if (cancelled) return undefined
+        const conv = Array.isArray(convs)
+          ? convs.find(c => c.user_a_id === createForm.targetUserId || c.user_b_id === createForm.targetUserId)
+          : undefined
+        if (!conv) { setNoConversation(true); setLoadingChat(false); return undefined }
+        return fetchApi<ChatMessage[]>(`/chat/conversations/${conv.id}/messages`)
+      })
+      .then(msgs => {
+        if (cancelled || !msgs) return
+        setChatMessages(msgs.filter(m => !m.is_deleted && m.content && m.type === 'text'))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingChat(false) })
+
+    return () => { cancelled = true }
+  }, [createForm.targetUserId])
+
+  // Ausgewählte Nachrichten → chatPassage formatieren
+  useEffect(() => {
+    if (selectedMsgIds.size === 0) {
+      setCreateForm(f => ({ ...f, chatPassage: '' }))
+      return
+    }
+    const targetNick = createForm.targetNickname
+    const passage = chatMessages
+      .filter(m => selectedMsgIds.has(m.id))
+      .map(m => {
+        const nick = m.sender_id === currentUserId ? 'Du' : targetNick
+        return `[${nick}]: ${m.content}`
+      })
+      .join('\n')
+    setCreateForm(f => ({ ...f, chatPassage: passage }))
+  }, [selectedMsgIds, chatMessages, currentUserId, createForm.targetNickname])
+
+  function searchUsers(query: string) {
+    if (query.trim().length < 1) { setSearchResults([]); return }
+    const q = query.toLowerCase()
+    setSearchResults(partners.filter(p => p.nickname.toLowerCase().includes(q)))
+  }
+
+  useEffect(() => {
+    if (!isHidden) return
+    fetchApi<UserSearchResult[]>('/chat/conversations/partners')
+      .then(r => setPartners(Array.isArray(r) ? r : []))
+      .catch(() => {})
+  }, [isHidden])
+
+  async function handleCreate() {
+    if (!createForm.targetUserId || !createForm.tldr.trim() || !createForm.chatPassage.trim() || creating) return
+    setCreating(true)
+    setCreateError(null)
+    try {
+      await fetchApi('/hidden/beef', {
+        method: 'POST',
+        body: JSON.stringify({
+          target_id: createForm.targetUserId,
+          tldr: createForm.tldr.trim(),
+          chat_passage: createForm.chatPassage.trim(),
+          game_type: createForm.gameType,
+          duration_seconds: createForm.durationSeconds,
+        }),
+      })
+      setCreateSuccess(true)
+      setCreateForm({ targetUserId: '', targetNickname: '', tldr: '', chatPassage: '', gameType: 'rps', durationSeconds: 86400 })
+      setUserSearch('')
+      setSearchResults([])
+      setChatMessages([])
+      setSelectedMsgIds(new Set())
+      await load()
+      setTimeout(() => { setCreateSuccess(false); setTab('mine') }, 2000)
+    } catch (e: unknown) {
+      setCreateError(e instanceof Error ? e.message : 'Fehler beim Erstellen')
+    } finally { setCreating(false) }
+  }
+
   async function respond(beefId: string, response: 'fight' | 'chicken') {
     setResponding(beefId)
     try {
@@ -117,6 +299,7 @@ export default function BeefPage() {
     { key: 'mine',      label: t.beef.tabMine,      icon: <Flame size={15}/> },
     { key: 'public',    label: t.beef.tabPublic,    icon: <Users size={15}/> },
     { key: 'highscore', label: t.beef.tabHighscore, icon: <Trophy size={15}/> },
+    { key: 'create',    label: 'Beef starten',       icon: <Plus size={15}/> },
   ]
 
   return (
@@ -244,9 +427,11 @@ export default function BeefPage() {
                 </div>
               ) : myBeefs.map(beef => (
                 <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
-                  <div className="bg-surface-container border-2 border-primary-fixed-dim
-                    rounded-2xl p-5 flex flex-col gap-3 hover:border-primary-fixed-dim
-                    transition-colors cursor-pointer">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-3 cursor-pointer transition-colors ${
+                    beef.status === 'game_pending' || beef.status === 'in_game'
+                      ? 'bg-surface-container border-2 border-yellow-400 hover:border-yellow-300'
+                      : 'bg-surface-container border-2 border-primary-fixed-dim hover:border-primary-fixed-dim'
+                  }`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-primary-fixed-dim font-bold
@@ -255,13 +440,19 @@ export default function BeefPage() {
                         </span>
                         <p className="font-bold text-on-surface">{beef.tldr}</p>
                       </div>
-                      {beef.ends_at && (
+                      {(beef.status === 'game_pending' || beef.status === 'in_game') ? (
+                        <span className="text-xs font-bold text-yellow-400
+                          bg-yellow-400/10 border border-yellow-400/30
+                          px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                          {beef.status === 'in_game' ? '🎮 Spielt!' : '🎮 Spiel wartet'}
+                        </span>
+                      ) : beef.ends_at ? (
                         <span className="text-xs text-on-surface-variant
                           bg-surface-container-high px-2 py-0.5 rounded-full
                           whitespace-nowrap flex-shrink-0">
                           {t.beef.running}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="bg-surface-container-low rounded-xl p-3
                       border-l-2 border-primary-fixed-dim">
@@ -286,18 +477,26 @@ export default function BeefPage() {
                 </div>
               ) : publicBeefs.map(beef => (
                 <Link key={beef.id} href={`/beef/${beef.id}`} className="block">
-                  <div className="bg-surface-container border border-outline-variant
-                    rounded-2xl p-5 flex flex-col gap-3 hover:border-outline
-                    transition-colors cursor-pointer">
+                  <div className={`rounded-2xl p-5 flex flex-col gap-3 transition-colors cursor-pointer ${
+                    beef.status === 'game_pending' || beef.status === 'in_game'
+                      ? 'bg-surface-container border border-yellow-400/40 hover:border-yellow-400'
+                      : 'bg-surface-container border border-outline-variant hover:border-outline'
+                  }`}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-bold text-on-surface">{beef.tldr}</p>
-                      {beef.ends_at && (
+                      {(beef.status === 'game_pending' || beef.status === 'in_game') ? (
+                        <span className="text-xs font-bold text-yellow-400
+                          bg-yellow-400/10 border border-yellow-400/30
+                          px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                          {beef.status === 'in_game' ? '🎮 Live!' : '🎮 Startet...'}
+                        </span>
+                      ) : beef.ends_at ? (
                         <span className="text-xs text-on-surface-variant
                           bg-surface-container-high px-2 py-0.5 rounded-full
                           whitespace-nowrap flex-shrink-0">
                           {t.beef.running}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="bg-surface-container-low rounded-xl p-3
                       border-l-2 border-outline-variant">
@@ -347,8 +546,254 @@ export default function BeefPage() {
               ))}
             </div>
           )}
+
+          {/* CREATE TAB */}
+          {tab === 'create' && (
+            <div className="flex flex-col gap-5">
+
+              {/* Success banner */}
+              {createSuccess && (
+                <div className="bg-tertiary-container text-on-tertiary-container rounded-xl p-4 text-sm font-semibold text-center">
+                  🥊 Beef erstellt! Warte auf Genehmigung...
+                </div>
+              )}
+
+              {/* Target user search */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Gegner auswählen
+                </label>
+
+                {createForm.targetUserId ? (
+                  /* Selected user pill */
+                  <div className="flex items-center gap-3 bg-primary-fixed-dim/10 border border-primary-fixed-dim rounded-xl p-3">
+                    <span className="font-bold text-on-surface flex-1">{createForm.targetNickname}</span>
+                    <button
+                      onClick={() => setCreateForm(f => ({ ...f, targetUserId: '', targetNickname: '' }))}
+                      className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
+                    >
+                      <X size={16}/>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="flex items-center gap-2 bg-surface-container border border-outline-variant rounded-xl px-3 py-2">
+                      <Search size={16} className="text-on-surface-variant flex-shrink-0"/>
+                      <input
+                        type="text"
+                        value={userSearch}
+                        onChange={(e) => {
+                          setUserSearch(e.target.value)
+                          searchUsers(e.target.value)
+                        }}
+                        placeholder="Nickname suchen..."
+                        className="flex-1 bg-transparent text-on-surface text-sm outline-none placeholder:text-on-surface-variant"
+                      />
+                    </div>
+
+                    {searchResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-surface-container-high border border-outline-variant rounded-xl overflow-hidden z-10 shadow-lg">
+                        {searchResults.map((u) => (
+                          <button
+                            key={u.user_id}
+                            onClick={() => {
+                              setCreateForm(f => ({ ...f, targetUserId: u.user_id, targetNickname: u.nickname }))
+                              setUserSearch('')
+                              setSearchResults([])
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container transition-colors text-left"
+                          >
+                            {u.photo_url ? (
+                              <img
+                                src={u.photo_url.replace('http://localhost:3000', '')}
+                                alt={u.nickname}
+                                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-semibold text-on-surface-variant">
+                                  {(u.nickname || '?').charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            <span className="font-semibold text-on-surface text-sm">{u.nickname}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* TLDR */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Worum geht's? (TLDR)
+                </label>
+                <input
+                  type="text"
+                  value={createForm.tldr}
+                  onChange={(e) => setCreateForm(f => ({ ...f, tldr: e.target.value }))}
+                  maxLength={120}
+                  placeholder="z.B. Kevin hat den letzten Slice Pizza genommen"
+                  className="bg-surface-container border border-outline-variant rounded-xl px-4 py-3
+                    text-on-surface text-sm outline-none focus:border-primary-fixed-dim placeholder:text-on-surface-variant"
+                />
+                <span className="text-xs text-on-surface-variant text-right">{createForm.tldr.length}/120</span>
+              </div>
+
+              {/* Duration */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Dauer des Beefs
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {DURATION_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setCreateForm(f => ({ ...f, durationSeconds: opt.value }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        createForm.durationSeconds === opt.value
+                          ? 'border-primary-fixed-dim bg-primary-fixed-dim/20 text-on-surface'
+                          : 'border-outline-variant text-on-surface-variant hover:border-outline'
+                      } ${opt.value === 60 ? 'border-dashed opacity-70' : ''}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat Passage Picker */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Chat-Ausschnitt als Beweis
+                </label>
+
+                {!createForm.targetUserId ? (
+                  <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
+                    text-center text-sm text-on-surface-variant">
+                    Erst einen Gegner auswählen
+                  </div>
+                ) : loadingChat ? (
+                  <div className="flex justify-center py-6">
+                    <div className="w-5 h-5 border-2 border-primary-fixed-dim border-t-transparent rounded-full animate-spin"/>
+                  </div>
+                ) : noConversation ? (
+                  <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
+                    text-center text-sm text-on-surface-variant">
+                    Kein Chat mit <span className="font-bold text-on-surface">{createForm.targetNickname}</span> vorhanden
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
+                    text-center text-sm text-on-surface-variant">
+                    Keine Textnachrichten im Chat
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-on-surface-variant">
+                      Tippe auf Nachrichten um sie auszuwählen
+                      {selectedMsgIds.size > 0 && (
+                        <span className="ml-1 font-semibold text-primary-fixed-dim">
+                          ({selectedMsgIds.size} ausgewählt)
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex flex-col gap-1 max-h-64 overflow-y-auto rounded-xl border border-outline-variant bg-surface-container p-2">
+                      {chatMessages.map(msg => {
+                        const isMe = msg.sender_id === currentUserId
+                        const nick = isMe ? 'Du' : createForm.targetNickname
+                        const selected = selectedMsgIds.has(msg.id)
+                        return (
+                          <button
+                            key={msg.id}
+                            type="button"
+                            onClick={() => setSelectedMsgIds(prev => {
+                              const next = new Set(prev)
+                              if (next.has(msg.id)) next.delete(msg.id)
+                              else next.add(msg.id)
+                              return next
+                            })}
+                            className={`text-left px-3 py-2 rounded-lg border-2 transition-all text-sm ${
+                              selected
+                                ? 'border-primary-fixed-dim bg-primary-fixed-dim/10'
+                                : 'border-transparent hover:border-outline-variant bg-transparent'
+                            }`}
+                          >
+                            <span className={`text-[10px] font-bold mr-2 ${isMe ? 'text-primary-fixed-dim' : 'text-on-surface-variant'}`}>
+                              {nick}
+                            </span>
+                            <span className="text-on-surface">{msg.content}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {selectedMsgIds.size > 0 && (
+                      <div className="bg-surface-container-low border border-outline-variant rounded-xl p-3">
+                        <p className="text-[10px] text-on-surface-variant mb-1 font-semibold uppercase tracking-widest">
+                          Vorschau Passage
+                        </p>
+                        <p className="text-xs text-on-surface font-mono whitespace-pre-line leading-relaxed">
+                          {createForm.chatPassage}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Game type selection */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Mini-Game auswählen
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {GAME_OPTIONS.map((g) => (
+                    <button
+                      key={g.value}
+                      onClick={() => setCreateForm(f => ({ ...f, gameType: g.value }))}
+                      className={`flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all ${
+                        createForm.gameType === g.value
+                          ? 'border-primary-fixed-dim bg-primary-fixed-dim/10'
+                          : 'border-outline-variant bg-surface-container hover:border-outline'
+                      }`}
+                    >
+                      <span className="text-xl">{g.emoji}</span>
+                      <span className="font-bold text-on-surface text-xs">{g.label}</span>
+                      <span className="text-[10px] text-on-surface-variant leading-snug">{g.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error */}
+              {createError && (
+                <div className="bg-error-container text-on-error-container rounded-xl p-3 text-sm">
+                  {createError}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                onClick={handleCreate}
+                disabled={!createForm.targetUserId || !createForm.tldr.trim() || !createForm.chatPassage.trim() || creating}
+                className="w-full py-4 rounded-2xl bg-primary-fixed-dim text-on-primary-container
+                  font-bold text-sm disabled:opacity-40 transition-opacity"
+              >
+                {creating ? '...' : '🥊 Beef einreichen'}
+              </button>
+
+              <p className="text-xs text-on-surface-variant text-center">
+                Dein Beef wird nach Admin-Prüfung freigegeben.
+              </p>
+            </div>
+          )}
         </>
       )}
+
+      <DevQuickFight />
     </div>
   )
 }

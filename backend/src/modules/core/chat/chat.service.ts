@@ -167,6 +167,24 @@ export class ChatService {
         return { message: 'Anfrage abgelehnt' };
     }
 
+    async getConversationPartners(userId: string): Promise<{ user_id: string; nickname: string; photo_url: string | null }[]> {
+        return this.conversationRepository.manager.query<{ user_id: string; nickname: string; photo_url: string | null }[]>(`
+            SELECT DISTINCT
+                p.user_id,
+                p.nickname,
+                m.file_url AS photo_url
+            FROM conversations c
+            JOIN profiles p ON p.user_id = CASE
+                WHEN c.user_a_id = $1 THEN c.user_b_id
+                ELSE c.user_a_id
+            END
+            LEFT JOIN media_uploads m ON m.id = p.photo_id AND m.needs_review = false
+            WHERE (c.user_a_id = $1 AND c.deleted_at_a IS NULL)
+               OR (c.user_b_id = $1 AND c.deleted_at_b IS NULL)
+            ORDER BY p.nickname
+        `, [userId]);
+    }
+
     async getConversations(userId: string) {
         const conversations = await this.conversationRepository.find({
             where: [

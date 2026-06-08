@@ -5,8 +5,17 @@ export enum BeefStatus {
     PENDING_APPROVAL = 'pending_approval',
     WAITING = 'waiting',
     ACTIVE = 'active',
+    GAME_PENDING = 'game_pending',
+    IN_GAME = 'in_game',
     CLOSED = 'closed',
     CHICKENED = 'chickened',
+}
+
+export enum GameType {
+    RPS = 'rps',
+    TICTACTOE = 'tictactoe',
+    MASTERMIND = 'mastermind',
+    REACTION = 'reaction',
 }
 
 @Entity('beefs')
@@ -52,6 +61,18 @@ export class Beef {
 
     @Column({ type: 'timestamptz', nullable: true })
     ends_at!: Date | null;
+
+    @Column({ type: 'int', default: 0 })
+    pot_coins!: number;
+
+    @Column({ type: 'varchar', length: 30, default: GameType.RPS })
+    game_type!: string;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    game_deadline_at!: Date | null;
+
+    @Column({ type: 'timestamptz', nullable: true })
+    comment_window_until!: Date | null;
 
     @CreateDateColumn()
     created_at!: Date;

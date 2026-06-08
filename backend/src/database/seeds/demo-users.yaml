@@ -1,0 +1,908 @@
+# =============================================================================
+#  DEMO USER SEED — XXX Platform
+#  Bearbeite diese Datei, dann: npx ts-node src/database/seeds/demo-seed.ts
+#
+#  HINWEISE:
+#  - email:       echte E-Mail-Adresse (wird verschluesselt gespeichert)
+#  - password:    Klartext — wird beim Einspielen gehasht
+#  - photo_file:  Dateiname in $DEMO_MEDIA_PATH/demoPfp/ (leer = kein Bild)
+#  - audio_file:  Dateiname in $DEMO_MEDIA_PATH/demoAudio/ (leer = kein Audio)
+#  - interests:   Freitext-Tags, werden in interests-Tabelle angelegt falls noetig
+#  - birthdate:   Format YYYY-MM-DD
+#  - gender:      male | female | non_binary | diverse | not_specified
+#  - looking_for: friendship | relationship | exchange | all
+#  - status:      available | looking_for_chat | looking_for_date | busy | do_not_disturb
+#  - role:        user | admin | org | owner
+#
+#  HINWEIS DB-Constraint:
+#  chk_media_file_url (media_uploads.file_url ~ '^https://') wurde beim letzten
+#  Seed-Lauf entfernt, weil BACKEND_URL lokal auf http:// zeigt.
+#  Wiederherstellen (nur wenn alle file_url-Eintraege https:// sind):
+#    ALTER TABLE media_uploads ADD CONSTRAINT chk_media_file_url CHECK (file_url ~ '^https://');
+# =============================================================================
+
+users:
+
+  # ===========================================================================
+  #  ADMIN
+  # ===========================================================================
+
+  - id: admin1
+    email: admin1@demo.example.com
+    password: Demo1234!
+    role: admin
+    is_verified: true
+    nickname: gutz
+    birthdate: "1988-03-10"
+    gender: male
+    looking_for: exchange
+    bio: ""
+    city: Berlin
+    status: available
+    photo_file: admin1.png
+    audio_file: admin1.mp3
+    interests:
+      - Programmieren
+      - Gaming
+      - Kaffee
+
+  - id: admin2
+    email: admin2@demo.example.com
+    password: Demo1234!
+    role: admin
+    is_verified: true
+    nickname: saos43
+    birthdate: "1993-07-22"
+    gender: female
+    looking_for: exchange
+    bio: ""
+    city: München
+    status: available
+    photo_file: admin2.jpg
+    audio_file: admin2.mp3
+    interests:
+      - Yoga
+      - Lesen
+      - Reisen
+
+  # ===========================================================================
+  #  OWNER
+  # ===========================================================================
+
+  - id: o1
+    email: owner@demo.example.com
+    password: Demo1234!
+    role: owner
+    is_verified: true
+    nickname: gandalf
+    birthdate: "1985-01-15"
+    gender: male
+    looking_for: exchange
+    bio: ""
+    city: Hamburg
+    status: do_not_disturb
+    photo_file: o1.png
+    audio_file: ""
+    interests:
+      - Programmieren
+      - Kaffee
+      - Musik
+
+  # ===========================================================================
+  #  DIVERSE
+  # ===========================================================================
+
+  - id: d1
+    email: d1@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: fuck_wordpress
+    birthdate: "1997-06-15"
+    gender: diverse
+    looking_for: all
+    bio: ""
+    city: Freiburg
+    status: available
+    photo_file: d1.jpg
+    audio_file: ""
+    interests:
+      - Kunst
+      - DIY
+      - Fotografie
+      - Programmieren
+      - Musik
+
+  # ===========================================================================
+  #  FEMALE
+  # ===========================================================================
+
+  - id: f1
+    email: f1@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: sid
+    birthdate: "1996-03-21"
+    gender: female
+    looking_for: friendship
+    bio: ""
+    city: Berlin
+    status: available
+    photo_file: f1.jpg
+    audio_file: ""
+    interests:
+      - Yoga
+      - Meditation
+      - Natur
+      - Wandern
+
+  - id: f2
+    email: f2@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: dualapeep
+    birthdate: "2001-09-14"
+    gender: female
+    looking_for: relationship
+    bio: ""
+    city: München
+    status: looking_for_chat
+    photo_file: f2.jpg
+    audio_file: ""
+    interests:
+      - Fotografie
+      - Kunst
+      - Mode
+
+  - id: f3
+    email: f3@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: tifa
+    birthdate: "1994-11-08"
+    gender: female
+    looking_for: friendship
+    bio: ""
+    city: Hamburg
+    status: available
+    photo_file: f3.jpg
+    audio_file: ""
+    interests:
+      - Musik
+      - Tanzen
+      - Kino
+
+  - id: f4
+    email: f4@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: _2b
+    birthdate: "2003-05-03"
+    gender: female
+    looking_for: exchange
+    bio: ""
+    city: Köln
+    status: looking_for_date
+    photo_file: f4.jpg
+    audio_file: ""
+    interests:
+      - Lesen
+      - Podcasts
+      - Kaffee
+
+  - id: f5
+    email: f5@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: madi
+    birthdate: "1989-07-19"
+    gender: female
+    looking_for: friendship
+    bio: ""
+    city: Frankfurt
+    status: available
+    photo_file: f5.jpg
+    audio_file: ""
+    interests:
+      - Kochen
+      - Backen
+      - Reisen
+
+  - id: f6
+    email: f6@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: hinata
+    birthdate: "1998-02-27"
+    gender: female
+    looking_for: all
+    bio: ""
+    city: Stuttgart
+    status: looking_for_chat
+    photo_file: f6.jpg
+    audio_file: ""
+    interests:
+      - Fitness
+      - Sport
+      - Klettern
+
+  - id: f7
+    email: f7@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: makima
+    birthdate: "2000-12-04"
+    gender: female
+    looking_for: friendship
+    bio: ""
+    city: Düsseldorf
+    status: available
+    photo_file: f7.jpg
+    audio_file: f7.mp3
+    interests:
+      - Musik
+      - Tanzen
+      - Film & Serien
+
+  - id: f8
+    email: f8@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: robin
+    birthdate: "1985-06-16"
+    gender: female
+    looking_for: relationship
+    bio: ""
+    city: Leipzig
+    status: busy
+    photo_file: f8.jpg
+    audio_file: ""
+    interests:
+      - Lesen
+      - Sprachen
+      - Reisen
+      - Kunst
+
+  - id: f9
+    email: f9@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: chun_li
+    birthdate: "1993-01-30"
+    gender: female
+    looking_for: friendship
+    bio: ""
+    city: Hannover
+    status: available
+    photo_file: f9.jpg
+    audio_file: ""
+    interests:
+      - Yoga
+      - Meditation
+      - Backen
+
+  - id: f10
+    email: f10@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: yenn
+    birthdate: "2004-08-22"
+    gender: female
+    looking_for: all
+    bio: ""
+    city: Nürnberg
+    status: looking_for_chat
+    photo_file: f10.webp
+    audio_file: ""
+    interests:
+      - Gaming
+      - Film & Serien
+      - Kino
+
+  - id: f11
+    email: f11@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: power
+    birthdate: "1987-04-07"
+    gender: female
+    looking_for: exchange
+    bio: ""
+    city: Dortmund
+    status: available
+    photo_file: f11.webp
+    audio_file: ""
+    interests:
+      - Fotografie
+      - DIY
+      - Mode
+
+  - id: f12
+    email: f12@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: sylvanas
+    birthdate: "1999-11-13"
+    gender: female
+    looking_for: friendship
+    bio: ""
+    city: Bremen
+    status: looking_for_date
+    photo_file: f12.jpg
+    audio_file: ""
+    interests:
+      - Reisen
+      - Sprachen
+      - Musik
+
+  - id: f13
+    email: f13@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: triss
+    birthdate: "1992-09-26"
+    gender: female
+    looking_for: relationship
+    bio: ""
+    city: Dresden
+    status: available
+    photo_file: f13.png
+    audio_file: ""
+    interests:
+      - Kochen
+      - Kaffee
+      - Natur
+      - Wandern
+
+  # ===========================================================================
+  #  MALE
+  # ===========================================================================
+
+  - id: m1
+    email: m1@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: roro
+    birthdate: "1993-05-12"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Berlin
+    status: available
+    photo_file: m1.jpg
+    audio_file: m1.mp3
+    interests:
+      - Fotografie
+      - Musik
+      - Reisen
+
+  - id: m2
+    email: m2@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: theMac
+    birthdate: "1998-11-23"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: München
+    status: looking_for_chat
+    photo_file: m2.webp
+    audio_file: m2.mp3
+    interests:
+      - Gaming
+      - Programmieren
+      - Film & Serien
+
+  - id: m3
+    email: m3@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: 50cent
+    birthdate: "1991-07-14"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Hamburg
+    status: available
+    photo_file: m3.png
+    audio_file: ""
+    interests:
+      - Sport
+      - Fitness
+      - Wandern
+      - Natur
+
+  - id: m4
+    email: m4@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: infowarrior
+    birthdate: "2000-02-28"
+    gender: male
+    looking_for: relationship
+    bio: ""
+    city: Köln
+    status: looking_for_date
+    photo_file: m4.jpg
+    audio_file: m4.mp3
+    interests:
+      - Kochen
+      - Backen
+      - Kaffee
+
+  - id: m5
+    email: m5@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: orangensaft
+    birthdate: "1986-09-03"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Frankfurt
+    status: available
+    photo_file: m5.jpg
+    audio_file: m5.mp3
+    interests:
+      - Reisen
+      - Fotografie
+      - Kunst
+      - Musik
+
+  - id: m6
+    email: m6@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: princeofdarkness
+    birthdate: "2003-04-17"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Stuttgart
+    status: looking_for_chat
+    photo_file: m6.jpg
+    audio_file: m6.mp3
+    interests:
+      - Gaming
+      - Film & Serien
+
+  - id: m7
+    email: m7@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: slash
+    birthdate: "1994-12-01"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Düsseldorf
+    status: available
+    photo_file: m7.png
+    audio_file: ""
+    interests:
+      - Fitness
+      - Klettern
+      - Wandern
+
+  - id: m8
+    email: m8@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: pfp_1
+    birthdate: "1989-06-22"
+    gender: male
+    looking_for: exchange
+    bio: ""
+    city: Leipzig
+    status: busy
+    photo_file: m8.png
+    audio_file: ""
+    interests:
+      - Programmieren
+      - Podcasts
+      - Kaffee
+
+  - id: m9
+    email: m9@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: thehangman
+    birthdate: "2001-08-09"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Hannover
+    status: available
+    photo_file: m9.png
+    audio_file: ""
+    interests:
+      - Sport
+      - Radfahren
+      - Natur
+
+  - id: m10
+    email: m10@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: unkillabledemonking
+    birthdate: "1985-03-31"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Nürnberg
+    status: looking_for_chat
+    photo_file: m10.png
+    audio_file: m10.wav
+    interests:
+      - Lesen
+      - Musik
+      - Meditation
+      - Sprachen
+
+  - id: m11
+    email: m11@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: igor
+    birthdate: "1997-10-15"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Dortmund
+    status: available
+    photo_file: m11.png
+    audio_file: ""
+    interests:
+      - Gaming
+      - Film & Serien
+      - Kino
+
+  - id: m12
+    email: m12@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: lemmy
+    birthdate: "2002-01-07"
+    gender: male
+    looking_for: relationship
+    bio: ""
+    city: Bremen
+    status: looking_for_date
+    photo_file: m12.jpg
+    audio_file: ""
+    interests:
+      - Fotografie
+      - Reisen
+      - Mode
+
+  - id: m13
+    email: m13@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: frankwhite
+    birthdate: "1990-07-25"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Dresden
+    status: available
+    photo_file: m13.webp
+    audio_file: m13.mp3
+    interests:
+      - Kochen
+      - Backen
+      - DIY
+
+  - id: m14
+    email: m14@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: aikut
+    birthdate: "1995-11-30"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Freiburg
+    status: looking_for_chat
+    photo_file: m14.jpg
+    audio_file: m14.mp3
+    interests:
+      - Musik
+      - Tanzen
+      - Kino
+
+  - id: m15
+    email: m15@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: theeagle
+    birthdate: "1984-04-14"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Heidelberg
+    status: available
+    photo_file: m15.webp
+    audio_file: m15.mp3
+    interests:
+      - Wandern
+      - Natur
+      - Meditation
+      - Yoga
+
+  - id: m16
+    email: m16@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: banger
+    birthdate: "1999-09-08"
+    gender: male
+    looking_for: exchange
+    bio: ""
+    city: Münster
+    status: busy
+    photo_file: m16.jpg
+    audio_file: m16.mp3
+    interests:
+      - Sport
+      - Fitness
+      - Klettern
+
+  - id: m17
+    email: m17@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: whitefalcon
+    birthdate: "1988-02-18"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Mannheim
+    status: available
+    photo_file: m17.png
+    audio_file: ""
+    interests:
+      - Lesen
+      - Podcasts
+      - Kaffee
+
+  - id: m18
+    email: m18@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: ironmike
+    birthdate: "2004-05-22"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Augsburg
+    status: looking_for_chat
+    photo_file: m18.jpg
+    audio_file: m18.mp3
+    interests:
+      - Gaming
+      - Programmieren
+
+  - id: m19
+    email: m19@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: diddydone
+    birthdate: "1992-12-11"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Kiel
+    status: available
+    photo_file: m19.png
+    audio_file: ""
+    interests:
+      - Radfahren
+      - Natur
+      - Wandern
+      - Sport
+
+  - id: m20
+    email: m20@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: levi
+    birthdate: "1983-07-04"
+    gender: male
+    looking_for: relationship
+    bio: ""
+    city: Wiesbaden
+    status: do_not_disturb
+    photo_file: m20.jpg
+    audio_file: ""
+    interests:
+      - Lesen
+      - Sprachen
+      - Reisen
+
+  - id: m21
+    email: m21@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: inusuke
+    birthdate: "2001-03-15"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Berlin
+    status: available
+    photo_file: m21.jpg
+    audio_file: ""
+    interests:
+      - Musik
+      - Tanzen
+
+  - id: m22
+    email: m22@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: zeni
+    birthdate: "1996-08-27"
+    gender: male
+    looking_for: exchange
+    bio: ""
+    city: München
+    status: looking_for_chat
+    photo_file: m22.png
+    audio_file: ""
+    interests:
+      - Kochen
+      - Backen
+      - Kaffee
+      - Mode
+
+  - id: m23
+    email: m23@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: denji
+    birthdate: "1987-11-06"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Hamburg
+    status: available
+    photo_file: m23.png
+    audio_file: m23.mp3
+    interests:
+      - Fotografie
+      - Kunst
+      - DIY
+
+  - id: m24
+    email: m24@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: diobrando
+    birthdate: "2003-01-19"
+    gender: male
+    looking_for: relationship
+    bio: ""
+    city: Köln
+    status: looking_for_date
+    photo_file: m24.webp
+    audio_file: ""
+    interests:
+      - Gaming
+      - Film & Serien
+      - Kino
+
+  - id: m25
+    email: m25@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: gojo
+    birthdate: "1993-06-30"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Frankfurt
+    status: available
+    photo_file: m25.jpg
+    audio_file: m25.mp3
+    interests:
+      - Fitness
+      - Sport
+      - Klettern
+      - Wandern
+
+  - id: m26
+    email: m26@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: togi
+    birthdate: "1998-04-11"
+    gender: male
+    looking_for: all
+    bio: ""
+    city: Stuttgart
+    status: looking_for_chat
+    photo_file: m26.webp
+    audio_file: m26.mp3
+    interests:
+      - Musik
+      - Podcasts
+      - Kaffee
+
+  - id: m27
+    email: m27@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: winkler
+    birthdate: "1991-10-24"
+    gender: male
+    looking_for: friendship
+    bio: ""
+    city: Düsseldorf
+    status: available
+    photo_file: m27.webp
+    audio_file: m27.mp3
+    interests:
+      - Reisen
+      - Fotografie
+      - Sprachen
+
+  - id: m28
+    email: m28@demo.example.com
+    password: Demo1234!
+    role: user
+    is_verified: true
+    nickname: goated
+    birthdate: "2000-07-17"
+    gender: male
+    looking_for: relationship
+    bio: ""
+    city: Leipzig
+    status: looking_for_date
+    photo_file: m28.jpg
+    audio_file: m28.mp3
+    interests:
+      - Kochen
+      - Yoga
+      - Meditation

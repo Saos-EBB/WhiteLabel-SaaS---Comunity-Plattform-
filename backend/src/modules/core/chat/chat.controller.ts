@@ -50,6 +50,11 @@ was
         return this.chatService.getConversations(req.user.sub);
     }
 
+    @Get('conversations/partners')
+    getConversationPartners(@Request() req: any) {
+        return this.chatService.getConversationPartners(req.user.sub);
+    }
+
     @Get('conversations/:id')
     getConversation(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
         return this.chatService.getConversation(req.user.sub, id);

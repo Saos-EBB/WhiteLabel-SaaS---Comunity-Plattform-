@@ -671,6 +671,11 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
+### 2026-06-08 (latest)
+- Fix (`TicTacToeGame`): Turn-Timer wird nach jedem Zug sofort zurückgesetzt statt kurz auf 0 zu hängen
+- Feat (`beef/page`): Öffentlicher Tab zeigt Beefs im `game_pending`/`in_game`-Status mit gelbem „🎮 Live!"-Badge
+- Feat (`DevQuickFight`): Floating DEV-Panel (nur dev-mode) zum direkten Start eines Testkampfs ohne normalen Beef-Flow
+
 ### 2026-06-01 (latest)
 - Fix (`TopNav/StatusPicker`): Online-Status-Icon reset nach jedem Page-Reload — Root Cause: Backend liefert `statusMessage`/`statusVisible` (camelCase), Picker las aber `status_message`/`status_visible` (snake_case) → immer `undefined`; `user`-Objekt wird jetzt im Zustand-Store persistiert und nach erfolgreichem PUT sofort aktualisiert
 

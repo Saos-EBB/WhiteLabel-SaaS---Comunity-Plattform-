@@ -310,7 +310,11 @@ CREATE TABLE users (
     vulnerable_flag     BOOLEAN NOT NULL DEFAULT false,
     enhanced_protection BOOLEAN NOT NULL DEFAULT false,
 
-    email_verified_at   TIMESTAMP WITH TIME ZONE NULL,
+    email_verified_at               TIMESTAMP WITH TIME ZONE NULL,
+    email_verification_token        VARCHAR(128) NULL,
+    email_verification_expires_at   TIMESTAMP WITH TIME ZONE NULL,
+    password_reset_token            VARCHAR(128) NULL,
+    password_reset_expires_at       TIMESTAMP WITH TIME ZONE NULL,
     created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     last_login          TIMESTAMP WITH TIME ZONE NULL,
     deleted_at          TIMESTAMP WITH TIME ZONE NULL,

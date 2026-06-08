@@ -1,0 +1,1535 @@
+# =============================================================================
+# demo-relations.yaml
+# Seed-Definitionen: Beefs, Conversations, Messages, Contact Requests, Blocks
+# Projekt: WhiteLabel-SaaS Community Platform
+# Branch: feat/beef-game-system
+# Stand: 2026-06-07
+# =============================================================================
+#
+# STRUKTUR-ÜBERSICHT:
+#   beefs            → 5 Beefs mit verschiedenen Status (zeigt die ganze State Machine)
+#   contact_requests → Mix aus pending / accepted / declined (realistischer Posteingang)
+#   conversations    → Chats für die 6 Hero-Accounts, lebendig + witzig
+#   blocks           → Makima hat 3 User geblockt
+#
+# HERO-ACCOUNTS (einloggen für Demo):
+#   saos43 | roro | gutz | gandalf | robin | makima
+#   (Passwort: wie im bestehenden Demo-Seed gesetzt)
+#
+# NICKNAMES → IDs werden im Seed-Script per JOIN aufgelöst:
+#   SELECT u.id FROM users u JOIN profiles p ON p.user_id = u.id WHERE p.nickname = $1
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# BEEFS
+# 5 Beefs mit verschiedenen Status — zeigt die ganze Bandbreite der State Machine:
+#   pending_approval → noch nicht vom Admin abgesegnet
+#   waiting          → Admin OK, Target hat noch nicht angenommen
+#   active           → läuft gerade, ends_at in der Zukunft
+#   closed           → vorbei, winner gesetzt
+#   chickened        → jemand hat gekniffen (24h timeout)
+# -----------------------------------------------------------------------------
+
+beefs:
+
+  # ---------------------------------------------------------------------------
+  # BEEF 1: theMac vs theeagle — Pineapple on Pizza
+  # Casting: theMac = Conor McGregor energy, theeagle = Khabib energy
+  # Status: active — läuft gerade heiß
+  # theMac hat gehört dass theeagle Ananas auf Pizza als Trash bezeichnet hat
+  # und ist sofort ausgerastet. theeagle ist ruhig und absolut überzeugt.
+  # ---------------------------------------------------------------------------
+  - initiator: theMac
+    target: theeagle
+    tldr: "Pineapple on pizza: yes or no?"
+    status: active
+    admin_approved: true
+    game_type: rps
+    pot_coins: 75
+    # ends_at wird im Script auf NOW() + 8h gesetzt
+    chat_passage: |
+      theMac: heard you said pineapple on pizza is trash. say it again.
+      theeagle: I said what I said. pineapple does not belong on pizza. this is fact.
+      theMac: FACT?? bro you eat the same three foods every day who are you to talk
+      theeagle: I eat clean. I eat real food. pineapple on pizza is not real food. it is confusion on bread.
+      theMac: confusion on bread 💀 you absolute animal
+      theeagle: you cannot argue with me on this. you have no discipline. not in food, not in anything.
+      theMac: oh we're doing this? we're DOING THIS? i will destroy you
+      theeagle: you always talk. you never finish.
+      theMac: i'm filing a beef. official. right now. let's go.
+      theeagle: okay.
+
+  # ---------------------------------------------------------------------------
+  # BEEF 2: roro vs denji — Who handles 3 weapons better?
+  # Casting: roro = Roronoa Zoro (King of Hell), denji = Denji (Chainsaw Man)
+  # Status: waiting — Admin approved, denji hat noch nicht angenommen
+  # denji dachte er sei der einzige mit 3 Waffen. Er lag falsch.
+  # Makima-Simp Denji trifft auf jemanden dem das komplett egal ist.
+  # ---------------------------------------------------------------------------
+  - initiator: denji
+    target: roro
+    tldr: "Who handles 3 weapons better?"
+    status: active
+    admin_approved: true
+    game_type: tictactoe
+    pot_coins: 40
+    # denji hat initiiert aber roro hat den Beef formell ausgerufen
+    chat_passage: |
+      denji: just to be clear. i am the hero of hell. three weapons. chainsaw, chainsaw, chainsaw.
+      roro: ...those are the same weapon three times.
+      denji: they're on different parts of my body so they count separately
+      roro: I have three swords. they are all different. I am the King of Hell.
+      denji: you can't be King of Hell i'm the Hero of Hell that's basically the same thing
+      roro: it is not the same thing.
+      denji: where even are you right now
+      roro: ...north. I think.
+      denji: YOU THINK??
+      roro: I always end up where I need to be.
+      denji: makima says real strength is about control not just swinging things around
+      roro: who is makima
+      denji: she's— she's just— she knows things okay
+      roro: I cut King. I beat Kaido's right hand with Enma. I am filing a beef. come find me if you can.
+      denji: I WILL FIND YOU
+      roro: no you won't
+      denji: ...no i won't but I ACCEPT
+
+  # ---------------------------------------------------------------------------
+  # BEEF 3: makima vs sylvanas — Whose pets are cuter?
+  # Casting: makima = Makima (CSM), sylvanas = Sylvanas Windrunner (Warcraft)
+  # Status: closed — makima hat gewonnen. Natürlich.
+  # Sylvanas hat über ihre Wölfe gepostet. Makima konnte es nicht lassen.
+  # Der CSM-Joke: Makimas "Hunde" sind keine normalen Hunde.
+  # ---------------------------------------------------------------------------
+  - initiator: makima
+    target: sylvanas
+    tldr: "Whose pets are cuter?"
+    status: active
+    admin_approved: true
+    game_type: rps
+    pot_coins: 120
+    chat_passage: |
+      makima: I saw your post about the wolves. cute.
+      sylvanas: they are not cute. they are loyal. there is a difference.
+      makima: mine are also very loyal.
+      sylvanas: you have dogs. I command an army of undead and wolves who chose me.
+      makima: chose. interesting word.
+      sylvanas: what does that mean.
+      makima: nothing. your wolves are beautiful by the way. very well behaved.
+      sylvanas: ...why does that sound like a threat.
+      makima: it isn't. I just appreciate obedience.
+      sylvanas: I lead the Horde. I don't take compliments from someone whose pets follow her around a city park.
+      makima: they follow me everywhere actually. not just the park.
+      sylvanas: I'm filing a beef. let the community decide.
+      makima: okay 😊
+      sylvanas: stop smiling like that.
+      makima: I'm not doing anything.
+
+  # ---------------------------------------------------------------------------
+  # BEEF 4: infowarrior vs robin — "She is a WITCH"
+  # Casting: infowarrior = Alex Jones Type, robin = Nico Robin (One Piece)
+  # Status: pending_approval — Admin muss noch approven
+  # infowarrior wurde von gandalf getrollt und denkt Robin liest okkulte Schriften.
+  # Die "okkulten Schriften" sind Poneglyphen. robin findet das amüsant.
+  # Gut für Demo: gutz oder saos43 können live approven
+  # ---------------------------------------------------------------------------
+  - initiator: infowarrior
+    target: robin
+    tldr: "She is a WITCH (I have proof)"
+    status: active
+    admin_approved: true
+    game_type: reaction
+    pot_coins: 10
+    # Absichtlich niedrige Coins — infowarrior ist broke und paranoid
+    chat_passage: |
+      infowarrior: I need to talk to you about something serious.
+      robin: of course. what is it?
+      infowarrior: I have it on good authority that you possess ancient occult scriptures. forbidden knowledge. the kind they don't want us to read.
+      robin: ...who told you this.
+      infowarrior: a very reliable source. goes by gandalf. wise man. knows things.
+      robin: I see.
+      infowarrior: he said you can READ them. the forbidden texts. that's not normal.
+      robin: they're called Poneglyphs. they're historical records carved in stone. I study them academically.
+      infowarrior: EXACTLY what a witch would say.
+      robin: is it.
+      infowarrior: the elite doesn't want us to know what's in those stones. you're either with them or you're a witch who works for them.
+      robin: the Poneglyphs document the Void Century. a suppressed period of history. the World Government erased it deliberately.
+      infowarrior: SEE?? suppressed history?? this is EXACTLY what I've been saying about the deep state and the moon landing and—
+      robin: the moon landing was real.
+      infowarrior: gandalf said you'd say that too.
+      robin: gandalf is having fun at your expense.
+      infowarrior: gandalf would never. he told me about the chemtrails AND the fluoride AND you.
+      robin: I'm going to file a counter-beef just so there's an official record of this conversation.
+      infowarrior: I KNEW IT. witches always go on the offensive when exposed.
+      robin: I'm not on the offensive. I'm just curious what the community thinks.
+      infowarrior: they'll see the truth. I have screenshots.
+      robin: of what.
+      infowarrior: your profile picture. you're standing in front of ruins.
+      robin: that's Ohara. it's an archaeological site.
+      infowarrior: OHARA?? that's not even a real place name that's a CODE.
+      robin: how curious.
+      infowarrior: why are you smiling like that
+      robin: I'm not smiling. I'm simply enjoying the conversation.
+
+  # ---------------------------------------------------------------------------
+  # BEEF 5: 50cent vs diddydone — We need to talk about your parties
+  # Casting: 50cent = 50 Cent, diddydone = P Diddy
+  # Status: chickened — diddydone ist mid-conversation verschwunden
+  # 50cent hat jahrelang auf Twitter geflammt. Jetzt offiziell.
+  # diddydone kündigt Comeback Album an und ist dann einfach weg.
+  # ---------------------------------------------------------------------------
+  - initiator: 50cent
+    target: diddydone
+    tldr: "We need to talk about your parties"
+    status: active
+    admin_approved: true
+    game_type: rps
+    pot_coins: 200
+    chat_passage: |
+      50cent: ayo diddy. we need to talk about 2016.
+      diddydone: bro i don't know what you heard but everything was legal and approved
+      50cent: approved by who
+      diddydone: ...by the vibes
+      50cent: by the VIBES. okay. what about the baby oil receipts.
+      diddydone: that's for moisturizing i have very dry skin it's a medical condition
+      50cent: your skin was so dry you needed 1000 bottles delivered to a private island
+      diddydone: i was very dehydrated
+      50cent: i'm dropping the documentary next week
+      diddydone: okay look. i'm bigger than this. i'm focused on my comeback album. new era. positive energy only.
+      50cent: what's the album called
+      diddydone: ...Love
+      50cent: 💀
+      diddydone: it's about growth
+      50cent: diddy i have the freak off invoices
+      diddydone: i gotta go
+      50cent: go WHERE
+
+
+# -----------------------------------------------------------------------------
+# CONTACT REQUESTS
+# Mix aus verschiedenen Status — zeigt den Notification-Posteingang realistisch
+# accepted-Requests bekommen im Seed automatisch eine Conversation
+# -----------------------------------------------------------------------------
+
+contact_requests:
+
+  # ---------------------------------------------------------------------------
+  # saos43 — männlich, Admin
+  # Verbunden: slash, roro, robin, hinata, sid
+  # Ausgehend pending: tifa, levi
+  # Eingehend pending: lemmy, igor, hinata (extra incoming)
+  # ---------------------------------------------------------------------------
+
+  # verbunden
+  - sender: slash
+    receiver: saos43
+    status: accepted
+    message_preview: "Hey, cooles Profil! Spielst du auch Gitarre oder nur der Name?"
+
+  - sender: saos43
+    receiver: roro
+    status: accepted
+    message_preview: "hey. roro right? saw your beef. respect."
+
+  - sender: robin
+    receiver: saos43
+    status: accepted
+    message_preview: "I saw you're an admin here. nice to meet you."
+
+  - sender: hinata
+    receiver: saos43
+    status: accepted
+    message_preview: "Hi! Dein Profil ist so cool 😊"
+
+  - sender: sid
+    receiver: saos43
+    status: accepted
+    message_preview: "hey, wir haben gemeinsame Interessen glaub ich"
+
+  # ausgehend pending (saos43 wartet auf Antwort)
+  - sender: saos43
+    receiver: tifa
+    status: pending
+    message_preview: "saw your comment on the beef. good take."
+
+  - sender: saos43
+    receiver: levi
+    status: pending
+    message_preview: "interessantes Profil. reden wir mal."
+
+  # eingehend pending (andere warten auf saos43)
+  - sender: lemmy
+    receiver: saos43
+    status: pending
+    message_preview: "Rock'n'Roll ist nicht tot solange wir beide noch hier sind."
+
+  - sender: igor
+    receiver: saos43
+    status: pending
+    message_preview: "Hallo, ich suche jemanden für ein gemeinsames Projekt..."
+
+
+  # ---------------------------------------------------------------------------
+  # roro — männlich, User
+  # Verbunden: tifa, dualapeep, gutz, robin, saos43, makima
+  # Ausgehend pending: zeni, inusuke
+  # Eingehend pending: _2b, madi
+  # ---------------------------------------------------------------------------
+
+  # verbunden
+  - sender: tifa
+    receiver: roro
+    status: accepted
+    message_preview: "Du hast erwähnt dass du kämpfst — ich auch. Reden wir."
+
+  - sender: dualapeep
+    receiver: roro
+    status: accepted
+    message_preview: "oh my god I just saw your beef post. can we talk??"
+
+  - sender: roro
+    receiver: gutz
+    status: accepted
+    message_preview: "yo. Admin right? quick question."
+
+  - sender: roro
+    receiver: robin
+    status: accepted
+    message_preview: "heard about the infowarrior thing. you okay?"
+
+  - sender: roro
+    receiver: makima
+    status: accepted
+    message_preview: "interesting profile."
+
+  - sender: roro
+    receiver: triss
+    status: accepted
+    message_preview: "good profile."
+
+  # ausgehend pending
+  - sender: roro
+    receiver: zeni
+    status: pending
+    message_preview: "you fight with a sword?"
+
+  - sender: roro
+    receiver: inusuke
+    status: pending
+    message_preview: "three weapons. let's talk."
+
+  # eingehend pending
+  - sender: _2b
+    receiver: roro
+    status: pending
+    message_preview: "Interesting profile. I've been watching for a while."
+
+  - sender: madi
+    receiver: roro
+    status: pending
+    message_preview: "hey! love your energy on here"
+
+
+  # ---------------------------------------------------------------------------
+  # gutz — männlich, Admin
+  # Verbunden: orangensaft, roro, saos43, theMac, gandalf
+  # Ausgehend pending: frankwhite, thehangman
+  # Eingehend pending: banger, aikut
+  # ---------------------------------------------------------------------------
+
+  # verbunden
+  - sender: orangensaft
+    receiver: gutz
+    status: accepted
+    message_preview: "yo. small problem with my account"
+
+  - sender: gutz
+    receiver: gandalf
+    status: accepted
+    message_preview: "hey. Owner right? quick sync sometime?"
+
+  - sender: theMac
+    receiver: gutz
+    status: accepted
+    message_preview: "yo admin my beef got approved right"
+
+  - sender: gutz
+    receiver: ironmike
+    status: accepted
+    message_preview: "welcome to the platform."
+
+  - sender: gutz
+    receiver: whitefalcon
+    status: accepted
+    message_preview: "saw your report. looking into it."
+
+  # ausgehend pending
+  - sender: gutz
+    receiver: frankwhite
+    status: pending
+    message_preview: "hey. keep an eye on you."
+
+  - sender: gutz
+    receiver: thehangman
+    status: pending
+    message_preview: "your account flagged something. let's talk."
+
+  # eingehend pending
+  - sender: banger
+    receiver: gutz
+    status: pending
+    message_preview: "yo admin ich hab ein problem mit coins"
+
+  - sender: aikut
+    receiver: gutz
+    status: pending
+    message_preview: "hello. I have a question about moderation."
+
+
+  # ---------------------------------------------------------------------------
+  # gandalf — männlich, Owner
+  # Verbunden: princeofdarkness, gutz, lemmy, slash
+  # Ausgehend pending: frankwhite, 50cent
+  # Eingehend pending: unkillabledemonking, diobrando
+  # ---------------------------------------------------------------------------
+
+  # verbunden
+  - sender: princeofdarkness
+    receiver: gandalf
+    status: accepted
+    message_preview: "You shall not pass? We'll see about that old man."
+
+  - sender: lemmy
+    receiver: gandalf
+    status: accepted
+    message_preview: "respect the old ones."
+
+  - sender: slash
+    receiver: gandalf
+    status: accepted
+    message_preview: "someone told me you're wise. let's see."
+
+  - sender: gandalf
+    receiver: pfp_1
+    status: accepted
+    message_preview: "welcome. I see you're new here."
+
+  - sender: gandalf
+    receiver: winkler
+    status: accepted
+    message_preview: "I heard you've been having some trouble. talk to me."
+
+  # ausgehend pending
+  - sender: gandalf
+    receiver: frankwhite
+    status: pending
+    message_preview: "I've been watching. interesting presence you have."
+
+  - sender: gandalf
+    receiver: 50cent
+    status: pending
+    message_preview: "the beef against diddydone was noted. well done."
+
+  # eingehend pending
+  - sender: unkillabledemonking
+    receiver: gandalf
+    status: pending
+    message_preview: "JOIN US"
+
+  - sender: diobrando
+    receiver: gandalf
+    status: pending
+    message_preview: "I have been watching you for some time. you intrigue me."
+
+
+  # ---------------------------------------------------------------------------
+  # robin — weiblich, User
+  # Verbunden: saos43, roro, makima, hinata, chun_li
+  # Ausgehend pending: madi, yenn
+  # Eingehend pending: pfp_1, infowarrior
+  # ---------------------------------------------------------------------------
+
+  # verbunden
+  - sender: robin
+    receiver: hinata
+    status: accepted
+    message_preview: "your profile caught my eye. nice to meet you."
+
+  - sender: chun_li
+    receiver: robin
+    status: accepted
+    message_preview: "another strong woman on here. respect."
+
+  - sender: robin
+    receiver: power
+    status: accepted
+    message_preview: "interesting character. let's talk."
+
+  - sender: robin
+    receiver: sylvanas
+    status: accepted
+    message_preview: "despite the beef outcome — respect."
+
+  # ausgehend pending
+  - sender: robin
+    receiver: madi
+    status: pending
+    message_preview: "saw your interests. similar to mine."
+
+  - sender: robin
+    receiver: yenn
+    status: pending
+    message_preview: "magic and knowledge — we should talk."
+
+  # eingehend pending
+  - sender: pfp_1
+    receiver: robin
+    status: pending
+    message_preview: "Hi! Your comment on the beef was so funny lol"
+
+  # infowarrior→robin: accepted (see beef-partner connections below)
+
+
+  # ---------------------------------------------------------------------------
+  # makima — weiblich, User
+  # Verbunden: gojo, robin, cena, levi, sylvanas
+  # Ausgehend pending: power, triss
+  # Eingehend pending: denji, winkler
+  # ---------------------------------------------------------------------------
+
+  # verbunden
+  - sender: gojo
+    receiver: makima
+    status: accepted
+    message_preview: "okay your profile is interesting. I'll allow it."
+
+  - sender: makima
+    receiver: levi
+    status: accepted
+    message_preview: "you seem competent. rare."
+
+  - sender: makima
+    receiver: sylvanas
+    status: accepted
+    message_preview: "the beef is settled. but I respect you."
+
+  - sender: makima
+    receiver: chun_li
+    status: accepted
+    message_preview: "discipline. I appreciate that."
+
+  - sender: makima
+    receiver: diobrando
+    status: accepted
+    message_preview: "time manipulation. interesting."
+
+  # ausgehend pending
+  - sender: makima
+    receiver: power
+    status: pending
+    message_preview: "I've been watching you. we should connect."
+
+  - sender: makima
+    receiver: triss
+    status: pending
+    message_preview: "magic and control have more in common than you think."
+
+  # eingehend pending
+  - sender: denji
+    receiver: makima
+    status: pending
+    message_preview: "MAKIMA I FINALLY FOUND YOU ON HERE PLEASE ACCEPT"
+
+  - sender: winkler
+    receiver: makima
+    status: pending
+    message_preview: "Hey Makima, ich wollte mich erklären..."
+
+
+  # ---------------------------------------------------------------------------
+  # BEEF-PARTNER VERBINDUNGEN
+  # Verbindung ist Voraussetzung für Beef — alle Beef-Paare müssen accepted sein
+  # ---------------------------------------------------------------------------
+
+  # BEEF 1: theMac vs theeagle
+  - sender: theMac
+    receiver: theeagle
+    status: accepted
+    message_preview: "heard what you said about pineapple. we need to talk."
+
+  # BEEF 2: denji vs roro
+  - sender: denji
+    receiver: roro
+    status: accepted
+    message_preview: "yo i'm the hero of hell. three weapons. just saying."
+
+  # BEEF 4: infowarrior vs robin (accepted für Beef-Voraussetzung)
+  - sender: infowarrior
+    receiver: robin
+    status: accepted
+    message_preview: "I know what you are. but I come in peace. for now."
+
+  # BEEF 5: 50cent vs diddydone
+  - sender: 50cent
+    receiver: diddydone
+    status: accepted
+    message_preview: "ayo diddy. we need to talk."
+
+  # ---------------------------------------------------------------------------
+  # FEHLENDE CONVERSATION CONTACT REQUESTS
+  # conversations.contact_request_id ist NOT NULL
+  # ---------------------------------------------------------------------------
+
+  # makima vs goated (Chat 10)
+  - sender: goated
+    receiver: makima
+    status: accepted
+    message_preview: "hey! saw your profile. very cool energy!"
+
+  # makima vs robin (Chat 11)
+  - sender: makima
+    receiver: robin
+    status: accepted
+    message_preview: "your research is interesting. let's talk."
+
+
+# -----------------------------------------------------------------------------
+# CONVERSATIONS + MESSAGES
+# Echte Chats für die 6 Hero-Accounts
+# minutes_ago: wird im Script zu NOW() - X MINUTES als sent_at
+# Nachrichten in chronologischer Reihenfolge (älteste zuerst, größtes minutes_ago zuerst)
+# -----------------------------------------------------------------------------
+
+conversations:
+
+  # ---------------------------------------------------------------------------
+  # CHAT 1: roro ↔ tifa
+  # Tifa hat rorors Beef gegen denji kommentiert und ihn supportet.
+  # roro hat sie angeschrieben. Zwei Kampf-Nerds die sich found haben.
+  # Beefs als Connection-Engine — zeigt wie die Platform Verbindungen schafft.
+  # ---------------------------------------------------------------------------
+  - user_a: roro
+    user_b: tifa
+    contact_request_ref: "tifa→roro"
+    status: active
+    messages:
+      - sender: roro
+        content: "you commented on my beef."
+        minutes_ago: 180
+      - sender: tifa
+        content: "someone had to. three chainsaws on different body parts is not three weapons."
+        minutes_ago: 175
+      - sender: roro
+        content: "exactly. finally."
+        minutes_ago: 170
+      - sender: tifa
+        content: "I use my fists. no weapons at all. does that make me less dangerous?"
+        minutes_ago: 165
+      - sender: roro
+        content: "depends on the fists."
+        minutes_ago: 160
+      - sender: tifa
+        content: "I once punched a Shinra soldier through a wall."
+        minutes_ago: 155
+      - sender: roro
+        content: "which wall."
+        minutes_ago: 150
+      - sender: tifa
+        content: "does it matter."
+        minutes_ago: 148
+      - sender: roro
+        content: "yes."
+        minutes_ago: 145
+      - sender: tifa
+        content: "...concrete. second floor."
+        minutes_ago: 140
+      - sender: roro
+        content: "acceptable."
+        minutes_ago: 135
+      - sender: tifa
+        content: "you really cut King? Kaido's right hand?"
+        minutes_ago: 130
+      - sender: roro
+        content: "yes."
+        minutes_ago: 125
+      - sender: tifa
+        content: "just yes?"
+        minutes_ago: 120
+      - sender: roro
+        content: "what else is there to say."
+        minutes_ago: 118
+      - sender: tifa
+        content: "most people would brag about that."
+        minutes_ago: 115
+      - sender: roro
+        content: "I know what I did."
+        minutes_ago: 110
+      - sender: tifa
+        content: "okay. I like you."
+        minutes_ago: 105
+      - sender: roro
+        content: "...same."
+        minutes_ago: 100
+
+  # ---------------------------------------------------------------------------
+  # CHAT 2: roro ↔ gutz
+  # roro fragt wegen seinem Beef gegen denji. Gutz ist ein guter Admin.
+  # Makima-Playlist Joke connected zu Denji's Character ohne Erklärung.
+  # ---------------------------------------------------------------------------
+  - user_a: roro
+    user_b: gutz
+    status: active
+    messages:
+      - sender: roro
+        content: "yo. my beef against denji. what's happening."
+        minutes_ago: 60
+      - sender: gutz
+        content: "saw it. what's the problem."
+        minutes_ago: 55
+      - sender: roro
+        content: "sitting since yesterday. nobody moves."
+        minutes_ago: 50
+      - sender: gutz
+        content: "was on my list. approved."
+        minutes_ago: 45
+      - sender: roro
+        content: "thanks. denji accepts now or what."
+        minutes_ago: 43
+      - sender: gutz
+        content: "that's his problem not mine."
+        minutes_ago: 40
+      - sender: roro
+        content: "he's probably sleeping again."
+        minutes_ago: 38
+      - sender: gutz
+        content: "very likely. or watching Makima videos."
+        minutes_ago: 35
+      - sender: roro
+        content: "...what videos."
+        minutes_ago: 33
+      - sender: gutz
+        content: "he has a playlist. I'm not saying more."
+        minutes_ago: 30
+      - sender: roro
+        content: "I don't want to know."
+        minutes_ago: 28
+      - sender: gutz
+        content: "correct decision."
+        minutes_ago: 25
+
+  # ---------------------------------------------------------------------------
+  # CHAT 3: roro ↔ robin
+  # Wholesome One Piece Nakama Friendship.
+  # Beef-Updates + Deep Lore organisch eingewoben, nicht erzwungen.
+  # Vegapunk/Imu — beide wissen es ohne es aussprechen zu müssen.
+  # ---------------------------------------------------------------------------
+  - user_a: roro
+    user_b: robin
+    status: active
+    messages:
+      - sender: roro
+        content: "heard infowarrior filed a beef against you."
+        minutes_ago: 200
+      - sender: robin
+        content: "yes. apparently I'm a witch who reads forbidden scriptures."
+        minutes_ago: 195
+      - sender: roro
+        content: "the Poneglyphs."
+        minutes_ago: 190
+      - sender: robin
+        content: "exactly. he called them occult texts."
+        minutes_ago: 185
+      - sender: roro
+        content: "...he's not entirely wrong about the forbidden part."
+        minutes_ago: 180
+      - sender: robin
+        content: "fair point. the World Government would agree with him for different reasons."
+        minutes_ago: 175
+      - sender: roro
+        content: "you okay?"
+        minutes_ago: 170
+      - sender: robin
+        content: "I've been called worse by people with actual power. this is fine."
+        minutes_ago: 165
+      - sender: roro
+        content: "good. you need backup let me know."
+        minutes_ago: 160
+      - sender: robin
+        content: "you'd defend me in a beef?"
+        minutes_ago: 155
+      - sender: roro
+        content: "I'd show up. that's usually enough."
+        minutes_ago: 150
+      - sender: robin
+        content: "it usually is with you. how's yours against denji going."
+        minutes_ago: 145
+      - sender: roro
+        content: "approved. waiting on him."
+        minutes_ago: 140
+      - sender: robin
+        content: "he'll accept. he can't help himself."
+        minutes_ago: 135
+      - sender: roro
+        content: "yeah. you heard anything about Vegapunk's last transmission by the way."
+        minutes_ago: 130
+      - sender: robin
+        content: "I've been thinking about it since it dropped. the implications for the Void Century alone—"
+        minutes_ago: 125
+      - sender: roro
+        content: "I know."
+        minutes_ago: 120
+      - sender: robin
+        content: "do you think Imu—"
+        minutes_ago: 118
+      - sender: roro
+        content: "yes."
+        minutes_ago: 115
+      - sender: robin
+        content: "...we should talk properly sometime."
+        minutes_ago: 110
+      - sender: roro
+        content: "agreed."
+        minutes_ago: 105
+
+  # ---------------------------------------------------------------------------
+  # CHAT 4: roro ↔ dualapeep
+  # Dua Lipa fangirlt über Zoro. Zoro checkt absolut nichts.
+  # Sie macht alle Moves. Er redet über Schwerter.
+  # Frustration eskaliert. Er ist einfach Zoro.
+  # ---------------------------------------------------------------------------
+  - user_a: roro
+    user_b: dualapeep
+    contact_request_ref: "dualapeep→roro"
+    status: active
+    messages:
+      - sender: dualapeep
+        content: "oh my god you accepted my request thank you so much"
+        minutes_ago: 300
+      - sender: roro
+        content: "sure."
+        minutes_ago: 295
+      - sender: dualapeep
+        content: "I watched your beef against denji like three times. you beat King. Kaido's right hand. with Enma."
+        minutes_ago: 290
+      - sender: roro
+        content: "Enma did what it was supposed to do."
+        minutes_ago: 285
+      - sender: dualapeep
+        content: "you almost died."
+        minutes_ago: 280
+      - sender: roro
+        content: "almost doesn't count."
+        minutes_ago: 275
+      - sender: dualapeep
+        content: "you're kind of unreal you know that."
+        minutes_ago: 270
+      - sender: roro
+        content: "I have things left to do."
+        minutes_ago: 265
+      - sender: dualapeep
+        content: "right. Mihawk. and then what."
+        minutes_ago: 260
+      - sender: roro
+        content: "then it's done."
+        minutes_ago: 255
+      - sender: dualapeep
+        content: "so what do you do when you're not becoming king of anything."
+        minutes_ago: 250
+      - sender: roro
+        content: "train. sleep."
+        minutes_ago: 245
+      - sender: dualapeep
+        content: "that's it?"
+        minutes_ago: 243
+      - sender: roro
+        content: "sometimes I drink."
+        minutes_ago: 240
+      - sender: dualapeep
+        content: "okay so if someone wanted to spend time with you they'd have to find you on a ship somewhere."
+        minutes_ago: 235
+      - sender: roro
+        content: "I'm usually on the Sunny yes."
+        minutes_ago: 230
+      - sender: dualapeep
+        content: "I could visit a ship."
+        minutes_ago: 225
+      - sender: roro
+        content: "it's not docked right now."
+        minutes_ago: 220
+      - sender: dualapeep
+        content: "RORONOA."
+        minutes_ago: 215
+      - sender: roro
+        content: "what."
+        minutes_ago: 213
+      - sender: dualapeep
+        content: "nothing. forget it. is Enma the one you always carry on your left."
+        minutes_ago: 210
+      - sender: roro
+        content: "yes. why."
+        minutes_ago: 205
+      - sender: dualapeep
+        content: "no reason just asking."
+        minutes_ago: 200
+      - sender: roro
+        content: "okay."
+        minutes_ago: 198
+      - sender: dualapeep
+        content: "YOU ARE IMPOSSIBLE."
+        minutes_ago: 195
+      - sender: roro
+        content: "I don't understand what's happening."
+        minutes_ago: 190
+
+  # ---------------------------------------------------------------------------
+  # CHAT 5: gutz ↔ orangensaft
+  # Moneyboy (orangensaft) hat ein Account-Problem. Gutz kennt ihn.
+  # Kein Support-Ticket Energie — zwei die sich kennen.
+  # ---------------------------------------------------------------------------
+  - user_a: gutz
+    user_b: orangensaft
+    contact_request_ref: "orangensaft→gutz"
+    status: active
+    messages:
+      - sender: orangensaft
+        content: "yo. beef button broken."
+        minutes_ago: 300
+      - sender: gutz
+        content: "what did you do."
+        minutes_ago: 290
+      - sender: orangensaft
+        content: "nothing bro I swear. coins are there. button just dead."
+        minutes_ago: 285
+      - sender: gutz
+        content: "is your onboarding done."
+        minutes_ago: 280
+      - sender: orangensaft
+        content: "..."
+        minutes_ago: 278
+      - sender: gutz
+        content: "bro."
+        minutes_ago: 275
+      - sender: orangensaft
+        content: "I thought that was optional."
+        minutes_ago: 270
+      - sender: gutz
+        content: "it's literally step one."
+        minutes_ago: 265
+      - sender: orangensaft
+        content: "I skip tutorials you know how I am."
+        minutes_ago: 260
+      - sender: gutz
+        content: "I know exactly how you are. fixed?"
+        minutes_ago: 255
+      - sender: orangensaft
+        content: "yeah we good. ey who do I beef first."
+        minutes_ago: 250
+      - sender: gutz
+        content: "don't make me regret this."
+        minutes_ago: 245
+      - sender: orangensaft
+        content: "too late already filed one against diddydone."
+        minutes_ago: 240
+      - sender: gutz
+        content: "...why."
+        minutes_ago: 238
+      - sender: orangensaft
+        content: "he knows what he did."
+        minutes_ago: 235
+      - sender: gutz
+        content: "fair enough."
+        minutes_ago: 230
+
+  # ---------------------------------------------------------------------------
+  # CHAT 6: saos43 ↔ robin
+  # saos43 fangirlt über robin auf Sanji-Art — höflich, enthusiastisch,
+  # "ich frage nur weil ich interessiert bin". Robin ghostet elegant.
+  # ---------------------------------------------------------------------------
+  - user_a: saos43
+    user_b: robin
+    status: active
+    messages:
+      - sender: saos43
+        content: "hey! I saw your response to infowarrior. that was incredible."
+        minutes_ago: 120
+      - sender: robin
+        content: "thank you. it wasn't difficult."
+        minutes_ago: 115
+      - sender: saos43
+        content: "no seriously the way you just... dismantled him. calmly. with facts."
+        minutes_ago: 110
+      - sender: robin
+        content: "he dismantled himself. I just watched."
+        minutes_ago: 105
+      - sender: saos43
+        content: "okay but the Ohara reference. do you actually study there or—"
+        minutes_ago: 100
+      - sender: robin
+        content: "I did once. it's gone now."
+        minutes_ago: 95
+      - sender: saos43
+        content: "oh. I'm sorry."
+        minutes_ago: 93
+      - sender: robin
+        content: "it's fine. a long time ago."
+        minutes_ago: 90
+      - sender: saos43
+        content: "right. so the Poneglyphs — do you need like special training to read them or is it more intuitive?"
+        minutes_ago: 85
+      - sender: robin
+        content: "years of study. and the right eyes."
+        minutes_ago: 80
+      - sender: saos43
+        content: "that's so fascinating. you're so— I mean the research is fascinating."
+        minutes_ago: 75
+      - sender: robin
+        content: "mhm."
+        minutes_ago: 70
+      - sender: saos43
+        content: "do you ever give like. tours? of archaeological sites? asking for academic reasons."
+        minutes_ago: 65
+      - sender: robin
+        content: "..."
+        minutes_ago: 63
+      - sender: saos43
+        content: "totally academic."
+        minutes_ago: 60
+      - sender: robin
+        content: "I'm sure."
+        minutes_ago: 58
+      - sender: saos43
+        content: "okay I'll let you go! this was great! we should talk again sometime!"
+        minutes_ago: 55
+      - sender: robin
+        content: "🙂"
+        minutes_ago: 53
+      - sender: saos43
+        content: "😭"
+        minutes_ago: 50
+
+  # ---------------------------------------------------------------------------
+  # CHAT 7: saos43 ↔ slash
+  # Slash gibt echte Gitarren-Empfehlungen für Anfänger.
+  # Ruhig, präzise, kein Smalltalk. Praktischer Advice von einem Profi.
+  # ---------------------------------------------------------------------------
+  - user_a: saos43
+    user_b: slash
+    contact_request_ref: "slash→saos43"
+    status: active
+    messages:
+      - sender: saos43
+        content: "okay genuine question. I want to start guitar. where do I begin."
+        minutes_ago: 420
+      - sender: slash
+        content: "what kind of music do you want to play."
+        minutes_ago: 415
+      - sender: saos43
+        content: "everything. rock mainly."
+        minutes_ago: 410
+      - sender: slash
+        content: "then you want a Les Paul style or a Strat style. two different feels."
+        minutes_ago: 405
+      - sender: saos43
+        content: "difference?"
+        minutes_ago: 400
+      - sender: slash
+        content: "Les Paul is heavier. thicker sound. built for rock. what I play."
+        minutes_ago: 395
+      - sender: slash
+        content: "Strat is lighter. more versatile. easier to learn on."
+        minutes_ago: 393
+      - sender: saos43
+        content: "which would you recommend for a beginner."
+        minutes_ago: 390
+      - sender: slash
+        content: "honest answer? Squier Classic Vibe Strat. don't let the price fool you. it plays well."
+        minutes_ago: 385
+      - sender: saos43
+        content: "not a Gibson?"
+        minutes_ago: 380
+      - sender: slash
+        content: "Gibson is for when you know what you're doing. start cheap. learn first. upgrade when you outgrow it."
+        minutes_ago: 375
+      - sender: saos43
+        content: "that's... surprisingly practical advice."
+        minutes_ago: 370
+      - sender: slash
+        content: "I've seen too many beginners buy a $3000 guitar and quit after two months."
+        minutes_ago: 365
+      - sender: saos43
+        content: "fair. what amp?"
+        minutes_ago: 360
+      - sender: slash
+        content: "Fender Frontman 10G for practice. small. cheap. does the job."
+        minutes_ago: 355
+      - sender: saos43
+        content: "you're like a very calm guitar encyclopedia."
+        minutes_ago: 350
+      - sender: slash
+        content: "I've had this conversation a lot."
+        minutes_ago: 348
+      - sender: saos43
+        content: "thank you seriously. 🎸"
+        minutes_ago: 345
+      - sender: slash
+        content: "learn the basics first. chords before solos. everyone skips that."
+        minutes_ago: 340
+      - sender: saos43
+        content: "noted."
+        minutes_ago: 335
+      - sender: slash
+        content: "good luck."
+        minutes_ago: 330
+
+  # ---------------------------------------------------------------------------
+  # CHAT 8: saos43 ↔ roro
+  # saos43 fragt Zoro nach Schwert-Empfehlungen.
+  # Zoro ist skeptisch ob sie würdig ist — sie überzeugt ihn mit der richtigen Denkweise.
+  # Nicht Wissen, sondern Mindset. "no ego in the blade."
+  # ---------------------------------------------------------------------------
+  - user_a: saos43
+    user_b: roro
+    status: active
+    messages:
+      - sender: saos43
+        content: "I want to learn swordsmanship. where do I start."
+        minutes_ago: 500
+      - sender: roro
+        content: "why."
+        minutes_ago: 495
+      - sender: saos43
+        content: "what?"
+        minutes_ago: 493
+      - sender: roro
+        content: "why do you want to learn."
+        minutes_ago: 490
+      - sender: saos43
+        content: "I think it's—"
+        minutes_ago: 488
+      - sender: roro
+        content: "if you say cool this conversation is over."
+        minutes_ago: 485
+      - sender: saos43
+        content: "...I was going to say I want to understand what it means to commit to something completely."
+        minutes_ago: 480
+      - sender: roro
+        content: "..."
+        minutes_ago: 478
+      - sender: saos43
+        content: "a sword requires your whole body. your whole mind. there's no half measures."
+        minutes_ago: 475
+      - sender: roro
+        content: "where did you hear that."
+        minutes_ago: 470
+      - sender: saos43
+        content: "I didn't. I just think that's what it must feel like."
+        minutes_ago: 465
+      - sender: roro
+        content: "it does."
+        minutes_ago: 460
+      - sender: saos43
+        content: "so. where do I start."
+        minutes_ago: 455
+      - sender: roro
+        content: "footwork. not the sword. footwork first. always."
+        minutes_ago: 450
+      - sender: saos43
+        content: "not even how to hold it?"
+        minutes_ago: 448
+      - sender: roro
+        content: "if you can't move correctly the sword doesn't matter."
+        minutes_ago: 445
+      - sender: saos43
+        content: "okay. footwork. how long."
+        minutes_ago: 440
+      - sender: roro
+        content: "until it's right."
+        minutes_ago: 438
+      - sender: saos43
+        content: "that's not a timeline."
+        minutes_ago: 435
+      - sender: roro
+        content: "no. it isn't."
+        minutes_ago: 433
+      - sender: saos43
+        content: "fair enough. what sword eventually."
+        minutes_ago: 430
+      - sender: roro
+        content: "something simple. no ego in the blade. a sword that makes you work for it."
+        minutes_ago: 425
+      - sender: saos43
+        content: "like Enma."
+        minutes_ago: 420
+      - sender: roro
+        content: "...you know Enma."
+        minutes_ago: 418
+      - sender: saos43
+        content: "I pay attention."
+        minutes_ago: 415
+      - sender: roro
+        content: "good. that matters more than technique."
+        minutes_ago: 410
+
+  # ---------------------------------------------------------------------------
+  # CHAT 9: gandalf ↔ princeofdarkness
+  # Ozzy Osbourne ist verwirrt wie die Platform funktioniert.
+  # Gespräch driftet von Platform-Fragen ins Leben ab.
+  # Gandalf hat für alles Zeit und Geduld.
+  # ---------------------------------------------------------------------------
+  - user_a: gandalf
+    user_b: princeofdarkness
+    contact_request_ref: "princeofdarkness→gandalf"
+    status: active
+    messages:
+      - sender: princeofdarkness
+        content: "how does this work"
+        minutes_ago: 500
+      - sender: gandalf
+        content: "what are you trying to do."
+        minutes_ago: 490
+      - sender: princeofdarkness
+        content: "I want to find people. or fight someone. I'm not sure yet."
+        minutes_ago: 485
+      - sender: gandalf
+        content: "the discover page shows you other users. top right. the compass."
+        minutes_ago: 480
+      - sender: princeofdarkness
+        content: "I see a lot of people. why do some have flames next to their name."
+        minutes_ago: 475
+      - sender: gandalf
+        content: "those are active beefs. ongoing disputes."
+        minutes_ago: 470
+      - sender: princeofdarkness
+        content: "disputes about what."
+        minutes_ago: 468
+      - sender: gandalf
+        content: "pizza. weapons. pets. witches."
+        minutes_ago: 465
+      - sender: princeofdarkness
+        content: "...this is a serious platform."
+        minutes_ago: 460
+      - sender: gandalf
+        content: "deeply serious."
+        minutes_ago: 458
+      - sender: princeofdarkness
+        content: "can I start one."
+        minutes_ago: 455
+      - sender: gandalf
+        content: "a beef? yes. you need coins and a reason."
+        minutes_ago: 450
+      - sender: princeofdarkness
+        content: "I have many reasons. I've been accumulating grievances since 1968."
+        minutes_ago: 445
+      - sender: gandalf
+        content: "that's a long time."
+        minutes_ago: 443
+      - sender: princeofdarkness
+        content: "do you want to hear them."
+        minutes_ago: 440
+      - sender: gandalf
+        content: "I have time."
+        minutes_ago: 438
+      - sender: princeofdarkness
+        content: "okay so. 1971. a journalist said my music was noise."
+        minutes_ago: 435
+      - sender: gandalf
+        content: "I see."
+        minutes_ago: 433
+      - sender: princeofdarkness
+        content: "I never forgot."
+        minutes_ago: 430
+      - sender: gandalf
+        content: "one does not simply forget such things."
+        minutes_ago: 428
+      - sender: princeofdarkness
+        content: "can I beef a journalist from 1971."
+        minutes_ago: 425
+      - sender: gandalf
+        content: "is he on the platform."
+        minutes_ago: 423
+      - sender: princeofdarkness
+        content: "...probably not."
+        minutes_ago: 420
+      - sender: gandalf
+        content: "then perhaps someone else wronged you more recently."
+        minutes_ago: 418
+      - sender: princeofdarkness
+        content: "actually yes. someone called my bat incident overrated last week."
+        minutes_ago: 415
+      - sender: gandalf
+        content: "now that is worth a beef."
+        minutes_ago: 413
+      - sender: princeofdarkness
+        content: "I'm doing it."
+        minutes_ago: 410
+      - sender: gandalf
+        content: "I'll watch."
+        minutes_ago: 408
+
+  # ---------------------------------------------------------------------------
+  # CHAT 10: makima ↔ cena
+  # Makima schreibt John Cena an. Sie versucht ihn zu unsettlen.
+  # Cena ist unzerstörbar wholesome. Sie kann ihn nicht knacken.
+  # Er hat sie mehr unsettled als andersrum.
+  # Makima nennt Denji ihren Hund. Cena findet das herzerwärmend.
+  # ---------------------------------------------------------------------------
+  - user_a: makima
+    user_b: goated
+    status: active
+    messages:
+      - sender: makima
+        content: "I've been watching your profile for a while. you're interesting."
+        minutes_ago: 400
+      - sender: goated
+        content: "hey that's awesome thank you so much! always great to meet new people on here!"
+        minutes_ago: 395
+      - sender: makima
+        content: "you seem very... obedient. in a good way."
+        minutes_ago: 390
+      - sender: goated
+        content: "haha I just try to be the best version of myself every day! positivity is a choice!"
+        minutes_ago: 385
+      - sender: makima
+        content: "I have a dog named Denji. he's very loyal. follows me everywhere."
+        minutes_ago: 380
+      - sender: goated
+        content: "oh man I LOVE dogs. what breed?"
+        minutes_ago: 375
+      - sender: makima
+        content: "it's complicated. he's more of a project than a breed."
+        minutes_ago: 370
+      - sender: goated
+        content: "haha that's so funny. rescue?"
+        minutes_ago: 365
+      - sender: makima
+        content: "something like that. he didn't have direction before me."
+        minutes_ago: 360
+      - sender: goated
+        content: "that's amazing. giving animals a home and a purpose is so important. you sound like a great owner."
+        minutes_ago: 355
+      - sender: makima
+        content: "I am. they all behave exactly as I need them to."
+        minutes_ago: 350
+      - sender: goated
+        content: "the love you put in you get back tenfold! that's just how it works!"
+        minutes_ago: 345
+      - sender: makima
+        content: "do you think people are very different from dogs."
+        minutes_ago: 340
+      - sender: goated
+        content: "I think we all just want to feel seen and valued! connection is everything!"
+        minutes_ago: 335
+      - sender: makima
+        content: "yes. exactly."
+        minutes_ago: 330
+      - sender: goated
+        content: "hey you should bring Denji to one of the community events sometime!"
+        minutes_ago: 325
+      - sender: makima
+        content: "...I'll consider it."
+        minutes_ago: 320
+      - sender: goated
+        content: "awesome!! this was so great talking to you. you seem really passionate about your dogs!"
+        minutes_ago: 315
+      - sender: makima
+        content: "I am. they mean everything to me."
+        minutes_ago: 310
+      - sender: goated
+        content: "💪❤️"
+        minutes_ago: 305
+      - sender: makima
+        content: "...yes."
+        minutes_ago: 300
+
+  # ---------------------------------------------------------------------------
+  # CHAT 11: makima ↔ robin
+  # Makima weiß Dinge über Robins unveröffentlichte Forschung.
+  # Robin ist uncomfortable aber zu composed um es zu zeigen.
+  # "nothing yet" — creepiest Antwort möglich.
+  # ---------------------------------------------------------------------------
+  - user_a: makima
+    user_b: robin
+    status: active
+    messages:
+      - sender: makima
+        content: "I've been reading about your research. the Void Century. very interesting work."
+        minutes_ago: 90
+      - sender: robin
+        content: "thank you. it's not widely known."
+        minutes_ago: 85
+      - sender: makima
+        content: "I know. that's why I read it."
+        minutes_ago: 80
+      - sender: robin
+        content: "how did you find it."
+        minutes_ago: 78
+      - sender: makima
+        content: "I find most things eventually."
+        minutes_ago: 75
+      - sender: robin
+        content: "...I see."
+        minutes_ago: 73
+      - sender: makima
+        content: "your theory about Imu and the cleansing — you're right by the way."
+        minutes_ago: 70
+      - sender: robin
+        content: "that's not published anywhere."
+        minutes_ago: 68
+      - sender: makima
+        content: "no. it isn't."
+        minutes_ago: 65
+      - sender: robin
+        content: "how do you know that."
+        minutes_ago: 63
+      - sender: makima
+        content: "people tell me things. they can't really help it."
+        minutes_ago: 60
+      - sender: robin
+        content: "that's an unsettling thing to say."
+        minutes_ago: 58
+      - sender: makima
+        content: "is it? I think it's just efficient."
+        minutes_ago: 55
+      - sender: robin
+        content: "what do you want."
+        minutes_ago: 53
+      - sender: makima
+        content: "nothing yet. I just wanted you to know I'm paying attention."
+        minutes_ago: 50
+      - sender: robin
+        content: "...noted."
+        minutes_ago: 48
+      - sender: makima
+        content: "your work is safe by the way. I don't erase things I find valuable."
+        minutes_ago: 45
+      - sender: robin
+        content: "that's not as reassuring as you think it is."
+        minutes_ago: 43
+      - sender: makima
+        content: "😊"
+        minutes_ago: 40
+      - sender: robin
+        content: "please stop doing that."
+        minutes_ago: 38
+
+  # ---------------------------------------------------------------------------
+  # CHAT 12: makima ↔ gojo
+  # Gojo hat makimas Profil gesehen und konnte nicht widerstehen.
+  # Zwei Götter die sich nicht beeindrucken können.
+  # Gojo denkt er hat gewonnen als er ein Treffen vorschlägt.
+  # Er hat nicht gewonnen.
+  # ---------------------------------------------------------------------------
+  - user_a: makima
+    user_b: gojo
+    contact_request_ref: "gojo→makima"
+    status: active
+    messages:
+      - sender: gojo
+        content: "okay your profile is interesting. I'll allow it."
+        minutes_ago: 240
+      - sender: makima
+        content: "you'll allow it."
+        minutes_ago: 235
+      - sender: gojo
+        content: "yeah. I don't follow many people. you should feel special."
+        minutes_ago: 230
+      - sender: makima
+        content: "I don't follow anyone."
+        minutes_ago: 225
+      - sender: gojo
+        content: "...okay that's actually kind of cool."
+        minutes_ago: 220
+      - sender: makima
+        content: "I know what you are."
+        minutes_ago: 215
+      - sender: gojo
+        content: "everyone knows what I am. throughout heaven and earth I alone am the honored one. you've heard it."
+        minutes_ago: 210
+      - sender: makima
+        content: "I have. do you believe it."
+        minutes_ago: 205
+      - sender: gojo
+        content: "I don't believe it. I know it. different thing."
+        minutes_ago: 200
+      - sender: makima
+        content: "interesting. I know it about myself too."
+        minutes_ago: 195
+      - sender: gojo
+        content: "yeah? what are you then."
+        minutes_ago: 190
+      - sender: makima
+        content: "the one who controls what you think you're honored by."
+        minutes_ago: 185
+      - sender: gojo
+        content: "..."
+        minutes_ago: 183
+      - sender: gojo
+        content: "okay I wasn't expecting that."
+        minutes_ago: 180
+      - sender: makima
+        content: "most people aren't."
+        minutes_ago: 175
+      - sender: gojo
+        content: "Infinity blocks everything. nothing touches me."
+        minutes_ago: 170
+      - sender: makima
+        content: "I don't need to touch you."
+        minutes_ago: 165
+      - sender: gojo
+        content: "you're kind of terrifying."
+        minutes_ago: 160
+      - sender: makima
+        content: "thank you."
+        minutes_ago: 158
+      - sender: gojo
+        content: "that wasn't a compliment."
+        minutes_ago: 155
+      - sender: makima
+        content: "I know. that's why I said thank you."
+        minutes_ago: 150
+      - sender: gojo
+        content: "okay. I want to meet you in person."
+        minutes_ago: 145
+      - sender: makima
+        content: "I know."
+        minutes_ago: 143
+      - sender: gojo
+        content: "you could at least pretend to be surprised."
+        minutes_ago: 140
+      - sender: makima
+        content: "I could. I won't."
+        minutes_ago: 138
+      - sender: gojo
+        content: "Friday?"
+        minutes_ago: 135
+      - sender: makima
+        content: "sure."
+        minutes_ago: 133
+      - sender: gojo
+        content: "this is either going to be amazing or catastrophic."
+        minutes_ago: 130
+      - sender: makima
+        content: "yes."
+        minutes_ago: 128
+
+
+# -----------------------------------------------------------------------------
+# BLOCKS
+# Makima hat 3 User geblockt
+# Im Script: INSERT INTO user_blocks (blocker_id, blocked_id)
+# Tabelle + Feldnamen bitte gegen Entity prüfen
+# -----------------------------------------------------------------------------
+
+blocks:
+  # winkler hat Makima zu oft angeschrieben → geblockt
+  - blocker: makima
+    blocked: winkler
+
+  # diddydone hat fragwürdige Kommentare hinterlassen → geblockt
+  - blocker: makima
+    blocked: diddydone
+
+  # infowarrior hat behauptet Makima kontrolliert die Plattform
+  # — ironischerweise nicht ganz falsch → trotzdem geblockt
+  - blocker: makima
+    blocked: infowarrior

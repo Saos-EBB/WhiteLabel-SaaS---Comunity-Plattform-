@@ -537,6 +537,10 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
+### 2026-06-08 (latest)
+- Fix (`beef.service.ts`): `listPublic` gibt jetzt auch Beefs mit Status `game_pending` und `in_game` zurück
+- Feat (`beef.service.ts`, `beef.controller.ts`): `POST /hidden/beef/dev/quick-fight` — Dev-Endpoint überspringt Approval/Waiting/Active und erstellt Beef direkt in `game_pending` (404 in production)
+
 ### 2026-05-31 (latest)
 - Feat (`admin.controller.ts`, `admin.service.ts`): zwei neue Owner-only Endpoints — `GET /admin/owner/coin-transactions` und `GET /admin/owner/cash-transactions`; beide joinen `profiles.nickname` per Raw-SQL und sind durch `OwnerGuard` geschützt
 
