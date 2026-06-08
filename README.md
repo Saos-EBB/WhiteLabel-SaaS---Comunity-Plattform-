@@ -163,6 +163,12 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-08 (5)
+- feat: TicTacToe zeigt Runden-Ergebnis-Banner (wer hat gewonnen / Unentschieden) für 2.5s zwischen den Runden bevor das Spielfeld zurückgesetzt wird
+- fix: GameOverlay startet den 5s-Countdown jetzt nur einmal (beim Übergang von "waiting" → "in_game"), nicht bei jedem Board-Update
+- fix: TicTacToe Timer pausiert während der Rundenauswertung und springt nicht mehr falsch zurück
+- refactor: `round_over` + `round_winner` als explizite State-Felder in TicTacToe-Handler; `advanceToNextRound` läuft serverseitig mit 2.5s Delay
+
 ### 2026-06-08 (4)
 - feat: 5-Minuten-Kommentar-Fenster nach Beef-Ende — `comment_window_until` Spalte (Migration 036), Kommentare bleiben für 5 min nach Spielende offen, dann schließt sich der Bereich automatisch
 - feat: Beefers werden nach dem Schließen des WinnerScreens direkt zur Profilseite (Exil) redirected

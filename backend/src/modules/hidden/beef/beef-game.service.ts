@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GameRegistry } from './games/game.registry';
+import { TicTacToeHandler } from './games/tictactoe.handler';
 import { BeefGame } from './entities/beef-game.entity';
 import { Beef, BeefStatus } from './entities/beef.entity';
 import { BeefStateMachineService, BeefEvent } from './beef-state-machine.service';
@@ -125,18 +126,15 @@ export class BeefGameService {
             game.move_deadline_at = null;
             await this.gameRepo.save(game);
             this.eventBus.emit(AppEvents.beefGameFinished, { beefId, winnerId });
+        } else if (board.round_over) {
+            // Round ended, series continues — hold the winning board for 2.5 s then reset
+            game.move_deadline_at = null;
+            await this.gameRepo.save(game);
+            setTimeout(() => void this.advanceToNextRound(beefId, beef.initiator_id, beef.target_id), 2500);
         } else {
             const timeoutSec = await this.systemSettings.getNumber('game.move_timeout_seconds', 180);
             game.move_deadline_at = new Date(Date.now() + timeoutSec * 1000);
             await this.gameRepo.save(game);
-
-            this.eventBus.emit(AppEvents.beefGameStateUpdate, {
-                beefId,
-                state: 'in_game',
-                gameType: game.game_type,
-                initiatorReady: game.initiator_ready,
-                targetReady: game.target_ready,
-            });
         }
 
         return game;
@@ -198,6 +196,26 @@ export class BeefGameService {
         game.move_deadline_at = null;
         await this.gameRepo.save(game);
         this.eventBus.emit(AppEvents.beefGameFinished, { beefId, winnerId });
+    }
+
+    private async advanceToNextRound(beefId: string, initiatorId: string, targetId: string): Promise<void> {
+        const game = await this.gameRepo.findOne({ where: { beef_id: beefId } });
+        if (!game || !game.state?.round_over) return;
+
+        const handler = this.registry.get('tictactoe') as TicTacToeHandler;
+        const nextState = handler.startNextRound(game.state as any);
+        game.state = nextState;
+        const timeoutSec = await this.systemSettings.getNumber('game.move_timeout_seconds', 180);
+        game.move_deadline_at = new Date(Date.now() + timeoutSec * 1000);
+        await this.gameRepo.save(game);
+
+        const resetBoard = handler.shapeBoardUpdate(nextState, initiatorId, targetId, false);
+        this.eventBus.emit(AppEvents.beefGameBoardUpdate, {
+            beefId,
+            gameType: 'tictactoe',
+            board: resetBoard,
+            finished: false,
+        });
     }
 
     async handleReadyTimeout(beefId: string): Promise<void> {

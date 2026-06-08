@@ -19,6 +19,8 @@ interface TttGameState {
   game_number: number // which game in best-of-3
   game_winner: string | null
   is_draw: boolean
+  round_over: boolean
+  round_winner: string | null // userId or 'draw'
 }
 
 export interface TicTacToeGameProps {
@@ -67,6 +69,8 @@ export function TicTacToeGame({
   const [gameNumber, setGameNumber] = useState(1)
   const [gameWinner, setGameWinner] = useState<string | null>(null)
   const [isDraw, setIsDraw] = useState(false)
+  const [roundOver, setRoundOver] = useState(false)
+  const [roundWinner, setRoundWinner] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [turnTimeLeft, setTurnTimeLeft] = useState(TURN_MS)
   const turnStartRef = useRef<number>(0)
@@ -95,8 +99,6 @@ export function TicTacToeGame({
   useEffect(() => {
     function onBoardUpdate(data: TttGameState & { game_type: string }) {
       if (data.game_type !== 'tictactoe') return
-      turnStartRef.current = Date.now()
-      setTurnTimeLeft(TURN_MS)
       setBoard(data.board)
       setCurrentTurn(data.current_turn)
       setGameWinner(data.game_winner)
@@ -104,6 +106,13 @@ export function TicTacToeGame({
       setInitiatorWins(data.initiator_wins)
       setTargetWins(data.target_wins)
       setGameNumber(data.game_number)
+      setRoundOver(data.round_over ?? false)
+      setRoundWinner(data.round_winner ?? null)
+      if (!data.round_over) {
+        // Only reset timer when a new round starts or a move is made mid-round
+        turnStartRef.current = Date.now()
+        setTurnTimeLeft(TURN_MS)
+      }
     }
 
     socket.on('game:board_update', onBoardUpdate)
@@ -150,7 +159,12 @@ export function TicTacToeGame({
 
   const timerSec = Math.floor(turnTimeLeft / 1000)
   const timerMs  = Math.floor((turnTimeLeft % 1000) / 10)
-  const timerUrgent = turnTimeLeft < 5000 && !gameWinner && !isDraw
+  const timerUrgent = turnTimeLeft < 5000 && !gameWinner && !isDraw && !roundOver
+
+  function roundWinnerName() {
+    if (!roundWinner || roundWinner === 'draw') return null
+    return roundWinner === initiatorId ? initiatorNickname : targetNickname
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -178,15 +192,23 @@ export function TicTacToeGame({
       {gameWinner ? (
         <div className="text-center bg-primary-fixed-dim/10 border border-primary-fixed-dim rounded-xl p-3">
           <p className="font-bold text-primary-fixed-dim">
-            🏆 {winnerName(gameWinner)} gewinnt dieses Spiel!
+            🏆 {winnerName(gameWinner)} gewinnt den Beef!
           </p>
-          {(initiatorWins < 2 && targetWins < 2) && (
-            <p className="text-xs text-on-surface-variant mt-1">Nächstes Spiel startet...</p>
+        </div>
+      ) : roundOver ? (
+        <div className="text-center rounded-xl p-3 border-2 border-yellow-400/60 bg-yellow-400/10 animate-pulse">
+          {roundWinner === 'draw' ? (
+            <p className="font-bold text-yellow-400">🤝 Unentschieden — Runde {gameNumber} wiederholt!</p>
+          ) : (
+            <p className="font-bold text-yellow-400">
+              🏆 {roundWinnerName()} gewinnt Runde {gameNumber}!
+            </p>
           )}
+          <p className="text-xs text-on-surface-variant mt-1">Nächste Runde startet...</p>
         </div>
       ) : isDraw ? (
         <div className="text-center bg-surface-container-high border border-outline-variant rounded-xl p-3">
-          <p className="font-bold text-on-surface">🤝 Unentschieden — Extra-Spiel!</p>
+          <p className="font-bold text-on-surface">🤝 Unentschieden — Extra-Runde!</p>
         </div>
       ) : (
         <div className={`text-center py-3 px-4 rounded-xl border-2 transition-colors ${
@@ -235,7 +257,7 @@ export function TicTacToeGame({
       </div>
 
       {/* Turn timer — BELOW board */}
-      {!gameWinner && !isDraw && (
+      {!gameWinner && !isDraw && !roundOver && (
         <div className="flex flex-col items-center gap-2 pt-1">
           <span className={`text-3xl font-mono font-bold tabular-nums transition-colors ${
             timerUrgent ? 'text-rose-500' : 'text-on-surface'

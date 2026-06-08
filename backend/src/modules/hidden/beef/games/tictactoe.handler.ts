@@ -9,6 +9,8 @@ interface TicTacToeState {
     scores: { initiator: number; target: number };
     game_number: number;   // 1-based, max 3 (+ extras for draws)
     winner_id: string | null;
+    round_over: boolean;                                // true while showing round result
+    round_winner: 'initiator' | 'target' | 'draw' | null; // who won the just-finished round
 }
 
 const WINNING_LINES = [
@@ -32,7 +34,15 @@ export class TicTacToeHandler implements GameHandler {
     readonly realtime = false;
 
     createInitialState(_i: string, _t: string): TicTacToeState {
-        return { board: Array(9).fill(null), turn: 'initiator', scores: { initiator: 0, target: 0 }, game_number: 1, winner_id: null };
+        return {
+            board: Array(9).fill(null),
+            turn: 'initiator',
+            scores: { initiator: 0, target: 0 },
+            game_number: 1,
+            winner_id: null,
+            round_over: false,
+            round_winner: null,
+        };
     }
 
     applyMove(state: TicTacToeState, move: { position: number }, _playerId: string): MoveResult {
@@ -42,6 +52,8 @@ export class TicTacToeHandler implements GameHandler {
             scores: { ...state.scores },
             game_number: state.game_number,
             winner_id: null,
+            round_over: false,
+            round_winner: null,
         };
         next.board[move.position] = state.turn === 'initiator' ? 'X' : 'O';
 
@@ -52,8 +64,10 @@ export class TicTacToeHandler implements GameHandler {
         if (boardResult !== 'draw') {
             const roundWinner = boardResult === 'X' ? 'initiator' : 'target';
             next.scores[roundWinner]++;
+            next.round_winner = roundWinner;
+        } else {
+            next.round_winner = 'draw';
         }
-        // draw = no score change, play again (No-Draw Rule)
 
         const seriesWinner = next.scores.initiator >= 2 ? 'initiator'
             : next.scores.target >= 2 ? 'target' : null;
@@ -63,11 +77,21 @@ export class TicTacToeHandler implements GameHandler {
             return { newState: next, finished: true };
         }
 
-        // reset board for next game
-        next.board = Array(9).fill(null);
-        next.turn = 'initiator';
-        next.game_number++;
+        // Round ended, series continues — keep winning board visible, schedule reset externally
+        next.round_over = true;
         return { newState: next, finished: false };
+    }
+
+    // Called by beef-game.service after showing round result (2.5 s delay)
+    startNextRound(state: TicTacToeState): TicTacToeState {
+        return {
+            ...state,
+            board: Array(9).fill(null),
+            turn: 'initiator',
+            game_number: state.game_number + 1,
+            round_over: false,
+            round_winner: null,
+        };
     }
 
     getWinner(state: TicTacToeState, initiatorId: string, targetId: string): string | null {
@@ -84,6 +108,10 @@ export class TicTacToeHandler implements GameHandler {
     shapeBoardUpdate(state: TicTacToeState, initiatorId: string, targetId: string, finished: boolean): Record<string, any> {
         const currentTurn = state.turn === 'initiator' ? initiatorId : targetId;
         const gameWinner = finished ? this.getWinner(state, initiatorId, targetId) : null;
+        const roundWinnerId =
+            state.round_winner === 'initiator' ? initiatorId :
+            state.round_winner === 'target'    ? targetId :
+            state.round_winner === 'draw'      ? 'draw' : null;
         return {
             board: state.board,
             current_turn: currentTurn,
@@ -91,7 +119,9 @@ export class TicTacToeHandler implements GameHandler {
             target_wins: state.scores.target,
             game_number: state.game_number,
             game_winner: gameWinner,
-            is_draw: false,
+            is_draw: state.round_winner === 'draw' && state.round_over,
+            round_over: state.round_over,
+            round_winner: state.round_over ? roundWinnerId : null,
         };
     }
 }

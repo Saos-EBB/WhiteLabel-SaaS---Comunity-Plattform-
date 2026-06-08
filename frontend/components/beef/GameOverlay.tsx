@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Socket } from 'socket.io-client'
 import { X } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
@@ -165,6 +165,7 @@ export function GameOverlay({
   onClose,
 }: GameOverlayProps) {
   const [phase, setPhase] = useState<GamePhase>('waiting')
+  const phaseRef = useRef<GamePhase>('waiting')
   const [initiatorReady, setInitiatorReady] = useState(false)
   const [targetReady, setTargetReady] = useState(false)
   const [countdown, setCountdown] = useState(5)
@@ -190,6 +191,9 @@ export function GameOverlay({
       .catch(() => { /* non-critical, will be updated via WS */ })
   }, [beefId])
 
+  // Keep phaseRef in sync so socket callbacks don't capture stale closure
+  useEffect(() => { phaseRef.current = phase }, [phase])
+
   // ── Socket listeners ────────────────────────────────────────────────────
   useEffect(() => {
     function onStateUpdate(data: {
@@ -201,8 +205,8 @@ export function GameOverlay({
       setInitiatorReady(data.initiator_ready)
       setTargetReady(data.target_ready)
       if (data.state === 'in_game') {
-        // Both ready → start countdown then switch to playing
-        startCountdown()
+        // Only start countdown when transitioning from waiting — not on every move broadcast
+        if (phaseRef.current === 'waiting') startCountdown()
       } else if (data.state === 'finished') {
         setPhase('finished')
       }
