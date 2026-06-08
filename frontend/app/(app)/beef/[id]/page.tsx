@@ -240,11 +240,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
   const totalCoins    = beef.initiator_coins + beef.target_coins
   const initPct       = totalCoins > 0 ? Math.round(beef.initiator_coins / totalCoins * 100) : 50
 
-  // Socket instance for GameOverlay (only connect when needed)
-  const gameSocket = (isGamePhase || showGameOverlay) ? connectHiddenBeef() : null
-
   return (
-    <>
     <div className="max-w-screen-sm mx-auto px-4 py-6 pb-32">
 
       {/* Header */}
@@ -398,27 +394,22 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
         </div>
       )}
 
-      {/* Game phase banner + open overlay button */}
-      {isGamePhase && (
-        <div className="bg-surface-container border-2 border-primary-fixed-dim rounded-2xl p-4 mb-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="font-bold text-on-surface text-sm">
-                {isGamePending ? '🎮 Spiel wartet auf Spieler' : '🎮 Spiel läuft!'}
-              </p>
-              <p className="text-xs text-on-surface-variant mt-0.5">
-                {beef.game_type ? GAME_LABELS[beef.game_type] : 'Mini-Game'}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowGameOverlay(true)}
-              className="px-4 py-2 rounded-xl bg-primary-fixed-dim text-on-primary-container
-                font-bold text-sm hover:opacity-90 transition-opacity flex-shrink-0"
-            >
-              {isParticipant ? (isGamePending ? 'Bereit machen' : 'Spielen') : 'Zuschauen'}
-            </button>
-          </div>
-        </div>
+      {/* Game section — inline, no screen lock */}
+      {showGameOverlay && beef.game_type && (
+        <GameOverlay
+          beefId={beef.id}
+          gameType={beef.game_type}
+          potCoins={beef.pot_coins ?? 0}
+          initiatorId={beef.initiator_id}
+          targetId={beef.target_id}
+          initiatorNickname={beef.initiator_nickname ?? 'Initiator'}
+          targetNickname={beef.target_nickname ?? 'Target'}
+          initiatorPhotoUrl={initiatorPhotoUrl}
+          targetPhotoUrl={targetPhotoUrl}
+          currentUserId={currentUserId}
+          socket={connectHiddenBeef()}
+          onClose={() => setShowGameOverlay(false)}
+        />
       )}
 
       {/* Voting section — hidden during game phase */}
@@ -540,33 +531,6 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
       </div>
 
     </div>
-
-      {/* Game Overlay — fixed fullscreen, outside scroll container but inside fragment */}
-      {showGameOverlay && gameSocket && beef.game_type && (
-        <GameOverlay
-          beefId={beef.id}
-          gameType={beef.game_type}
-          potCoins={beef.pot_coins ?? 0}
-          initiatorId={beef.initiator_id}
-          targetId={beef.target_id}
-          initiatorNickname={beef.initiator_nickname ?? 'Initiator'}
-          targetNickname={beef.target_nickname ?? 'Target'}
-          initiatorPhotoUrl={initiatorPhotoUrl}
-          targetPhotoUrl={targetPhotoUrl}
-          currentUserId={currentUserId}
-          socket={gameSocket}
-          onClose={() => setShowGameOverlay(false)}
-        />
-      )}
-    </>
   )
 }
 
-// ─── Game label map (kept local to avoid coupling) ───────────────────────────
-
-const GAME_LABELS: Record<string, string> = {
-  rps: 'Rock Paper Scissors',
-  tictactoe: 'Tic Tac Toe',
-  mastermind: 'Mastermind',
-  reaction: 'Reaktionstest',
-}

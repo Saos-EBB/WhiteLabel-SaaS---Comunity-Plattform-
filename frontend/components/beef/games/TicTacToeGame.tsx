@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Socket } from 'socket.io-client'
 import { fetchApi } from '@/lib/api'
+
+const TURN_MS = 15_000
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,8 @@ export function TicTacToeGame({
   const [gameWinner, setGameWinner] = useState<string | null>(null)
   const [isDraw, setIsDraw] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [turnTimeLeft, setTurnTimeLeft] = useState(TURN_MS)
+  const turnStartRef = useRef<number>(0)
 
   // Initiator = X, Target = O
   const myMark: Cell = currentUserId === initiatorId ? 'X' : currentUserId === targetId ? 'O' : null
@@ -104,6 +108,16 @@ export function TicTacToeGame({
     return () => { socket.off('game:board_update', onBoardUpdate) }
   }, [socket])
 
+  // ── Turn timer ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    turnStartRef.current = Date.now()
+    if (gameWinner || isDraw) return
+    const iv = setInterval(() => setTurnTimeLeft(
+      Math.max(0, TURN_MS - (Date.now() - turnStartRef.current))
+    ), 50)
+    return () => clearInterval(iv)
+  }, [currentTurn, gameWinner, isDraw])
+
   // ── Place move ───────────────────────────────────────────────────────────
   async function handleCell(index: number) {
     if (!isMyTurn || !isParticipant || board[index] || submitting || gameWinner || isDraw) return
@@ -132,9 +146,13 @@ export function TicTacToeGame({
     return currentTurn === initiatorId ? initiatorNickname : targetNickname
   }
 
+  const timerSec = Math.floor(turnTimeLeft / 1000)
+  const timerMs  = Math.floor((turnTimeLeft % 1000) / 10)
+  const timerUrgent = turnTimeLeft < 5000 && !gameWinner && !isDraw
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-5 max-w-xs mx-auto w-full">
+    <div className="flex flex-col gap-4 max-w-xs mx-auto w-full">
 
       {/* Score tracker */}
       <div className="flex items-center justify-between bg-surface-container border border-outline-variant rounded-2xl p-3">
@@ -154,7 +172,7 @@ export function TicTacToeGame({
         </div>
       </div>
 
-      {/* Turn / result banner */}
+      {/* Turn / result banner — ABOVE board */}
       {gameWinner ? (
         <div className="text-center bg-primary-fixed-dim/10 border border-primary-fixed-dim rounded-xl p-3">
           <p className="font-bold text-primary-fixed-dim">
@@ -169,11 +187,17 @@ export function TicTacToeGame({
           <p className="font-bold text-on-surface">🤝 Unentschieden — Extra-Spiel!</p>
         </div>
       ) : (
-        <div className="text-center">
-          <p className="text-sm text-on-surface-variant">
+        <div className={`text-center py-3 px-4 rounded-xl border-2 transition-colors ${
+          isMyTurn && isParticipant
+            ? 'border-primary-fixed-dim bg-primary-fixed-dim/10'
+            : 'border-outline-variant bg-surface-container'
+        }`}>
+          <p className={`font-bold text-sm ${
+            isMyTurn && isParticipant ? 'text-primary-fixed-dim' : 'text-on-surface-variant'
+          }`}>
             {isParticipant
               ? isMyTurn
-                ? <span className="font-bold text-on-surface">Du bist dran ({myMark})</span>
+                ? `Du bist dran (${myMark})`
                 : `${turnName()} ist dran`
               : `${turnName()} ist dran`}
           </p>
@@ -207,6 +231,26 @@ export function TicTacToeGame({
           )
         })}
       </div>
+
+      {/* Turn timer — BELOW board */}
+      {!gameWinner && !isDraw && (
+        <div className="flex flex-col items-center gap-2 pt-1">
+          <span className={`text-3xl font-mono font-bold tabular-nums transition-colors ${
+            timerUrgent ? 'text-rose-500' : 'text-on-surface'
+          }`}>
+            {timerSec}.{String(timerMs).padStart(2, '0')}
+          </span>
+          <div className="w-full h-1.5 rounded-full bg-surface-container-high overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-none ${timerUrgent ? 'bg-rose-500' : 'bg-primary-fixed-dim'}`}
+              style={{ width: `${(turnTimeLeft / TURN_MS) * 100}%` }}
+            />
+          </div>
+          <span className="text-xs text-on-surface-variant">
+            {isMyTurn && isParticipant ? 'Sekunden zum Ziehen' : 'Verbleibende Zeit'}
+          </span>
+        </div>
+      )}
 
       {!isParticipant && (
         <p className="text-center text-xs text-on-surface-variant">Zuschauer — read only</p>

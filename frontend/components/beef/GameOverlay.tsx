@@ -263,22 +263,13 @@ export function GameOverlay({
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-surface/85 backdrop-blur-md">
+    <div className="flex flex-col rounded-3xl overflow-hidden border border-outline-variant bg-surface-container mb-4">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant bg-surface-container-high">
         <span className="font-bold text-on-surface text-sm uppercase tracking-widest">
           {GAME_LABELS[gameType]}
         </span>
-        {/* Only spectators can close freely; participants can't accidentally quit */}
-        {!isParticipant && (
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
-          >
-            <X size={20} />
-          </button>
-        )}
-        {isParticipant && phase === 'finished' && (
+        {(!isParticipant || phase === 'finished') && (
           <button
             onClick={onClose}
             className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
@@ -289,10 +280,10 @@ export function GameOverlay({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto flex flex-col">
+      <div className="flex flex-col">
         {/* ── WAITING PHASE ── */}
         {phase === 'waiting' && (
-          <div className="flex flex-col flex-1 p-4 gap-6">
+          <div className="flex flex-col p-4 gap-6">
             <p className="text-center text-xs text-on-surface-variant uppercase tracking-widest font-semibold pt-2">
               Warte auf beide Spieler
             </p>
@@ -330,7 +321,7 @@ export function GameOverlay({
             )}
 
             {/* Pot info */}
-            <div className="mt-auto bg-surface-container border border-outline-variant rounded-2xl p-4 text-center">
+            <div className="bg-surface-container-high border border-outline-variant rounded-2xl p-4 text-center">
               <p className="text-xs text-on-surface-variant mb-1">Im Pot</p>
               <p className="text-2xl font-bold text-primary-fixed-dim">{potCoins} 🪙</p>
               <p className="text-xs text-on-surface-variant mt-1">
@@ -342,16 +333,16 @@ export function GameOverlay({
 
         {/* ── COUNTDOWN PHASE ── */}
         {phase === 'countdown' && (
-          <div className="flex flex-1 items-center justify-center p-4">
+          <div className="flex items-center justify-center py-10">
             <CountdownDisplay seconds={countdown} />
           </div>
         )}
 
         {/* ── PLAYING PHASE ── */}
         {phase === 'playing' && (
-          <div className="flex flex-col flex-1">
+          <div className="flex flex-col">
             {/* Game board */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="p-4">
               {gameType === 'rps' && (
                 <RpsGame
                   beefId={beefId}

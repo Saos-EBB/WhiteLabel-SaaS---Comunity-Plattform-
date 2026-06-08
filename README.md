@@ -163,6 +163,11 @@ Seeded data: 45 demo user profiles, media, conversations, beef challenges, conta
 
 ## Changelog
 
+### 2026-06-08 (3)
+- refactor: Game-Overlay sperrt den Bildschirm nicht mehr — wird jetzt inline auf der Beef-Seite gerendert (kein `fixed inset-0` mehr)
+- feat: TicTacToe 15-Sekunden-Timer pro Zug mit Millisekunden-Anzeige und Fortschrittsbalken (wird rot unter 5s)
+- feat: TicTacToe zeigt über dem Spielfeld prominent wer dran ist, mit farbiger Hervorhebung wenn du am Zug bist
+
 ### 2026-06-08 (2)
 - fix: Spiel-Züge werden jetzt via `game:board_update` Socket-Event in Echtzeit verteilt — RPS, TicTacToe und Mastermind zeigen den Spielstand nach jedem Zug live an
 - fix: TicTacToe `move.index` → `move.position` (Feld-Name-Mismatch zwischen Frontend und Backend behoben)
