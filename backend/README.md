@@ -34,6 +34,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
   - [Setup — `/setup`](#setup--setup)
   - [Support — `/support`](#support--support)
   - [GDPR — `/gdpr`](#gdpr--gdpr)
+  - [Hidden Zone — `/hidden`](#hidden-zone---hidden)
 - [WebSocket Events](#websocket-events)
 - [Frontend](#frontend)
 - [Environment](#environment)
@@ -80,7 +81,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 | `SupportModule` | `src/modules/core/support` | Anonymous contact-support tickets (public endpoint) |
 | `CitiesModule` | `src/modules/core/cities` | City autocomplete search backed by seeded `cities` table |
 | `CommonModule` | `src/common` | `PremiumGuard`, `@RequiresPremium()`, `HttpExceptionFilter`, RLS helpers |
-| `BeefModule` | `src/modules/hidden/beef` | Hidden zone: beef challenges, voting, comments |
+| `BeefModule` | `src/modules/hidden/beef` | Hidden zone: beef challenges, voting, comments, coin pot; real-time game system (RPS/RPSLS, TicTacToe, Mastermind, Reaction) via `BeefGameService` + typed handlers; `HiddenBeefGateway` (`/hidden-beef` WS namespace) |
 | `CoinModule` | `src/modules/hidden/coin` | Hidden zone: coin balance ledger and transactions |
 | `TeethModule` | `src/modules/hidden/teeth` | Hidden zone: tooth collection and tooth-chain crafting |
 | `BadgeModule` | `src/modules/hidden/badge` | Hidden zone: winner/loser/chicken badges with expiry; `GET /hidden/badge/mine` |
@@ -459,6 +460,77 @@ All GDPR routes require JWT.
 
 ---
 
+### Hidden Zone — `/hidden`
+
+All hidden zone routes require JWT. Zone access is enforced client-side only (no server-side unlock flag — JWT is sufficient).
+
+**Coin — `/hidden/coin`**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/hidden/coin/balance` | Own coin balance. First call seeds 100 starting coins (`starting_bonus` transaction). |
+| POST | `/hidden/coin/packages/:package` | Purchase coins via Stripe Embedded Checkout. Packages: `sardine` / `thunfisch` / `hai` / `moby_dick`. Returns `{ clientSecret }`. |
+| POST | `/hidden/coin/webhook` | Stripe webhook for coin purchase confirmation. |
+
+**Teeth — `/hidden/teeth`**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/hidden/teeth` | List own teeth records. |
+| GET | `/hidden/teeth/chains` | List own tooth chains. |
+| POST | `/hidden/teeth/transform` | Convert 15 unconverted teeth into a `tooth_chain`. |
+
+**Badge — `/hidden/badge`**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/hidden/badge/mine` | Own active badges (not yet expired). |
+
+**Beef — `/hidden/beef`**
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/hidden/beef` | JWT | Create a beef challenge. Burns `entry_cost` coins. Body: `{ target_id, tldr, game_type, duration_seconds?, chat_passage? }`. |
+| GET | `/hidden/beef/pending` | JWT (admin) | Beefs awaiting admin approval. |
+| GET | `/hidden/beef/incoming` | JWT | Incoming WAITING beefs (caller is target). |
+| GET | `/hidden/beef/my-active` | JWT | ACTIVE + game-phase beefs involving the caller. |
+| GET | `/hidden/beef/public` | JWT | ACTIVE + game-phase beefs not involving the caller (spectator). |
+| GET | `/hidden/beef/highscore` | JWT | Top 20 players by win count. |
+| GET | `/hidden/beef/exile/status` | JWT | Own exile status: `{ in_exile, exile_until }`. |
+| POST | `/hidden/beef/exile/leave` | JWT | Clear own exile if eligible. |
+| GET | `/hidden/beef/:id` | JWT | Beef detail (includes `game_type`, `game_deadline_at`, `pot_coins`). |
+| POST | `/hidden/beef/:id/respond` | JWT | Target responds: `{ response: 'fight' \| 'chicken' }`. Chicken → 24h exile for both parties. |
+| PATCH | `/hidden/beef/:id/approve` | JWT (admin) | Approve a pending beef. |
+| DELETE | `/hidden/beef/:id/reject` | JWT (admin) | Reject and refund entry cost. |
+| POST | `/hidden/beef/:id/vote` | JWT | Wager coins on a side. Body: `{ coins_wagered }`. |
+| POST | `/hidden/beef/:id/comment` | JWT | Post a comment (open during beef + 5 min post-game window). |
+| GET | `/hidden/beef/:id/comments` | JWT | List comments. |
+| GET | `/hidden/beef/:id/votes` | JWT | Vote distribution. |
+| POST | `/hidden/beef/:id/ready` | JWT | Signal game-ready. GO fires when both players are ready. |
+| POST | `/hidden/beef/:id/move` | JWT | Submit a game move. Body: `{ move: {...} }` — see shapes below. |
+| GET | `/hidden/beef/:id/game` | JWT | Current game state (board, scores, status). |
+| POST | `/hidden/beef/dev/quick-fight` | JWT | **Dev only** (returns 404 in production). Bypasses approval flow; creates a match directly in `game_pending`. |
+
+**Game move shapes:**
+
+| `game_type` | `move` body |
+|---|---|
+| `rps` | `{ choice: 'rock' \| 'paper' \| 'scissors' \| 'lizard' \| 'spock' }` |
+| `tictactoe` | `{ position: 0–8 }` |
+| `mastermind` | `{ guess: string[] }` (4-element color code array) |
+| `reaction` | No REST move — use `game:reaction_click` on the `/hidden-beef` socket instead |
+
+**Game handlers** (`src/modules/hidden/beef/games/`):
+
+| Handler | Notes |
+|---|---|
+| `rps` | 5 choices (RPSLS); each beats exactly 2 others; `BEATS: Record<Choice, [Choice, Choice]>`; 28 unit tests covering all 25 combinations |
+| `tictactoe` | Best-of-3 rounds; 25 s turn timer (in-memory Map); timeout places a random empty cell; `round_over`/`round_winner` state fields for inter-round result banner |
+| `mastermind` | Code-setter vs guesser assigned randomly; 8 guesses max; exact + color pin feedback; time-based winner if neither solves; gateway sends per-role payloads (opponent rows redacted via `fetchSockets()`) |
+| `reaction` | GO delay 200 ms–5 s; `go_sent_at` written to DB **before** broadcasting `game:go`; `game:reaction_ready` handshake — GO only fires after both clients confirm component mount |
+
+---
+
 ## WebSocket Events
 
 Gateway runs on the same port as HTTP. Auth via `auth.token` in socket handshake.
@@ -477,6 +549,24 @@ Gateway runs on the same port as HTTP. Auth via `auth.token` in socket handshake
 | Server → Client | `user.banned` | `{}` | Pushed to the banned user's personal room when an admin bans them or the auto-suspend threshold is reached. Frontend shows the ban screen. |
 | Server → Client | `user.unbanned` | `{}` | Pushed to the user's personal room when an admin lifts a ban. Frontend hides the ban screen. |
 | Server → Client | `ticket.new` | `{}` | Pushed to all connected admin clients (shared `admin` room) whenever a new `admin_tickets` row is created — from reports, profanity nickname/image tickets, or support contact submissions. |
+
+### Hidden Beef Gateway — `/hidden-beef`
+
+Separate Socket.io namespace. JWT verified on connect (`auth.token` or `query.token` in handshake) — unauthenticated clients are disconnected immediately. `client.data.userId` set from token `sub`. Clients join `beef:{id}` rooms.
+
+| Direction | Event | Payload | Description |
+|---|---|---|---|
+| Client → Server | `join_beef` | `beefId: string` | Join a beef room (required to receive game events). |
+| Client → Server | `leave_beef` | `beefId: string` | Leave a beef room. |
+| Client → Server | `game:reaction_ready` | `{ beefId }` | Reaction component mounted; GO fires once both players have signalled. |
+| Client → Server | `game:reaction_click` | `{ beefId }` | Reaction click. `userId` resolved from JWT — never from payload. |
+| Server → Client | `beef:vote_update` | `{ initiator_coins, target_coins, total_votes }` | Vote distribution updated. |
+| Server → Client | `beef:comment_new` | `Comment` | New comment posted. |
+| Server → Client | `beef:closed` | `{ winner_id \| null }` | Beef resolved. |
+| Server → Client | `game:state_update` | `{ state, game_type, initiator_ready, target_ready }` | Lifecycle change (`waiting` → `in_game` → `finished`). |
+| Server → Client | `game:go` | `{ sent_at }` | GO signal for ReactionGame. Fired only after both players send `game:reaction_ready`. |
+| Server → Client | `game:board_update` | Board state (game-type-specific) | State after each move. Mastermind: per-socket payload via `fetchSockets()` — each player sees only own rows; opponent rows redacted. |
+| Server → Client | `game:finished` | `{ winner_id \| null }` | Game over; winner determined. |
 
 ---
 
@@ -537,9 +627,43 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
-### 2026-06-08 (latest)
-- Fix (`beef.service.ts`): `listPublic` gibt jetzt auch Beefs mit Status `game_pending` und `in_game` zurück
-- Feat (`beef.service.ts`, `beef.controller.ts`): `POST /hidden/beef/dev/quick-fight` — Dev-Endpoint überspringt Approval/Waiting/Active und erstellt Beef direkt in `game_pending` (404 in production)
+### 2026-06-08 — Beef Game System: Bugfixes & Security
+- fix(reaction): `go_sent_at` written to `game.state` (new object spread) **before** emitting `game:go` — prevents reaction handler bail-out on click; timing calc is now always valid
+- fix(reaction): `reaction.handler.ts` — `'initiator_placeholder'` → `'initiator'`; `initiator_reaction_ms` was never recorded
+- fix(gateway): `handleReactionClick` resolves `userId` from `client.data.userId` (JWT), not from untrusted payload
+- fix(gateway): `handleConnection` verifies JWT on connect; unauthenticated sockets disconnected immediately; `client.data.userId` set from token `sub`
+- feat(tictactoe): turn timer raised from 15 s to 25 s; timeout places a random empty cell instead of forfeiting (in-memory `Map` per beef, cleared/reset on each move and `advanceToNextRound`)
+- feat(rps): extended to RPSLS (Rock/Paper/Scissors/Lizard/Spock) — `BEATS` changed to `Record<Choice, [Choice, Choice]>`; `getWinner` uses `BEATS[i].includes(t)`; 28 unit tests for all 25 combinations
+- feat(mastermind): gateway emits per-role `game:board_update` payloads via `fetchSockets()` — initiator/target see own rows + opponent attempt count only; `initiatorId`/`targetId` added to `BeefGameBoardUpdateEvent`
+- feat(tictactoe): `round_over`/`round_winner` state fields; `advanceToNextRound` fires after 2.5 s server-side delay
+- feat(beef): migration 036 — `comment_window_until TIMESTAMPTZ`; `addComment` enforces the 5-min post-game window
+
+### 2026-06-08 — Beef Game System: Realtime & Flow
+- fix: migration 035 adds `game_pending` + `in_game` to `chk_beef_status` DB constraint
+- fix: `GET /hidden/beef/:id` now includes `game_type`, `game_deadline_at`, `pot_coins` in response
+- fix: `getMyActive` includes `game_pending`/`in_game` statuses
+- fix: move endpoints require `{ move: {...} }` wrapper in request body
+- fix: game lifecycle events (`waiting`/`in_game`/`finished`) correctly typed and emitted via `TypedEventBus`
+- fix: `startGamePhase` emits `game:state_update` socket event on game start
+- fix: `BeefScheduler` uses `winner_id: IsNull()` guard to prevent re-processing resolved games
+- fix: `game:board_update` emitted from `onGameBoardUpdate` for all game types after every move
+- fix: TicTacToe `move.index` → `move.position`; Mastermind `move.code` → `move.guess` + `realtime = true`
+- feat: `GET /hidden/beef/:id/game` returns current board state (reload/reconnect support)
+- feat: `GET /hidden/beef/public` lists `game_pending`/`in_game` beefs as spectatable
+- feat: `POST /hidden/beef/dev/quick-fight` — dev-only endpoint, bypasses approval flow (returns 404 in production)
+
+### 2026-06-07 — Beef Game System: Initial Implementation
+- feat(beef): full game system — `BeefGameService`, `BeefGameEntity` (JSONB state), game handler interface + `GameRegistry`
+- feat(games): `RpsHandler`, `TicTacToeHandler`, `MastermindHandler`, `ReactionHandler`
+- feat(beef): coin pot — entry cost burned on create + accept; `BeefResolutionService` distributes pot via 10/30/60 split (`SystemSettings`)
+- feat(beef): `POST /hidden/beef/:id/ready` → both ready → game starts → `game:state_update` broadcast
+- feat(chat): `GET /chat/conversations/partners` — returns only users with an active conversation (used by beef target search)
+- feat(beef): `HiddenBeefGateway` added to `BeefModule`; `JwtModule.registerAsync` registered for socket auth
+- fix: migration 034 adds `spent_beef_open` + `spent_beef_accept` to `chk_coin_tx_type` constraint
+- fix: `BeefService.create` rolls back beef record if `spendCoins` throws
+- feat(migrations): migrations 029–036 (game tables, pot coins, AGB consent, verification tokens, conversation per-user soft-deletes, coin tx types, beef game statuses, comment window)
+- test: unit tests for `RpsHandler`, `TicTacToeHandler`, `MastermindHandler`, `BeefResolutionService` coin split
+- chore: cities table seeded with 206 entries
 
 ### 2026-05-31 (latest)
 - Feat (`admin.controller.ts`, `admin.service.ts`): zwei neue Owner-only Endpoints — `GET /admin/owner/coin-transactions` und `GET /admin/owner/cash-transactions`; beide joinen `profiles.nickname` per Raw-SQL und sind durch `OwnerGuard` geschützt

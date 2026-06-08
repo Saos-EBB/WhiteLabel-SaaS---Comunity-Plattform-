@@ -158,7 +158,24 @@ A secret area unlocked by clicking the app logo 13 times within a 3-second windo
 
 `HiddenInitializer` (`components/HiddenInitializer.tsx`) adds/removes the corresponding CSS class on `document.documentElement` whenever `isHidden` or `theme` changes.
 
-**New route:** `app/beef/` — the Beef arena, accessible only when `isHidden = true`; linked from the nav as "Beef 🥊".
+**Routes:** `app/beef/` (arena list) and `app/beef/[id]/` (live match) — accessible only when `isHidden = true`; linked from nav as "Beef 🥊".
+
+**Game overlay** (`components/beef/`):
+
+| Component | Description |
+|---|---|
+| `GameOverlay.tsx` | Inline overlay on the beef detail page; 5-s pre-game countdown; routes `game:state_update` / `game:board_update` socket events to the active game component; `phaseRef` prevents duplicate countdown on board updates |
+| `WinnerScreen.tsx` | Post-game result screen with 5-s countdown; on close redirects to the player's exile profile page |
+| `DevQuickFight.tsx` | Floating dev-only panel (hidden in production) for instant match creation via `POST /hidden/beef/dev/quick-fight` |
+
+**Mini-game components** (`components/beef/games/`):
+
+| Component | Game | Notes |
+|---|---|---|
+| `TicTacToeGame.tsx` | TicTacToe | Best-of-3; 25 s turn timer with ms display + red progress bar below 5 s; round-result banner (2.5 s) between rounds; timer hidden during `roundOver` |
+| `RpsGame.tsx` | Rock / Paper / Scissors / Lizard / Spock | 5-choice grid with emoji; `RpsChoice` includes `'lizard' \| 'spock'` |
+| `MastermindGame.tsx` | Mastermind | Opponent `PlayerBoard` shows attempt count + solved badge when `playerState.redacted`; `MAX_GUESSES = 8` |
+| `ReactionGame.tsx` | Reaction | Registers `game:go` listener **before** emitting `game:reaction_ready` (prevents missed GO); click sends `game:reaction_click { beefId }` — userId never in payload |
 
 **Key files:**
 | File | Role |
@@ -359,6 +376,15 @@ Eight tabs (`owner` sees all; `admin` does not see **Verwaltung**):
 | `/datenschutz` | Full Datenschutzerklärung (7 sections). |
 | `/agb` | AGB. |
 | `/b2b` | B2B landing page. Contact section from `NEXT_PUBLIC_CONTACT_*` env vars. |
+
+### Beef — `beef/` (Hidden Zone)
+
+Accessible only when `isHidden = true`. Route group sits outside `(app)` — not in the standard App Router layout.
+
+| Route | Description |
+|---|---|
+| `/beef` | Arena list page. Four tabs: **Anfragen** (incoming challenges with Fight / Chicken buttons), **Meine Beefs** (active + game-phase), **Public** (spectator view with `🎮 Live!` badge for game-phase), **Highscore** (top 20 leaderboard). All three lists fetched in parallel. |
+| `/beef/[id]` | Live beef detail. Shows participant names, chat passage blockquote, coin vote bar with wager presets (1/5/10/50/100), comment section, winner screen. Mounts `GameOverlay` when beef is in `game_pending`/`in_game` state. |
 
 ---
 
@@ -671,10 +697,35 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Changelog
 
-### 2026-06-08 (latest)
-- Fix (`TicTacToeGame`): Turn-Timer wird nach jedem Zug sofort zurückgesetzt statt kurz auf 0 zu hängen
-- Feat (`beef/page`): Öffentlicher Tab zeigt Beefs im `game_pending`/`in_game`-Status mit gelbem „🎮 Live!"-Badge
-- Feat (`DevQuickFight`): Floating DEV-Panel (nur dev-mode) zum direkten Start eines Testkampfs ohne normalen Beef-Flow
+### 2026-06-08 — Beef Game System: Game Components & Bugfixes
+- fix(reaction): `ReactionGame` registers `game:go` listener **before** emitting `game:reaction_ready` — prevents missed GO signal if backend fires immediately; click payload is `{ beefId }` only (userId from JWT, never from frontend)
+- fix(overlay): `GameOverlay` uses `phaseRef` — 5-s pre-game countdown starts only once on `waiting` → `in_game` transition, not on every `game:board_update`
+- feat(tictactoe): `TicTacToeGame` — round-result banner (2.5 s between rounds) showing winner or draw; timer hidden during `roundOver` state; `TURN_MS` updated to `25_000`
+- feat(rps): `RpsGame` extended to RPSLS — Eidechse (🦎) and Spock (🖖) added to choice grid; `RpsChoice` type includes `'lizard' | 'spock'`
+- feat(mastermind): `MastermindGame` — opponent `PlayerBoard` renders attempt count + solved badge when `playerState.redacted`; `MAX_GUESSES` updated to `8`
+- fix(tictactoe): turn timer resets immediately after each move (no zero-flash)
+- feat(beef/page): `game_pending`/`in_game` beefs shown in Public tab with yellow `🎮 Live!` badge
+- feat(beef): `DevQuickFight` — floating dev panel for instant test match creation (hidden in production)
+
+### 2026-06-08 — Beef Game System: Overlay, Timer & Post-Game
+- refactor(overlay): `GameOverlay` rendered inline on beef detail page (replaced `fixed inset-0` modal overlay)
+- feat(tictactoe): 15-s turn timer with millisecond display, animated red progress bar below 5 s, "Du bist dran" current-player highlight
+- feat(beef): `WinnerScreen` — post-game result with 5-s countdown; redirects to exile profile page after close
+- refactor: `useCountdown` hook extracted to `lib/hooks/useCountdown.ts` — shared by beef detail page and `WinnerScreen`
+- feat(beef/[id]): comment section respects `comment_window_until` — input hidden after the 5-min post-game window
+
+### 2026-06-08 — Beef Game System: Real-time Board Updates
+- fix(overlay): `game:board_update` socket event wired in `GameOverlay` — all game components receive live state after each move
+- feat: `backdrop-blur-md` overlay behind game area
+
+### 2026-06-07 — Beef Game System: Initial Implementation
+- feat(beef/[id]): live beef detail page — participant names, chat passage blockquote, vote bar with wager presets, comment section with send input, winner banner, live countdown timer
+- feat(beef): `GameOverlay` component — mounts correct game component based on `game_type` with 5-s pre-game countdown; listens to `game:state_update` / `game:board_update` on `/hidden-beef` socket
+- feat(beef/games): `TicTacToeGame`, `RpsGame`, `MastermindGame`, `ReactionGame` initial implementations
+- feat(profile): "Beef starten" button on public profile with URL-param pre-fill
+- feat(beef/create): duration picker (15 Min / 1h / 6h / 12h / 24h / 48h); `game_type` selector step
+- feat(chat): beef creation modal gains step 3 — game type selection; `game_type` sent in `POST /hidden/beef`
+- fix(beef): beef target search is now local (no API call on keystroke) via `GET /chat/conversations/partners` fetched once on load
 
 ### 2026-06-01 (latest)
 - Fix (`TopNav/StatusPicker`): Online-Status-Icon reset nach jedem Page-Reload — Root Cause: Backend liefert `statusMessage`/`statusVisible` (camelCase), Picker las aber `status_message`/`status_visible` (snake_case) → immer `undefined`; `user`-Objekt wird jetzt im Zustand-Store persistiert und nach erfolgreichem PUT sofort aktualisiert
