@@ -1,0 +1,26 @@
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { JwtGuard } from '../../../common/guards/jwt.guard';
+import { MatchingService } from './matching.service';
+import { SwipeService } from './swipe.service';
+import { SwipeDto } from './dto/swipe.dto';
+
+@UseGuards(JwtGuard)
+@Controller('discover')
+export class DiscoverController {
+    constructor(
+        private readonly matchingService: MatchingService,
+        private readonly swipeService: SwipeService,
+    ) {}
+
+    @Get('deck')
+    async getDeck(@Req() req: any) {
+        const userId: string = req.user.sub;
+        return this.matchingService.buildDeck(userId);
+    }
+
+    @Post('swipe')
+    async swipe(@Req() req: any, @Body() dto: SwipeDto) {
+        const userId: string = req.user.sub;
+        return this.swipeService.swipe(userId, dto);
+    }
+}
