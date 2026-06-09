@@ -138,15 +138,22 @@ export function NotificationBell() {
         aria-label={`${t.notifications.label}${displayUnread > 0 ? `, ${displayUnread} ungelesen` : ''}`}
         aria-expanded={bellOpen}
         onClick={() => setBellOpen((v) => !v)}
-        className={`relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors ${
-          displayUnread > 0 ? 'animate-pulse ring-2 ring-offset-1 ring-[#73db9a]' : ''
-        }`}
+        className="relative p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+        style={displayUnread > 0 ? {
+          outline: '2px solid var(--color-nav-badge-glow)',
+          outlineOffset: '1px',
+          animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite',
+        } : undefined}
       >
         <Bell size={20} aria-hidden />
         {displayUnread > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error text-[10px] font-bold leading-none"
+            className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none"
+            style={{
+              background: 'var(--color-nav-badge-glow)',
+              color: 'var(--color-surface-container-lowest)',
+            }}
           >
             {displayUnread > 9 ? '9+' : displayUnread}
           </span>
