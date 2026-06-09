@@ -54,6 +54,12 @@ const CSS_GROUPS: { label: string; vars: { name: string; label: string }[] }[] =
       { name: '--color-error-container', label: 'Error Container' },
     ],
   },
+  {
+    label: 'Nav Badges',
+    vars: [
+      { name: '--color-nav-badge-glow', label: 'Badge Glow' },
+    ],
+  },
 ]
 
 const ALL_VARS = CSS_GROUPS.flatMap(g => g.vars.map(v => v.name))
