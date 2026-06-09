@@ -22,7 +22,7 @@ export const leetspeak = {
   nav: {
     home: 'H0m3',
     discover: 'D15c0v3r',
-    matches: 'M4TCH3Z',
+    matches: 'M47ch1n6',
     requests: 'R3qu3575',
     chat: 'Ch47',
     notifications: 'N071f1c4710n5',

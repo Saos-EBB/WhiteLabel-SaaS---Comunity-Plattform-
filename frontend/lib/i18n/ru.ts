@@ -25,7 +25,7 @@ export const ru = {
   nav: {
     home: 'Главная',
     discover: 'Обзор',
-    matches: 'Совпадения',
+    matches: 'Матчинг',
     requests: 'Заявки',
     chat: 'Чат',
     notifications: 'Уведомления',

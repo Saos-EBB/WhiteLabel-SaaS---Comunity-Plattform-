@@ -27,7 +27,7 @@ export const de = {
   nav: {
     home: 'Home',
     discover: 'Discover',
-    matches: 'Matches',
+    matches: 'Matching',
     requests: 'Requests',
     chat: 'Chat',
     notifications: 'Benachrichtigungen',
