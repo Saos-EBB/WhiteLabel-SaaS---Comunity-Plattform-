@@ -67,6 +67,9 @@ export class MatchingService {
                     )::int AS distance_km,
                     mu.file_url AS photo_url
                 FROM profiles p
+                JOIN users u ON u.id = p.user_id
+                    AND u.is_banned = false
+                    AND u.deleted_at IS NULL
                 LEFT JOIN media_uploads mu
                     ON mu.id = p.photo_id AND mu.moderation_status = 'approved'
                 WHERE p.user_id <> $1
@@ -135,6 +138,9 @@ export class MatchingService {
                     NULL::int AS distance_km,
                     mu.file_url AS photo_url
                 FROM profiles p
+                JOIN users u ON u.id = p.user_id
+                    AND u.is_banned = false
+                    AND u.deleted_at IS NULL
                 LEFT JOIN media_uploads mu
                     ON mu.id = p.photo_id AND mu.moderation_status = 'approved'
                 WHERE p.user_id <> $1
