@@ -45,6 +45,13 @@ export function DesktopSidebar() {
         <HiddenLogoButton />
       </div>
 
+      {/* Status + Notifications row */}
+      <div className="shrink-0 border-b border-outline-variant px-4 py-2 flex items-center gap-1">
+        <StatusPicker />
+        {isAdmin ? <AdminBadge /> : <NotificationBell />}
+        <HiddenZoneControls />
+      </div>
+
       {/* Main nav */}
       <nav className="flex-1 py-3 flex flex-col gap-0.5 overflow-y-auto" aria-label="Desktop navigation">
         <div className="px-3 mb-1">
@@ -102,12 +109,6 @@ export function DesktopSidebar() {
           })}
         </div>
 
-        {/* Utility row: status + bell + hidden zone */}
-        <div className="border-t border-outline-variant px-4 py-3 flex items-center gap-1 flex-wrap">
-          <StatusPicker />
-          {isAdmin ? <AdminBadge /> : <NotificationBell />}
-          <HiddenZoneControls />
-        </div>
       </div>
     </aside>
   )
