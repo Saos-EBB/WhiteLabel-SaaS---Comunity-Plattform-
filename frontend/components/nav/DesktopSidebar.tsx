@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import {
-  LayoutDashboard, Compass, MessageCircle, Users, Shield, Swords, Settings, User, Bell,
+  LayoutDashboard, Compass, MessageCircle, Users, Shield, Swords, Settings, User, Bell, Palette, ChevronDown,
 } from 'lucide-react'
 import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
@@ -12,6 +13,7 @@ import { useTranslation } from '@/lib/i18n'
 import { HiddenLogoButton, HiddenZoneControls } from './HiddenShortcut'
 import { StatusPicker } from './StatusPicker'
 import { AdminBadge } from './AdminBadge'
+import { ColorPalettePanel } from '@/components/DevColorPalette'
 
 const ROUTE_TYPES: Record<string, string[]> = {
   '/chat':          ['message'],
@@ -26,6 +28,8 @@ export function DesktopSidebar() {
   const isAdmin       = role === 'admin' || role === 'owner'
   const isHidden      = useHiddenStore((s) => s.isHidden)
   const notifications = useNotificationStore((s) => s.notifications)
+
+  const [colorsOpen, setColorsOpen] = useState(false)
 
   function badgeCount(href: string): number {
     const types = ROUTE_TYPES[href]
@@ -84,7 +88,7 @@ export function DesktopSidebar() {
                   active
                     ? 'text-primary-fixed-dim'
                     : 'text-on-surface-variant hover:text-on-surface'
-                } ${count > 0 && !active ? 'nav-badge-glow' : ''}`}
+                }`}
                 style={{
                   ...(active ? {
                     background: 'var(--color-surface-container)',
@@ -119,6 +123,36 @@ export function DesktopSidebar() {
 
       {/* Bottom section */}
       <div className="shrink-0 border-t border-outline-variant">
+
+        {/* Colors accordion — hidden zone only */}
+        {isHidden && (
+          <div data-dev-palette className="border-b border-outline-variant">
+            <button
+              data-dev-palette
+              onClick={() => setColorsOpen(v => !v)}
+              className="w-full flex items-center gap-3 px-6 py-2 text-sm transition-colors text-on-surface-variant hover:text-on-surface"
+            >
+              <Palette size={16} aria-hidden />
+              <span className="flex-1 text-left">Colors</span>
+              <ChevronDown
+                size={14}
+                aria-hidden
+                className="transition-transform duration-200"
+                style={{ transform: colorsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              />
+            </button>
+            {colorsOpen && (
+              <div
+                data-dev-palette
+                className="px-4 pb-4 overflow-y-auto"
+                style={{ maxHeight: '40vh' }}
+              >
+                <ColorPalettePanel />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Settings + Profile */}
         <div className="py-2 flex flex-col gap-0.5">
           {bottomLinks.map(({ href, label, Icon }) => {

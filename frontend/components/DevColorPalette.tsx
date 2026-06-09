@@ -91,9 +91,7 @@ function rgbToHex(rgb: string): string | null {
 
 function normaliseHex(val: string): string {
   const v = val.trim().toLowerCase()
-  // Already a valid 6-digit hex
   if (/^#[0-9a-f]{6}$/.test(v)) return v
-  // 3-digit shorthand
   if (/^#[0-9a-f]{3}$/.test(v)) {
     return '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]
   }
@@ -109,9 +107,8 @@ function readAllVars(): Record<string, string> {
   return out
 }
 
-// ── Inner component (hooks always run in dev) ─────────────────────────────
-function Inner() {
-  const [open,          setOpen]          = useState(false)
+// ── Shared panel content — used by floating widget + sidebar accordion ────
+export function ColorPalettePanel() {
   const [pickMode,      setPickMode]      = useState(false)
   const [values,        setValues]        = useState<Record<string, string>>({})
   const [pickedColors,  setPickedColors]  = useState<{ bg: string | null; text: string | null; border: string | null } | null>(null)
@@ -124,7 +121,7 @@ function Inner() {
 
   const refresh = useCallback(() => setValues(readAllVars()), [])
 
-  useEffect(() => { if (open) refresh() }, [open, refresh])
+  useEffect(() => { refresh() }, [refresh])
 
   useEffect(() => {
     try {
@@ -133,7 +130,6 @@ function Inner() {
     } catch {}
   }, [])
 
-  // ── Setters ──────────────────────────────────────────────────────────────
   const setVar = (name: string, value: string) => {
     document.documentElement.style.setProperty(name, value)
     setValues(prev => ({ ...prev, [name]: value }))
@@ -209,7 +205,6 @@ function Inner() {
       e.preventDefault()
       e.stopPropagation()
 
-      // Clean up highlight
       el.style.outline = ''
       el.style.outlineOffset = ''
       hoveredElRef.current = null
@@ -221,12 +216,11 @@ function Inner() {
 
       setPickedColors({ bg, text, border })
 
-      // Find matching vars
       const currentVars = readAllVars()
       const matched = new Set<string>()
       for (const [varName, varVal] of Object.entries(currentVars)) {
-        if (bg && varVal === bg)     matched.add(varName)
-        if (text && varVal === text) matched.add(varName)
+        if (bg && varVal === bg)         matched.add(varName)
+        if (text && varVal === text)     matched.add(varName)
         if (border && varVal === border) matched.add(varName)
       }
       setHighlighted(matched)
@@ -248,254 +242,254 @@ function Inner() {
     }
   }, [pickMode])
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div data-dev-palette className="fixed bottom-44 right-4 z-[9997] flex flex-col items-end gap-2 select-none">
+    <div data-dev-palette className="flex flex-col gap-4 select-none">
+
+      {/* Toolbar */}
+      <div data-dev-palette className="flex items-center gap-1 flex-wrap">
+        <button
+          data-dev-palette
+          onClick={() => { setPickMode(p => !p); refresh() }}
+          title="Klick auf ein Element um seine Farben zu sehen"
+          className="text-[11px] px-2 py-1 rounded-lg font-medium transition-all"
+          style={{
+            background: pickMode ? '#7c3aed' : 'var(--color-surface-container-highest)',
+            color: pickMode ? '#fff' : 'var(--color-on-surface-variant)',
+          }}
+        >
+          {pickMode ? '✕ picking…' : '🖱 pick'}
+        </button>
+        <button
+          data-dev-palette
+          onClick={resetAll}
+          title="Alle Inline-Overrides entfernen"
+          className="text-[11px] px-2 py-1 rounded-lg transition-colors"
+          style={{ background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface-variant)' }}
+        >
+          reset
+        </button>
+        <button
+          data-dev-palette
+          onClick={exportCSS}
+          title="CSS in Zwischenablage kopieren"
+          className="text-[11px] px-2 py-1 rounded-lg transition-colors"
+          style={{ background: 'var(--color-surface-container-highest)', color: copied ? '#4ade80' : 'var(--color-on-surface-variant)' }}
+        >
+          {copied ? '✓ copied' : 'copy CSS'}
+        </button>
+      </div>
+
+      {/* Picked element display */}
+      {pickedColors && (
+        <div data-dev-palette className="rounded-xl p-3 flex flex-col gap-2 border border-violet-500/20"
+          style={{ background: 'var(--color-surface-container-high)' }}>
+          <p className="text-[11px] font-semibold" style={{ color: '#a78bfa' }}>Picked element</p>
+          <div className="flex gap-3 flex-wrap">
+            {[
+              { label: 'bg',     color: pickedColors.bg },
+              { label: 'text',   color: pickedColors.text },
+              { label: 'border', color: pickedColors.border },
+            ].filter(c => c.color).map(({ label, color }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div
+                  className="w-5 h-5 rounded-md border border-white/10 flex-shrink-0"
+                  style={{ backgroundColor: color! }}
+                />
+                <div>
+                  <p className="text-[9px] leading-none" style={{ color: 'var(--color-on-surface-variant)' }}>{label}</p>
+                  <p className="text-[10px] font-mono leading-tight" style={{ color: 'var(--color-on-surface)' }}>{color}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {highlighted.size > 0 ? (
+            <p className="text-[10px]" style={{ color: '#a78bfa' }}>
+              ↑ {highlighted.size} passende{highlighted.size === 1 ? ' Variable' : ' Variablen'} hervorgehoben
+            </p>
+          ) : (
+            <p className="text-[10px]" style={{ color: 'var(--color-on-surface-variant)' }}>
+              Kein exakter Treffer
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Presets */}
+      <div data-dev-palette>
+        <p className="text-[10px] uppercase tracking-wider font-semibold mb-2"
+          style={{ color: 'var(--color-on-surface-variant)' }}>
+          Presets
+        </p>
+        <div className="flex gap-1 flex-wrap">
+          {PRESETS.map(p => (
+            <button
+              data-dev-palette
+              key={p.label}
+              onClick={() => applyPreset(p.cls)}
+              className="text-[11px] px-2.5 py-1 rounded-lg transition-colors"
+              style={{ background: 'var(--color-surface-container-high)', color: 'var(--color-on-surface)' }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Saved themes */}
+      {Object.keys(savedThemes).length > 0 && (
+        <div data-dev-palette>
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-2"
+            style={{ color: 'var(--color-on-surface-variant)' }}>
+            Gespeichert
+          </p>
+          <div className="flex gap-1 flex-wrap">
+            {Object.keys(savedThemes).map(name => (
+              <div key={name} className="flex items-center gap-0.5">
+                <button
+                  data-dev-palette
+                  onClick={() => applyCustomTheme(savedThemes[name])}
+                  className="text-[11px] px-2.5 py-1 rounded-l-lg"
+                  style={{ background: '#4c1d95', color: '#c4b5fd' }}
+                >
+                  {name}
+                </button>
+                <button
+                  data-dev-palette
+                  onClick={() => deleteTheme(name)}
+                  className="text-[11px] px-1.5 py-1 rounded-r-lg"
+                  style={{ background: '#4c1d95', color: '#c4b5fd', opacity: 0.6 }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Save current palette */}
+      <div data-dev-palette>
+        {showSaveInput ? (
+          <div className="flex gap-2 items-center">
+            <input
+              data-dev-palette
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveTheme(); if (e.key === 'Escape') setShowSaveInput(false) }}
+              placeholder="Theme-Name…"
+              autoFocus
+              className="flex-1 px-2 py-1 rounded-lg text-xs outline-none"
+              style={{
+                background: 'var(--color-surface-container-high)',
+                border: '1px solid #7c3aed',
+                color: 'var(--color-on-surface)',
+              }}
+            />
+            <button
+              data-dev-palette
+              onClick={saveTheme}
+              className="text-xs px-2 py-1 rounded-lg font-medium"
+              style={{ background: '#7c3aed', color: '#fff' }}
+            >
+              Save
+            </button>
+            <button
+              data-dev-palette
+              onClick={() => setShowSaveInput(false)}
+              className="text-xs"
+              style={{ color: 'var(--color-on-surface-variant)' }}
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            data-dev-palette
+            onClick={() => setShowSaveInput(true)}
+            className="text-[11px] transition-colors"
+            style={{ color: '#a78bfa' }}
+          >
+            + Als Theme speichern
+          </button>
+        )}
+      </div>
+
+      {/* CSS variable groups */}
+      {CSS_GROUPS.map(group => (
+        <div key={group.label} data-dev-palette>
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-2"
+            style={{ color: 'var(--color-on-surface-variant)' }}>
+            {group.label}
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {group.vars.map(({ name, label }) => {
+              const isHighlighted = highlighted.has(name)
+              return (
+                <label
+                  key={name}
+                  data-dev-palette
+                  className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer transition-all"
+                  style={{
+                    background: isHighlighted ? 'rgba(124, 58, 237, 0.15)' : 'transparent',
+                    outline:    isHighlighted ? '1px solid rgba(167, 139, 250, 0.5)' : '1px solid transparent',
+                  }}
+                >
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="w-7 h-7 rounded-lg border border-white/10"
+                      style={{ backgroundColor: values[name] || '#000' }}
+                    />
+                    <input
+                      data-dev-palette
+                      type="color"
+                      value={values[name] || '#000000'}
+                      onChange={e => setVar(name, e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
+                  <span className="flex-1 text-[11px] leading-tight" style={{ color: 'var(--color-on-surface)' }}>
+                    {label}
+                  </span>
+                  <span className="text-[10px] font-mono flex-shrink-0" style={{ color: 'var(--color-on-surface-variant)', opacity: 0.7 }}>
+                    {values[name] || '—'}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+    </div>
+  )
+}
+
+// ── Floating widget (dev-only, bottom-right corner) ───────────────────────
+function FloatingWidget() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div data-dev-palette className="fixed bottom-44 right-4 z-[9997] flex flex-col items-end gap-2">
       {open && (
         <div
           data-dev-palette
           className="flex flex-col w-72 max-h-[72vh] rounded-2xl shadow-2xl overflow-hidden border border-violet-500/30"
           style={{ background: 'var(--color-surface-container)' }}
         >
-          {/* ── Sticky header ── */}
           <div
             data-dev-palette
-            className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between border-b border-violet-500/20"
+            className="sticky top-0 z-10 px-4 py-3 border-b border-violet-500/20"
             style={{ background: 'var(--color-surface-container-high)' }}
           >
             <span className="text-xs font-bold tracking-wider" style={{ color: '#a78bfa' }}>
               🎨 Dev Colors
             </span>
-            <div className="flex gap-1">
-              <button
-                data-dev-palette
-                onClick={() => { setPickMode(p => !p); if (open) refresh() }}
-                title="Klick auf ein Element um seine Farben zu sehen"
-                className="text-[11px] px-2 py-1 rounded-lg font-medium transition-all"
-                style={{
-                  background: pickMode ? '#7c3aed' : 'var(--color-surface-container-highest)',
-                  color: pickMode ? '#fff' : 'var(--color-on-surface-variant)',
-                }}
-              >
-                {pickMode ? '✕ picking…' : '🖱 pick'}
-              </button>
-              <button
-                data-dev-palette
-                onClick={resetAll}
-                title="Alle Inline-Overrides entfernen"
-                className="text-[11px] px-2 py-1 rounded-lg transition-colors"
-                style={{ background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface-variant)' }}
-              >
-                reset
-              </button>
-              <button
-                data-dev-palette
-                onClick={exportCSS}
-                title="CSS in Zwischenablage kopieren"
-                className="text-[11px] px-2 py-1 rounded-lg transition-colors"
-                style={{ background: 'var(--color-surface-container-highest)', color: copied ? '#4ade80' : 'var(--color-on-surface-variant)' }}
-              >
-                {copied ? '✓' : 'copy'}
-              </button>
-            </div>
           </div>
-
-          {/* ── Scrollable body ── */}
-          <div data-dev-palette className="overflow-y-auto flex flex-col gap-5 p-4">
-
-            {/* Picked element display */}
-            {pickedColors && (
-              <div data-dev-palette className="rounded-xl p-3 flex flex-col gap-2 border border-violet-500/20"
-                style={{ background: 'var(--color-surface-container-high)' }}>
-                <p className="text-[11px] font-semibold" style={{ color: '#a78bfa' }}>Picked element</p>
-                <div className="flex gap-3 flex-wrap">
-                  {[
-                    { label: 'bg',     color: pickedColors.bg },
-                    { label: 'text',   color: pickedColors.text },
-                    { label: 'border', color: pickedColors.border },
-                  ].filter(c => c.color).map(({ label, color }) => (
-                    <div key={label} className="flex items-center gap-1.5">
-                      <div
-                        className="w-5 h-5 rounded-md border border-white/10 flex-shrink-0"
-                        style={{ backgroundColor: color! }}
-                      />
-                      <div>
-                        <p className="text-[9px] leading-none" style={{ color: 'var(--color-on-surface-variant)' }}>{label}</p>
-                        <p className="text-[10px] font-mono leading-tight" style={{ color: 'var(--color-on-surface)' }}>{color}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {highlighted.size > 0 ? (
-                  <p className="text-[10px]" style={{ color: '#a78bfa' }}>
-                    ↑ {highlighted.size} passende{highlighted.size === 1 ? ' Variable' : ' Variablen'} unten hervorgehoben
-                  </p>
-                ) : (
-                  <p className="text-[10px]" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    Kein exakter Treffer — Farbe könnte durch Opacity-Modifier abweichen
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Built-in presets */}
-            <div data-dev-palette>
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-2"
-                style={{ color: 'var(--color-on-surface-variant)' }}>
-                Presets
-              </p>
-              <div className="flex gap-1 flex-wrap">
-                {PRESETS.map(p => (
-                  <button
-                    data-dev-palette
-                    key={p.label}
-                    onClick={() => applyPreset(p.cls)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg transition-colors"
-                    style={{ background: 'var(--color-surface-container-high)', color: 'var(--color-on-surface)' }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Saved themes */}
-            {Object.keys(savedThemes).length > 0 && (
-              <div data-dev-palette>
-                <p className="text-[10px] uppercase tracking-wider font-semibold mb-2"
-                  style={{ color: 'var(--color-on-surface-variant)' }}>
-                  Gespeichert
-                </p>
-                <div className="flex gap-1 flex-wrap">
-                  {Object.keys(savedThemes).map(name => (
-                    <div key={name} className="flex items-center gap-0.5">
-                      <button
-                        data-dev-palette
-                        onClick={() => applyCustomTheme(savedThemes[name])}
-                        className="text-[11px] px-2.5 py-1 rounded-l-lg"
-                        style={{ background: '#4c1d95', color: '#c4b5fd' }}
-                      >
-                        {name}
-                      </button>
-                      <button
-                        data-dev-palette
-                        onClick={() => deleteTheme(name)}
-                        className="text-[11px] px-1.5 py-1 rounded-r-lg"
-                        style={{ background: '#4c1d95', color: '#c4b5fd', opacity: 0.6 }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Save current palette */}
-            <div data-dev-palette>
-              {showSaveInput ? (
-                <div className="flex gap-2 items-center">
-                  <input
-                    data-dev-palette
-                    value={saveName}
-                    onChange={e => setSaveName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') saveTheme(); if (e.key === 'Escape') setShowSaveInput(false) }}
-                    placeholder="Theme-Name…"
-                    autoFocus
-                    className="flex-1 px-2 py-1 rounded-lg text-xs outline-none"
-                    style={{
-                      background: 'var(--color-surface-container-high)',
-                      border: '1px solid #7c3aed',
-                      color: 'var(--color-on-surface)',
-                    }}
-                  />
-                  <button
-                    data-dev-palette
-                    onClick={saveTheme}
-                    className="text-xs px-2 py-1 rounded-lg font-medium"
-                    style={{ background: '#7c3aed', color: '#fff' }}
-                  >
-                    Save
-                  </button>
-                  <button
-                    data-dev-palette
-                    onClick={() => setShowSaveInput(false)}
-                    className="text-xs"
-                    style={{ color: 'var(--color-on-surface-variant)' }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <button
-                  data-dev-palette
-                  onClick={() => setShowSaveInput(true)}
-                  className="text-[11px] transition-colors"
-                  style={{ color: '#a78bfa' }}
-                >
-                  + Als Theme speichern
-                </button>
-              )}
-            </div>
-
-            {/* ── CSS variable groups ── */}
-            {CSS_GROUPS.map(group => (
-              <div key={group.label} data-dev-palette>
-                <p className="text-[10px] uppercase tracking-wider font-semibold mb-2"
-                  style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {group.label}
-                </p>
-                <div className="flex flex-col gap-0.5">
-                  {group.vars.map(({ name, label }) => {
-                    const isHighlighted = highlighted.has(name)
-                    return (
-                      <label
-                        key={name}
-                        data-dev-palette
-                        className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl cursor-pointer transition-all"
-                        style={{
-                          background: isHighlighted
-                            ? 'rgba(124, 58, 237, 0.15)'
-                            : 'transparent',
-                          outline: isHighlighted
-                            ? '1px solid rgba(167, 139, 250, 0.5)'
-                            : '1px solid transparent',
-                        }}
-                      >
-                        {/* Color swatch + native color picker */}
-                        <div className="relative flex-shrink-0">
-                          <div
-                            className="w-7 h-7 rounded-lg border border-white/10"
-                            style={{ backgroundColor: values[name] || '#000' }}
-                          />
-                          <input
-                            data-dev-palette
-                            type="color"
-                            value={values[name] || '#000000'}
-                            onChange={e => setVar(name, e.target.value)}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          />
-                        </div>
-
-                        <span className="flex-1 text-[11px] leading-tight" style={{ color: 'var(--color-on-surface)' }}>
-                          {label}
-                        </span>
-
-                        <span className="text-[10px] font-mono flex-shrink-0" style={{ color: 'var(--color-on-surface-variant)', opacity: 0.7 }}>
-                          {values[name] || '—'}
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-
+          <div data-dev-palette className="overflow-y-auto p-4">
+            <ColorPalettePanel />
           </div>
         </div>
       )}
-
-      {/* Toggle button */}
       <button
         data-dev-palette
         onClick={() => setOpen(o => !o)}
@@ -508,8 +502,8 @@ function Inner() {
   )
 }
 
-// ── Public export: dev-only wrapper ──────────────────────────────────────
+// ── Public export: dev-only floating widget ───────────────────────────────
 export function DevColorPalette() {
   if (process.env.NODE_ENV === 'production') return null
-  return <Inner />
+  return <FloatingWidget />
 }
