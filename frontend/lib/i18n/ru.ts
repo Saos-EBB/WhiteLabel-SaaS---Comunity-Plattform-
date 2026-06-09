@@ -298,6 +298,16 @@ export const ru = {
     age: 'лет',
   },
 
+  matches: {
+    title: 'Мэтчи',
+    empty: 'Пока нет мэтчей',
+    emptyDesc: 'Свайпайте в Discover чтобы получить мэтчи',
+    matchedOn: 'Мэтч {date}',
+    openChat: 'Открыть чат',
+    chatUnavailable: 'Чат недоступен',
+    loadError: 'Не удалось загрузить мэтчи',
+  },
+
   requests: {
     title: 'Contact requests',
     tabIncoming: 'Incoming',

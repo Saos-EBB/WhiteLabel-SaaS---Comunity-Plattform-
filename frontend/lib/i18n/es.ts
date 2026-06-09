@@ -298,6 +298,16 @@ export const es = {
     age: 'años',
   },
 
+  matches: {
+    title: 'Matches',
+    empty: 'Aún no tienes matches',
+    emptyDesc: 'Desliza en Discover para conseguir matches',
+    matchedOn: 'Match el {date}',
+    openChat: 'Abrir chat',
+    chatUnavailable: 'Chat no disponible',
+    loadError: 'No se pudieron cargar los matches',
+  },
+
   requests: {
     title: 'Contact requests',
     tabIncoming: 'Incoming',

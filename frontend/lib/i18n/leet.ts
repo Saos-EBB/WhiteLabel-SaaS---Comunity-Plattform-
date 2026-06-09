@@ -284,6 +284,17 @@ export const leetspeak = {
     km: 'km',
     age: 'yr5',
   },
+
+  matches: {
+    title: 'M47ch35',
+    empty: 'n0 m47ch35 y37',
+    emptyDesc: '5w1p3 1n d15c0v3r 70 637 m47ch35',
+    matchedOn: 'm47ch3d 0n {date}',
+    openChat: '0p3n ch47',
+    chatUnavailable: 'ch47 un4v41l4b13',
+    loadError: 'c0u1d n07 104d m47ch35',
+  },
+
   requests: {
     title: 'C0n74c7 r3qu3575',
     tabIncoming: '1nc0m1n6',

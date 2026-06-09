@@ -298,6 +298,16 @@ export const ja = {
     age: '歳',
   },
 
+  matches: {
+    title: 'マッチ',
+    empty: 'まだマッチがありません',
+    emptyDesc: 'Discoverでスワイプしてマッチを集めよう',
+    matchedOn: '{date}にマッチ',
+    openChat: 'チャットを開く',
+    chatUnavailable: 'チャット不可',
+    loadError: 'マッチを読み込めませんでした',
+  },
+
   requests: {
     title: 'Contact requests',
     tabIncoming: 'Incoming',

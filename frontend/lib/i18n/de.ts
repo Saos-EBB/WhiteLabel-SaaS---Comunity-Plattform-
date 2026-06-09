@@ -299,6 +299,16 @@ export const de = {
     age: 'Jahre',
   },
 
+  matches: {
+    title: 'Matches',
+    empty: 'Noch keine Matches',
+    emptyDesc: 'Swipen in Discover um Matches zu sammeln',
+    matchedOn: 'Gematcht am {date}',
+    openChat: 'Chat öffnen',
+    chatUnavailable: 'Chat nicht verfügbar',
+    loadError: 'Matches konnten nicht geladen werden',
+  },
+
   requests: {
     title: 'Kontaktanfragen',
     tabIncoming: 'Eingehend',

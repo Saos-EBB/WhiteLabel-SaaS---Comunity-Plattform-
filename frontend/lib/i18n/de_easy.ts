@@ -297,6 +297,16 @@ export const deEasy = {
     age: 'Jahre',
   },
 
+  matches: {
+    title: 'Matches',
+    empty: 'Noch keine Matches',
+    emptyDesc: 'Wische in Discover um Matches zu finden',
+    matchedOn: 'Match am {date}',
+    openChat: 'Chat öffnen',
+    chatUnavailable: 'Chat nicht verfügbar',
+    loadError: 'Matches konnten nicht geladen werden',
+  },
+
   requests: {
     title: 'Kontaktanfragen',
     tabIncoming: 'Eingehend',

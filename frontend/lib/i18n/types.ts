@@ -320,6 +320,15 @@ export interface Translations {
     km: string
     age: string
   }
+  matches: {
+    title: string
+    empty: string
+    emptyDesc: string
+    matchedOn: string
+    openChat: string
+    chatUnavailable: string
+    loadError: string
+  }
   requests: {
     title: string
     tabIncoming: string
