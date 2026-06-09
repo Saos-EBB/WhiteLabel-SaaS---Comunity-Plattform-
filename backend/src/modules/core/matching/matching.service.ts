@@ -2,6 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
+export interface MatchListItem {
+    match_id: string;
+    conversation_id: string | null;
+    matched_at: string;
+    nickname: string;
+    age: number | null;
+    city: string | null;
+    photo_url: string | null;
+}
+
 export interface DeckCandidate {
     user_id: string;
     nickname: string;
@@ -116,6 +126,47 @@ export class MatchingService {
         );
 
         return this.attachInterests(rows, viewerUserId);
+    }
+
+    async getMatches(userId: string): Promise<MatchListItem[]> {
+        const rows = await this.dataSource.query<any[]>(
+            `
+            SELECT
+                m.id            AS match_id,
+                m.conversation_id,
+                m.created_at    AS matched_at,
+                p.nickname,
+                DATE_PART('year', AGE(p.birthdate::date))::int AS age,
+                p.city,
+                mu.file_url     AS photo_url
+            FROM matches m
+            JOIN profiles p
+                ON p.user_id = CASE
+                    WHEN m.user_a_id = $1 THEN m.user_b_id
+                    ELSE m.user_a_id
+                END
+            JOIN users u ON u.id = p.user_id
+                AND u.is_banned = false
+                AND u.deleted_at IS NULL
+            LEFT JOIN media_uploads mu
+                ON mu.id = p.photo_id AND mu.moderation_status = 'approved'
+            WHERE (m.user_a_id = $1 OR m.user_b_id = $1)
+            ORDER BY m.created_at DESC
+            `,
+            [userId],
+        );
+
+        return rows.map(r => ({
+            match_id: r.match_id,
+            conversation_id: r.conversation_id ?? null,
+            matched_at: r.matched_at instanceof Date
+                ? r.matched_at.toISOString()
+                : String(r.matched_at),
+            nickname: r.nickname,
+            age: r.age != null ? Number(r.age) : null,
+            city: r.city ?? null,
+            photo_url: r.photo_url ?? null,
+        }));
     }
 
     private async buildDeckWithoutLocation(viewerUserId: string): Promise<DeckCandidate[]> {

@@ -18,6 +18,12 @@ export class DiscoverController {
         return this.matchingService.buildDeck(userId);
     }
 
+    @Get('matches')
+    async getMatches(@Req() req: any) {
+        const userId: string = req.user.sub;
+        return this.matchingService.getMatches(userId);
+    }
+
     @Post('swipe')
     async swipe(@Req() req: any, @Body() dto: SwipeDto) {
         const userId: string = req.user.sub;
