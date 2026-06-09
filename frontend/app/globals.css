@@ -21,6 +21,7 @@
   --color-error: #ffb4ab;
   --color-error-container: #93000a;
   --color-nav-badge-glow: #73db9a;
+  --color-logout: #f59e0b;
 }
 
 /* ── Light mode token overrides ─────────────────────────────────────────── */
@@ -43,6 +44,7 @@
   --color-error:                     #B3261E;
   --color-error-container:           #F9DEDC;
   --color-nav-badge-glow:            #7C4DFF;
+  --color-logout:                    #7C4DFF;
 }
 
 /* ── Underground: Brick ─────────────────────────────────────────────────── */
@@ -65,6 +67,7 @@
   --color-error:                     #ff6b4a;
   --color-error-container:           #7a1a0a;
   --color-nav-badge-glow:            #c8a84b;
+  --color-logout:                    #c8a84b;
 }
 
 /* ── Underground: Neon ──────────────────────────────────────────────────── */
@@ -87,6 +90,7 @@
   --color-error:                     #ff0080;
   --color-error-container:           #4a0030;
   --color-nav-badge-glow:            #00fff5;
+  --color-logout:                    #ff0080;
 }
 
 /* ── Desktop: angular design ─────────────────────────────────────────────── */

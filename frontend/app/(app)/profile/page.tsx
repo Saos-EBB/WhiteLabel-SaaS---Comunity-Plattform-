@@ -1036,7 +1036,8 @@ export default function ProfilePage() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors min-h-[52px] mt-12"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-white text-sm font-semibold transition-colors min-h-[52px] mt-12"
+          style={{ background: 'var(--color-logout)' }}
         >
           <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
           {t.profile.logout}
