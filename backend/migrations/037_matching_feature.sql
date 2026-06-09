@@ -4,6 +4,10 @@
 -- Interest flags (all existing rows default to green = liked)
 ALTER TABLE user_interests ADD COLUMN IF NOT EXISTS is_green BOOLEAN NOT NULL DEFAULT true;
 
+-- Ensure each user can have each interest at most once (required for ON CONFLICT upsert)
+ALTER TABLE user_interests DROP CONSTRAINT IF EXISTS user_interests_user_id_interest_id_key;
+ALTER TABLE user_interests ADD CONSTRAINT user_interests_user_id_interest_id_key UNIQUE (user_id, interest_id);
+
 -- Swipe decisions (like / skip)
 -- UNIQUE on (swiper_id, swiped_id) — re-swiping upserts the existing row
 CREATE TABLE IF NOT EXISTS swipes (

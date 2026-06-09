@@ -45,6 +45,8 @@ users:
       - Programmieren
       - Gaming
       - Kaffee
+      - { name: Bürokratie, is_green: false }
+      - { name: Unordnung, is_green: false }
 
   - id: admin2
     email: admin2@demo.example.com
@@ -64,6 +66,8 @@ users:
       - Yoga
       - Lesen
       - Reisen
+      - { name: Lärm, is_green: false }
+      - { name: Unordnung, is_green: false }
 
   # ===========================================================================
   #  OWNER
@@ -87,6 +91,8 @@ users:
       - Programmieren
       - Kaffee
       - Musik
+      - { name: Ungeduld, is_green: false }
+      - { name: Drama, is_green: false }
 
   # ===========================================================================
   #  DIVERSE
@@ -250,6 +256,8 @@ users:
       - Musik
       - Tanzen
       - Film & Serien
+      - { name: Kontrollverlust, is_green: false }
+      - { name: Drama, is_green: false }
 
   - id: f8
     email: f8@demo.example.com
@@ -270,6 +278,8 @@ users:
       - Sprachen
       - Reisen
       - Kunst
+      - { name: Ignoranz, is_green: false }
+      - { name: Drama, is_green: false }
 
   - id: f9
     email: f9@demo.example.com
@@ -389,6 +399,8 @@ users:
       - Fotografie
       - Musik
       - Reisen
+      - { name: Lärm, is_green: false }
+      - { name: Unordnung, is_green: false }
 
   - id: m2
     email: m2@demo.example.com
