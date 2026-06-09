@@ -261,6 +261,13 @@ Filters: city (text, Enter to apply), gender, looking_for, age range (min/max), 
 
 Each profile card shows photo, name + age, city, up to 3 interest chips, and an `OnlineIndicator` for status. "Verbinden" button posts to `POST /chat/requests`; the card switches to "Anfrage gesendet ✓" optimistically. Nickname links to `/profile/[nickname]`. Connected profiles show "Chatten →" and a "Verbindung trennen" button; the latter opens a bottom sheet confirmation and calls `DELETE /chat/connections/:userId` (deletes chat for both sides).
 
+#### `/matches` (nav label: "Matching")
+Two-tab Matching hub.
+
+**Swipen tab** — swipe deck powered by `GET /discover/deck`. Each card shows profile photo, name + age + city, interest chips (green/red flag styling), and a compatibility score bar. Like (Heart) / Skip (X) buttons call `POST /discover/swipe`. On mutual like a match-flash banner appears at the top of the page with a button to jump straight to the Matches tab; the next card advances automatically after 2 s.
+
+**Matches tab** — grid of mutual matches from `GET /discover/matches`. Each card shows approved photo, nickname, age, city, and a "Chat öffnen" button (links to `GET /chat/conversations/:id`). Skeleton loading state on fetch; empty state with prompt to go swipe; error state.
+
 #### `/requests`
 Incoming and outgoing contact requests. Accept / decline.
 
@@ -397,7 +404,7 @@ Sticky left sidebar, desktop only (`hidden md:flex`). Layout top→bottom:
 
 1. **Logo row** — `HiddenLogoButton` (6-click Easter egg).
 2. **Status + Coins row** — `StatusPicker` (online status dropdown) + `HiddenZoneControls` (coin balance + shop, Hidden Zone only).
-3. **Main nav** — Home, Notifications, Discover, Chat, Requests/Admin, Beef (Hidden Zone). Each tab shows a coloured badge count for its unread notification types; the badge colour is `--color-nav-badge-glow` (theme-configurable).
+3. **Main nav** — Home, Notifications, Discover, Matching, Chat, Requests/Admin, Beef (Hidden Zone). Each tab shows a coloured badge count for its unread notification types; the badge colour is `--color-nav-badge-glow` (theme-configurable).
 4. **Colors accordion** — `ColorPalettePanel` collapsible section, Hidden Zone only. Live CSS-variable editor directly in the sidebar.
 5. **Settings + Profile** links.
 6. **AdminBadge** — admin/owner only.
@@ -414,7 +421,7 @@ Sticky header, **mobile only** (`md:hidden`).
 - Settings + Profile icon links.
 
 ### `BottomNav` — `components/nav/BottomNav.tsx`
-Fixed bottom bar, mobile only (`md:hidden`). Five items: Home, Discover, Requests, Chat, Profile. Active item gets a filled icon in the primary color.
+Fixed bottom bar, mobile only (`md:hidden`). Five items: Home, Discover, Matching, Chat, Profile. Active item gets a filled icon in the primary color.
 
 ---
 
@@ -733,6 +740,13 @@ Posts to `POST /hidden/beef/dev/quick-fight` (backend returns 404 in production)
 ---
 
 ## Changelog
+
+### 2026-06-09 — Matching Page: Swipe + Matches tabs; nav rename
+- feat(matches): `/matches` page is now a two-tab Matching hub — "Swipen" (swipe deck with like/skip + match-flash banner) and "Matches" (mutual matches list with photo, age, city, chat button)
+- feat(matching): match-flash banner lifted to page level; shows on mutual match with a "Zu deinen Matches" button to switch tabs; card advances after 2 s
+- refactor(discover): Discover page is now search-only — swipe tab removed, all swipe code moved to `/matches`
+- feat(i18n): `matches.*` section added in all 9 languages (de/en/es/fr/it/ja/ru/de_easy/leet)
+- feat(i18n): `nav.matches` renamed to "Matching" in all 9 languages; BottomNav and DesktopSidebar updated
 
 ### 2026-06-09 — Colors Tool in Hidden Mode Sidebar; Dev Button removed
 - `ColorPalettePanel` als Akkordion in der Desktop-Sidebar (nur Hidden Zone) — floating Button entfernt

@@ -80,6 +80,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 | `SetupModule` | `src/modules/core/setup` | One-time owner account bootstrap; setup-status check |
 | `SupportModule` | `src/modules/core/support` | Anonymous contact-support tickets (public endpoint) |
 | `CitiesModule` | `src/modules/core/cities` | City autocomplete search backed by seeded `cities` table |
+| `MatchingModule` | `src/modules/core/matching` | Swipe deck (interest + distance scoring), swipe action (mutual like → match + conversation), matches list (`GET /discover/matches`) |
 | `CommonModule` | `src/common` | `PremiumGuard`, `@RequiresPremium()`, `HttpExceptionFilter`, RLS helpers |
 | `BeefModule` | `src/modules/hidden/beef` | Hidden zone: beef challenges, voting, comments, coin pot; real-time game system (RPS/RPSLS, TicTacToe, Mastermind, Reaction) via `BeefGameService` + typed handlers; `HiddenBeefGateway` (`/hidden-beef` WS namespace) |
 | `CoinModule` | `src/modules/hidden/coin` | Hidden zone: coin balance ledger and transactions |
@@ -231,6 +232,18 @@ All protected routes require `Authorization: Bearer <accessToken>`.
 | DELETE | `/profile/me/block/:userId` | JWT | Unblock a user. |
 | GET | `/profile/user/:userId` | JWT | Get nickname and photo_id for any account UUID. Used by frontend to resolve partner names in chat. |
 | GET | `/profile/:nickname` | — | Public profile by nickname (published profiles only). Returns `is_online`, `status_visible`, `status_message`, `last_active_at`, `photo_needs_review`, `gender`, `looking_for`, `birthdate`. Fields masked by `show_*` flags: `bio`, `city`, `gender`, `looking_for`, `birthdate` return `null` when hidden; `audio_url` returns `null` when `show_audio = false`. Interests endpoint (`/:nickname/interests`) returns `[]` when `show_interests = false`. |
+
+---
+
+### Discover / Matching — `/discover`
+
+All routes require JWT.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/discover/deck` | Returns a scored deck of up to 20 candidates for the current user. Excludes self, already-swiped (likes permanent, skips expire after 30 days), banned/deleted users. If the viewer has a location, uses PostGIS `ST_DWithin` for radius-based scoring (distance component). Interest scores: +2 for shared green/red-flag interest, −1 for clash. |
+| POST | `/discover/swipe` | Record a swipe. Body: `{ target_user_id: UUID, action: 'like' \| 'skip' }`. On mutual like, creates a `Match` row (canonical pair order: `user_a_id < user_b_id`) and a `Conversation`. Returns `{ matched: boolean, conversation_id: string \| null }`. |
+| GET | `/discover/matches` | Returns all mutual matches for the authenticated user, excluding partners who are banned or deleted. Response: `[{ match_id, conversation_id, matched_at, nickname, age, city, photo_url }]` ordered by `matched_at DESC`. |
 
 ---
 
@@ -632,6 +645,14 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 ---
 
 ## Changelog
+
+### 2026-06-09 — Matching Feature: Swipe Deck, Swipe Action, Matches List
+- feat(matching): new `MatchingModule` (`DiscoverController`, `MatchingService`) wired into `AppModule`
+- feat(matching): `GET /discover/deck` — scored candidate deck (interest overlap + PostGIS distance scoring); excludes self, banned/deleted, and already-swiped users (likes permanent, skips expire 30 days)
+- feat(matching): `POST /discover/swipe` — records like/skip; mutual like creates `Match` row (canonical pair order: `user_a_id < user_b_id`) + `Conversation`; returns `{ matched, conversation_id }`
+- feat(matching): `GET /discover/matches` — returns all mutual matches with partner profile, approved photo, and `conversation_id` (nullable); ordered by `matched_at DESC`
+- feat(profile): `PATCH /profile/me/interests/:id` — toggle `is_green` flag on user interests
+- feat(seed): expanded interest catalog ~3× + red-flag interests for demo users
 
 ### 2026-06-08 — Beef Game System: Bugfixes & Security
 - fix(reaction): `go_sent_at` written to `game.state` (new object spread) **before** emitting `game:go` — prevents reaction handler bail-out on click; timing calc is now always valid
