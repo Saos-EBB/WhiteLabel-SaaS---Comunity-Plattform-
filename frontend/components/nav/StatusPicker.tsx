@@ -103,7 +103,7 @@ export function StatusPicker() {
         <div
           role="dialog"
           aria-label={t.status.choose}
-          className="fixed top-16 left-2 right-2 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-56 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
+          className="fixed top-16 left-2 right-2 md:absolute md:left-0 md:right-auto md:top-full md:mt-2 md:w-56 rounded-2xl bg-surface-container border border-outline-variant shadow-xl z-50 overflow-hidden"
         >
           <div className="px-4 py-3 border-b border-outline-variant">
             <span className="text-sm font-semibold text-on-surface">Status</span>
