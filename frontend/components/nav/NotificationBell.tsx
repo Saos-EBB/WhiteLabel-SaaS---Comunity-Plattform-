@@ -33,9 +33,9 @@ const TYPE_ROUTES: Record<NotificationType, string> = {
   ban:           '/notifications',
   request:       '/requests',
   beef_request:  '/beef',
-  beef_accepted: '/beef',
-  beef_won:      '/beef',
-  beef_lost:     '/beef',
+  beef_accepted: '/notifications',
+  beef_won:      '/notifications',
+  beef_lost:     '/notifications',
 }
 
 function relativeTime(

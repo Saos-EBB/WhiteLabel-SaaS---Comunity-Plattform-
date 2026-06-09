@@ -15,9 +15,9 @@ import { AdminBadge } from './AdminBadge'
 
 const ROUTE_TYPES: Record<string, string[]> = {
   '/chat':          ['message'],
-  '/notifications': ['match', 'system', 'ban'],
+  '/notifications': ['match', 'system', 'ban', 'beef_accepted', 'beef_won', 'beef_lost'],
   '/requests':      ['request'],
-  '/beef':          ['beef_request', 'beef_accepted', 'beef_won', 'beef_lost'],
+  '/beef':          ['beef_request'],
 }
 
 export function DesktopSidebar() {
