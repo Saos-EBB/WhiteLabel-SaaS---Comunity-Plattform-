@@ -29,7 +29,7 @@ The platform comes in two configurations sharing the same backbone:
 GDPR-compliant infrastructure (AES-256, pseudonymization, Art. 15 export), accessibility by design (WCAG-oriented), real-time chat, Stripe subscriptions, full moderation suite, PostGIS-based discovery, vulnerable user protection.
 
 **Dark Mode** — the engagement & monetization layer
-Live public "beef" battle system (15min–48h), coin economy with Stripe coin packages, weighted lottery payouts, hidden zone access (rotating film passwords), highscore leaderboard, exile mechanic with auto-resolution.
+Live public "beef" battle system (15min–48h), coin economy with Stripe coin packages, weighted lottery payouts, hidden zone access (rotating film passwords), highscore leaderboard, exile mechanic with auto-resolution. Hidden Zone also exposes a live CSS theme editor (Colors panel) directly in the sidebar.
 
 ### License Tiers
 

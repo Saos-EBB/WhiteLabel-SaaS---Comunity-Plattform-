@@ -8,7 +8,6 @@ import { DesktopSidebar } from '@/components/nav/DesktopSidebar'
 import AuthProvider from '@/components/AuthProvider'
 import ToastNotification from '@/components/ui/ToastNotification'
 import { HiddenEntryOverlay } from '@/components/HiddenEntryOverlay'
-import { DevColorPalette } from '@/components/DevColorPalette'
 import { useTranslation } from '@/lib/i18n'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -34,7 +33,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <BottomNav />
         <ToastNotification />
         <HiddenEntryOverlay />
-        <DevColorPalette />
       </div>
     </AuthProvider>
   )

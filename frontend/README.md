@@ -26,6 +26,7 @@ Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backen
   - [App — `(app)`](#app--app)
   - [Public — `(public)`](#public--public)
 - [Navigation](#navigation)
+  - [DesktopSidebar](#desktopsidebar--componentsnav-desktopsidebartsx)
   - [TopNav](#topnav--componentsnav-topnavtsx)
   - [BottomNav](#bottomnav--componentsnav-bottomnavtsx)
 - [Auth](#auth)
@@ -391,22 +392,29 @@ Accessible only when `isHidden = true`. Route group sits outside `(app)` — not
 
 ## Navigation
 
+### `DesktopSidebar` — `components/nav/DesktopSidebar.tsx`
+Sticky left sidebar, desktop only (`hidden md:flex`). Layout top→bottom:
+
+1. **Logo row** — `HiddenLogoButton` (6-click Easter egg).
+2. **Status + Coins row** — `StatusPicker` (online status dropdown) + `HiddenZoneControls` (coin balance + shop, Hidden Zone only).
+3. **Main nav** — Home, Notifications, Discover, Chat, Requests/Admin, Beef (Hidden Zone). Each tab shows a coloured badge count for its unread notification types; the badge colour is `--color-nav-badge-glow` (theme-configurable).
+4. **Colors accordion** — `ColorPalettePanel` collapsible section, Hidden Zone only. Live CSS-variable editor directly in the sidebar.
+5. **Settings + Profile** links.
+6. **AdminBadge** — admin/owner only.
+
+Notification routing per tab: Chat ← `message`; Notifications ← `match / system / ban / beef_*`; Requests ← `request`. Beef tab never badges (all beef notifications go to the Notifications tab).
+
 ### `TopNav` — `components/nav/TopNav.tsx`
-Sticky header, visible on all app pages.
+Sticky header, **mobile only** (`md:hidden`).
 
 - Logo → `/dashboard`.
-- Desktop nav links (Discover, Requests, Chat) with active-page highlight.
-- **Status indicator:** `OnlineIndicator` (dot only, label suppressed) inside the status button, reflecting `status_visible` + `status_message` from `/profile/me`. Clicking opens a dropdown to set one of five statuses (Verfügbar, Suche Gespräch, Suche Date, Beschäftigt, Nicht stören) or toggle "Unsichtbar"; all save to `PUT /profile/me` optimistically.
-- **Bell icon:** unread badge (count, max "9+") + pulse ring when `unreadCount > 0`. Dropdown shows last 5 notifications in Neu/Verlauf tabs; per-notification click navigates and marks read; trash deletes; "Alle als gelesen" button. Links to `/notifications` for the full view.
-- Polls `GET /notifications` and `GET /chat/requests/incoming` every 30 s; injects a `_local` notification for newly seen pending requests.
-- Settings icon link visible on all screen sizes; Profile icon link shown on desktop only.
-
-**Known gap:** user avatar in the top-right corner is a hardcoded `?` placeholder — profile photo is not loaded there.
+- **Status indicator:** `StatusPicker` reflecting `status_visible` + `status_message` from `/profile/me`. Clicking opens a dropdown to set one of five statuses or toggle "Unsichtbar"; saves to `PUT /profile/me` optimistically.
+- **Bell icon (`NotificationBell`):** unread badge (count, max "9+") + pulse ring using `--color-nav-badge-glow`. Dropdown shows last 5 notifications in Neu/Verlauf tabs; per-notification click navigates and marks read; trash deletes; "Alle als gelesen" button. Links to `/notifications` for the full view.
+- Polls `GET /notifications` and `GET /chat/requests/incoming` on mount; injects a `_local` notification for newly seen pending requests.
+- Settings + Profile icon links.
 
 ### `BottomNav` — `components/nav/BottomNav.tsx`
 Fixed bottom bar, mobile only (`md:hidden`). Five items: Home, Discover, Requests, Chat, Profile. Active item gets a filled icon in the primary color.
-
-**Known gap:** no unread badge on the Chat or Requests items — the badge only appears in TopNav's bell.
 
 ---
 
@@ -679,15 +687,13 @@ Syncs from props when `targetUserId` transitions from `''` (not yet loaded) to a
 
 ## Dev Tools
 
-Both tools are **dev-only** — they render `null` in production (`process.env.NODE_ENV === 'production'`).
+### `ColorPalettePanel` — `components/DevColorPalette.tsx`
 
-### `DevColorPalette` — `components/DevColorPalette.tsx`
-
-Floating panel (🎨 Colors, bottom-right) for live theme editing. Mounted globally in the `(app)` layout.
+Live theme editor accessible via the **Colors accordion** in the desktop sidebar — visible only when Hidden Zone is active (`isHidden = true`). No floating button; no prod/dev gate — always available in Hidden Mode.
 
 | Feature | Description |
 |---|---|
-| Color picker | All 17 CSS custom properties (`--color-*`) shown as editable swatches; changes apply instantly via `document.documentElement.style.setProperty` |
+| Color picker | All CSS custom properties (`--color-*`) shown as editable swatches; changes apply instantly via `document.documentElement.style.setProperty` |
 | Element picker | 🖱 pick mode — crosshair cursor; hover highlights elements with a dashed outline; click captures computed `backgroundColor`, `color`, `borderColor` and highlights any matching CSS vars in the palette |
 | Theme presets | One-click switch between `dark`, `light`, `underground-brick`, `underground-neon` |
 | Custom themes | Save the current palette under a name (stored in `localStorage['dev-color-themes']`); load or delete saved themes |
@@ -727,6 +733,10 @@ Posts to `POST /hidden/beef/dev/quick-fight` (backend returns 404 in production)
 ---
 
 ## Changelog
+
+### 2026-06-09 — Colors Tool in Hidden Mode Sidebar; Dev Button removed
+- `ColorPalettePanel` als Akkordion in der Desktop-Sidebar (nur Hidden Zone) — floating Button entfernt
+- Abmelden-Button-Farbe (`--color-logout`) und Badge-Glow (`--color-nav-badge-glow`) über das Colors-Panel einstellbar
 
 ### 2026-06-09 — Sidebar UI Cleanup & Notification Routing
 - Notifications-Tab ersetzt die Glocke in der Desktop-Sidebar; Tabs zeigen Unread-Badges mit einstellbarem Glow (`--color-nav-badge-glow`)
