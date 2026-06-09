@@ -43,6 +43,22 @@ export function useHiddenZone() {
   const isFirstRun  = useRef(true)
   const prevToken   = useRef(accessToken)
 
+  // Restore active custom color theme from localStorage on mount
+  useEffect(() => {
+    try {
+      const activeName = localStorage.getItem('dev-color-active-theme')
+      if (!activeName) return
+      const raw = localStorage.getItem('dev-color-themes')
+      if (!raw) return
+      const themes = JSON.parse(raw) as Record<string, Record<string, string>>
+      const theme = themes[activeName]
+      if (!theme) return
+      for (const [name, value] of Object.entries(theme)) {
+        document.documentElement.style.setProperty(name, value)
+      }
+    } catch {}
+  }, [])
+
   // Apply / remove underground theme classes on <html>
   useEffect(() => {
     const html = document.documentElement
