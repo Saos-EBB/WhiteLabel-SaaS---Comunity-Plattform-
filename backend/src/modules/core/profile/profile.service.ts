@@ -289,6 +289,14 @@ export class ProfileService {
         return this.getUserInterests(userId);
     }
 
+    async updateInterestFlag(userId: string, interestId: string, isGreen: boolean): Promise<UserInterest[]> {
+        await this.userInterestRepo.update(
+            { user_id: userId, interest_id: interestId },
+            { is_green: isGreen },
+        );
+        return this.getUserInterests(userId);
+    }
+
     async removeInterest(userId: string, interestId: string): Promise<UserInterest[]> {
         await this.userInterestRepo.delete({ user_id: userId, interest_id: interestId });
         return this.getUserInterests(userId);

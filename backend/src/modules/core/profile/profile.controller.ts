@@ -66,6 +66,16 @@ export class ProfileController {
         return this.profileService.addInterest(req.user.sub, interestId);
     }
 
+    @Patch('me/interests/:interestId')
+    @UseGuards(JwtGuard)
+    updateInterestFlag(
+        @Request() req: any,
+        @Param('interestId') interestId: string,
+        @Body() body: { is_green: boolean },
+    ) {
+        return this.profileService.updateInterestFlag(req.user.sub, interestId, body.is_green);
+    }
+
     @Delete('me/interests/:interestId')
     @UseGuards(JwtGuard)
     removeInterest(@Request() req: any, @Param('interestId') interestId: string) {
