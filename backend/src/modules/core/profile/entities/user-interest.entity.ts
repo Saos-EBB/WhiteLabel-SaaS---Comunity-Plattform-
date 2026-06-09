@@ -21,6 +21,9 @@ export class UserInterest {
     @JoinColumn({ name: 'interest_id' })
     interest!: Interest;
 
+    @Column({ type: 'boolean', default: true })
+    is_green!: boolean;
+
     @CreateDateColumn({ type: 'timestamptz' })
     created_at!: Date;
 }
