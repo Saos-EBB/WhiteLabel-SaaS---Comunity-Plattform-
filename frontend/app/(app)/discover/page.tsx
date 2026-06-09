@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Heart, X, MapPin, Users, UserRoundX, ChevronDown,
-  Sparkles, RefreshCw,
+  Sparkles, RefreshCw, CheckCircle2,
 } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
@@ -67,6 +67,27 @@ interface SearchProfile {
   request_id: string | null
 }
 
+// ─── Match Flash Banner ───────────────────────────────────────────────────────
+
+function MatchBanner({ nickname }: { nickname: string }) {
+  const { t } = useTranslation()
+  return (
+    <div className="w-full max-w-sm mx-auto flex items-center gap-3 px-4 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300"
+      style={{ background: 'var(--color-primary-fixed-dim)', color: 'var(--color-on-primary-container)' }}
+      role="status"
+      aria-live="polite"
+    >
+      <CheckCircle2 size={20} aria-hidden />
+      <span className="flex-1 font-semibold text-sm">
+        {t.discover.matchTitle} — {nickname}!
+      </span>
+      <Link href="/matches" className="text-xs font-bold underline underline-offset-2 whitespace-nowrap">
+        {t.nav.matches}
+      </Link>
+    </div>
+  )
+}
+
 // ─── Swipe Tab ────────────────────────────────────────────────────────────────
 
 function InterestTag({ interest }: { interest: DeckInterest }) {
@@ -81,84 +102,6 @@ function InterestTag({ interest }: { interest: DeckInterest }) {
       <span>{interest.is_green ? '💚' : '🚩'}</span>
       {interest.name_de}
     </span>
-  )
-}
-
-function MatchOverlay({
-  nickname,
-  photoUrl,
-  conversationId,
-  onClose,
-}: {
-  nickname: string
-  photoUrl: string | null
-  conversationId: string | null
-  onClose: () => void
-}) {
-  const { t } = useTranslation()
-  const router = useRouter()
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.discover.matchTitle}
-    >
-      <div
-        className="rounded-3xl p-8 max-w-sm w-full text-center space-y-5 shadow-2xl"
-        style={{ background: 'var(--color-surface-container-high)' }}
-      >
-        {/* Avatar */}
-        <div className="flex justify-center">
-          <div className="relative h-24 w-24 rounded-full overflow-hidden ring-4 ring-green-500/60">
-            {photoUrl ? (
-              <img
-                src={photoUrl.replace('http://localhost:3000', '')}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center bg-surface-container">
-                <Users className="h-10 w-10 text-outline" aria-hidden />
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <h2
-            className="text-3xl font-bold"
-            style={{ color: 'var(--color-primary-fixed-dim)' }}
-          >
-            {t.discover.matchTitle}
-          </h2>
-          <p className="text-on-surface-variant text-sm">
-            {t.discover.matchDesc.replace('{nickname}', nickname)}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2.5">
-          {conversationId && (
-            <button
-              onClick={() => router.push(`/chat/${conversationId}`)}
-              className="w-full py-3 rounded-full font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 transition-all"
-              style={{
-                background: 'var(--color-primary-fixed-dim)',
-                color: 'var(--color-on-primary-container)',
-              }}
-            >
-              {t.discover.matchOpenChat}
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="w-full py-3 rounded-full border border-outline-variant text-on-surface-variant font-semibold text-sm min-h-[44px] hover:bg-surface-container active:scale-95 transition-all"
-          >
-            {t.discover.matchContinue}
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -241,14 +184,17 @@ function SwipeTab() {
   const [error, setError] = useState<string | null>(null)
   const [limitError, setLimitError] = useState(false)
   const [swiping, setSwiping] = useState(false)
-  const [match, setMatch] = useState<{ nickname: string; photoUrl: string | null; conversationId: string | null } | null>(null)
-  // Swipe direction animation hint
+  const [matchBanner, setMatchBanner] = useState<string | null>(null)
   const [swipeDir, setSwipeDir] = useState<'like' | 'skip' | null>(null)
   const swipeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bannerTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     loadDeck()
-    return () => { if (swipeTimeout.current) clearTimeout(swipeTimeout.current) }
+    return () => {
+      if (swipeTimeout.current) clearTimeout(swipeTimeout.current)
+      if (bannerTimeout.current) clearTimeout(bannerTimeout.current)
+    }
   }, [])
 
   async function loadDeck() {
@@ -279,11 +225,11 @@ function SwipeTab() {
         body: JSON.stringify({ target_user_id: candidate.user_id, action }),
       })
       if (result.matched) {
-        setMatch({
-          nickname: candidate.nickname,
-          photoUrl: candidate.photo_url,
-          conversationId: result.conversation_id,
-        })
+        setMatchBanner(candidate.nickname)
+        bannerTimeout.current = setTimeout(() => {
+          setMatchBanner(null)
+          advance()
+        }, 2000)
       } else {
         advance()
       }
@@ -302,11 +248,6 @@ function SwipeTab() {
   function advance() {
     setIdx(i => i + 1)
     setSwipeDir(null)
-  }
-
-  function dismissMatch() {
-    setMatch(null)
-    advance()
   }
 
   const current = deck[idx]
@@ -367,6 +308,9 @@ function SwipeTab() {
 
   return (
     <div className="flex flex-col items-center gap-6 pb-6">
+      {/* Match flash banner */}
+      {matchBanner && <MatchBanner nickname={matchBanner} />}
+
       {/* Interest nudge */}
       <div
         className="w-full max-w-sm mx-auto px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm"
@@ -427,14 +371,6 @@ function SwipeTab() {
         </button>
       </div>
 
-      {match && (
-        <MatchOverlay
-          nickname={match.nickname}
-          photoUrl={match.photoUrl}
-          conversationId={match.conversationId}
-          onClose={dismissMatch}
-        />
-      )}
     </div>
   )
 }

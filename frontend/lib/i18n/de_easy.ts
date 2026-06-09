@@ -25,6 +25,7 @@ export const deEasy = {
   nav: {
     home: 'Start-Seite',
     discover: 'Andere finden',
+    matches: 'Matches',
     requests: 'Anfragen',
     chat: 'Nachrichten',
     notifications: 'Mitteilungen',

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
-  LayoutDashboard, Compass, MessageCircle, Users, Shield, Swords, Settings, User, Bell, Palette, ChevronDown,
+  LayoutDashboard, Compass, Heart, MessageCircle, Users, Shield, Swords, Settings, User, Bell, Palette, ChevronDown,
 } from 'lucide-react'
 import { useAuthStore, selectUserRole } from '@/lib/store/authStore'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
@@ -41,8 +41,9 @@ export function DesktopSidebar() {
   const mainLinks = [
     { href: '/dashboard',     label: t.nav.home,          Icon: LayoutDashboard },
     { href: '/notifications', label: t.nav.notifications, Icon: Bell },
-    { href: '/discover',      label: t.nav.discover,       Icon: Compass },
-    { href: '/chat',          label: t.nav.chat,           Icon: MessageCircle },
+    { href: '/discover',      label: t.nav.discover,      Icon: Compass },
+    { href: '/matches',       label: t.nav.matches,       Icon: Heart },
+    { href: '/chat',          label: t.nav.chat,          Icon: MessageCircle },
     ...(isAdmin
       ? [{ href: '/admin',    label: t.nav.admin,          Icon: Shield }]
       : [{ href: '/requests', label: t.nav.requests,       Icon: Users }]

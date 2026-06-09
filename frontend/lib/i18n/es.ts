@@ -25,6 +25,7 @@ export const es = {
   nav: {
     home: 'Inicio',
     discover: 'Descubrir',
+    matches: 'Coincidencias',
     requests: 'Solicitudes',
     chat: 'Chat',
     notifications: 'Notificaciones',

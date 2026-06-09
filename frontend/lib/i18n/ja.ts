@@ -25,6 +25,7 @@ export const ja = {
   nav: {
     home: 'ホーム',
     discover: '見つける',
+    matches: 'マッチ',
     requests: 'リクエスト',
     chat: 'チャット',
     notifications: '通知',

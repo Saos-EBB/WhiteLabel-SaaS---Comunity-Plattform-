@@ -22,6 +22,7 @@ export interface Translations {
   nav: {
     home: string
     discover: string
+    matches: string
     requests: string
     chat: string
     notifications: string
