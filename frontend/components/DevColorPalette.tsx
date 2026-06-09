@@ -126,7 +126,17 @@ export function ColorPalettePanel() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem('dev-color-themes')
-      if (raw) setSavedThemes(JSON.parse(raw))
+      if (raw) {
+        const themes = JSON.parse(raw) as Record<string, Record<string, string>>
+        setSavedThemes(themes)
+        const activeName = localStorage.getItem('dev-color-active-theme')
+        if (activeName && themes[activeName]) {
+          for (const [n, v] of Object.entries(themes[activeName])) {
+            document.documentElement.style.setProperty(n, v)
+          }
+          setValues(themes[activeName])
+        }
+      }
     } catch {}
   }, [])
 
@@ -137,6 +147,7 @@ export function ColorPalettePanel() {
 
   const resetAll = () => {
     ALL_VARS.forEach(n => document.documentElement.style.removeProperty(n))
+    localStorage.removeItem('dev-color-active-theme')
     setTimeout(refresh, 0)
     setPickedColors(null)
     setHighlighted(new Set())
@@ -148,12 +159,13 @@ export function ColorPalettePanel() {
     resetAll()
   }
 
-  const applyCustomTheme = (theme: Record<string, string>) => {
+  const applyCustomTheme = (theme: Record<string, string>, name?: string) => {
     resetAll()
-    for (const [name, value] of Object.entries(theme)) {
-      document.documentElement.style.setProperty(name, value)
+    for (const [varName, value] of Object.entries(theme)) {
+      document.documentElement.style.setProperty(varName, value)
     }
     setValues(theme)
+    if (name) localStorage.setItem('dev-color-active-theme', name)
   }
 
   const saveTheme = () => {
@@ -171,6 +183,9 @@ export function ColorPalettePanel() {
     delete updated[name]
     setSavedThemes(updated)
     localStorage.setItem('dev-color-themes', JSON.stringify(updated))
+    if (localStorage.getItem('dev-color-active-theme') === name) {
+      localStorage.removeItem('dev-color-active-theme')
+    }
   }
 
   const exportCSS = async () => {
@@ -347,7 +362,7 @@ export function ColorPalettePanel() {
               <div key={name} className="flex items-center gap-0.5">
                 <button
                   data-dev-palette
-                  onClick={() => applyCustomTheme(savedThemes[name])}
+                  onClick={() => applyCustomTheme(savedThemes[name], name)}
                   className="text-[11px] px-2.5 py-1 rounded-l-lg"
                   style={{ background: '#4c1d95', color: '#c4b5fd' }}
                 >
