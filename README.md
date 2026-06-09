@@ -78,6 +78,8 @@ Active development. Core feature set is functional; currently in final integrati
 ## Changelog
 
 ### 2026-06-09
+- Selbst gespeicherte Custom-Themes im Color-Panel bleiben nach F5 und Re-Login aktiv (aktives Theme wird in localStorage gemerkt und beim Start wiederhergestellt)
+- Beim Löschen oder Zurücksetzen wird das aktive Theme sauber aufgeräumt
 - Hidden Zone Theme und "einmal besucht"-Flag werden jetzt dauerhaft in localStorage gespeichert (überleben F5 und Re-Login)
 - Colors-Tab in der Sidebar bleibt sichtbar, sobald man die Hidden Zone mindestens einmal betreten hat
 
