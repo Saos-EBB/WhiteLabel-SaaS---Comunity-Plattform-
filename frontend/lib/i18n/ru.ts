@@ -27,6 +27,7 @@ export const ru = {
     discover: 'Обзор',
     requests: 'Заявки',
     chat: 'Чат',
+    notifications: 'Уведомления',
     profile: 'Профиль',
     admin: 'Админ',
     settings: 'Настройки',

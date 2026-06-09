@@ -24,6 +24,7 @@ export interface Translations {
     discover: string
     requests: string
     chat: string
+    notifications: string
     profile: string
     admin: string
     settings: string

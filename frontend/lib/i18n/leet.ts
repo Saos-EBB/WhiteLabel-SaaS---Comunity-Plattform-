@@ -24,6 +24,7 @@ export const leetspeak = {
     discover: 'D15c0v3r',
     requests: 'R3qu3575',
     chat: 'Ch47',
+    notifications: 'N071f1c4710n5',
     profile: 'Pr0f113',
     admin: '4dm1n',
     settings: '53771n65',

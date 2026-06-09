@@ -29,6 +29,7 @@ export const de = {
     discover: 'Discover',
     requests: 'Requests',
     chat: 'Chat',
+    notifications: 'Benachrichtigungen',
     profile: 'Profile',
     admin: 'Admin',
     settings: 'Einstellungen',

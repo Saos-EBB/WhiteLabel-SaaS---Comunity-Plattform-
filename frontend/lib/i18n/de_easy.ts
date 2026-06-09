@@ -27,6 +27,7 @@ export const deEasy = {
     discover: 'Andere finden',
     requests: 'Anfragen',
     chat: 'Nachrichten',
+    notifications: 'Mitteilungen',
     profile: 'Mein Profil',
     admin: 'Chef-Bereich',
     settings: 'Einstellungen',

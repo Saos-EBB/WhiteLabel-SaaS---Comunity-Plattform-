@@ -27,6 +27,7 @@ export const ja = {
     discover: '見つける',
     requests: 'リクエスト',
     chat: 'チャット',
+    notifications: '通知',
     profile: 'プロフィール',
     admin: '管理者',
     settings: '設定',

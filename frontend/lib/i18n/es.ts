@@ -27,6 +27,7 @@ export const es = {
     discover: 'Descubrir',
     requests: 'Solicitudes',
     chat: 'Chat',
+    notifications: 'Notificaciones',
     profile: 'Perfil',
     admin: 'Admin',
     settings: 'Ajustes',
