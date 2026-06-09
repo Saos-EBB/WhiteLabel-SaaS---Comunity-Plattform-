@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
 
 type HiddenTheme = 'brick' | 'neon'
 
@@ -9,6 +9,7 @@ interface HiddenState {
   theme: HiddenTheme
   showPWOverlay: boolean
   passwordAttempts: number
+  hasEverBeenHidden: boolean
   incrementClick: () => void
   resetClickCount: () => void
   unlock: () => void
@@ -27,9 +28,10 @@ export const useHiddenStore = create<HiddenState>()(
       theme: 'brick',
       showPWOverlay: false,
       passwordAttempts: 0,
+      hasEverBeenHidden: false,
       incrementClick: () => set({ clickCount: get().clickCount + 1 }),
       resetClickCount: () => set({ clickCount: 0 }),
-      unlock: () => set({ isHidden: true, clickCount: 0 }),
+      unlock: () => set({ isHidden: true, clickCount: 0, hasEverBeenHidden: true }),
       lock: () => set({ isHidden: false }),
       toggleTheme: () => set({ theme: get().theme === 'brick' ? 'neon' : 'brick' }),
       openOverlay: () => set({ showPWOverlay: true }),
@@ -38,8 +40,7 @@ export const useHiddenStore = create<HiddenState>()(
     }),
     {
       name: 'xxx-hidden',
-      storage: createJSONStorage(() => sessionStorage),
-      partialize: (state) => ({ isHidden: state.isHidden, theme: state.theme }),
+      partialize: (state) => ({ isHidden: state.isHidden, theme: state.theme, hasEverBeenHidden: state.hasEverBeenHidden }),
     }
   )
 )

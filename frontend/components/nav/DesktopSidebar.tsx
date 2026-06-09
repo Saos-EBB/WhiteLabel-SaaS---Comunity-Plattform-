@@ -26,7 +26,8 @@ export function DesktopSidebar() {
   const { t }         = useTranslation()
   const role          = useAuthStore(selectUserRole)
   const isAdmin       = role === 'admin' || role === 'owner'
-  const isHidden      = useHiddenStore((s) => s.isHidden)
+  const isHidden          = useHiddenStore((s) => s.isHidden)
+  const hasEverBeenHidden = useHiddenStore((s) => s.hasEverBeenHidden)
   const notifications = useNotificationStore((s) => s.notifications)
 
   const [colorsOpen, setColorsOpen] = useState(false)
@@ -124,8 +125,8 @@ export function DesktopSidebar() {
       {/* Bottom section */}
       <div className="shrink-0 border-t border-outline-variant">
 
-        {/* Colors accordion — hidden zone only */}
-        {isHidden && (
+        {/* Colors accordion — visible once hidden zone was entered at least once */}
+        {(isHidden || hasEverBeenHidden) && (
           <div data-dev-palette className="border-b border-outline-variant">
             <button
               data-dev-palette

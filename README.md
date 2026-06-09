@@ -75,6 +75,14 @@ Active development. Core feature set is functional; currently in final integrati
 
 ---
 
+## Changelog
+
+### 2026-06-09
+- Hidden Zone Theme und "einmal besucht"-Flag werden jetzt dauerhaft in localStorage gespeichert (überleben F5 und Re-Login)
+- Colors-Tab in der Sidebar bleibt sichtbar, sobald man die Hidden Zone mindestens einmal betreten hat
+
+---
+
 ## About the Developer
 
 Built by **Kevin Schaberl** (SaoS) — Junior Full-Stack Developer.
