@@ -50,6 +50,7 @@ interface UserInterest {
   id: string
   user_id: string
   interest_id: string
+  is_green: boolean
   interest: Interest
 }
 
@@ -305,16 +306,25 @@ export default function ProfilePage() {
   async function handleToggleInterest(interestId: string) {
     if (interestLoading) return
     setInterestLoading(interestId)
-    const isSelected = userInterests.some((ui) => ui.interest_id === interestId)
+    const existing = userInterests.find((ui) => ui.interest_id === interestId)
     try {
-      if (isSelected) {
-        const updated = await fetchApi<UserInterest[] | { data: UserInterest[] }>(`/profile/me/interests/${interestId}`, { method: 'DELETE' })
-        setUserInterests(normalise(updated))
-      } else {
+      if (!existing) {
+        // unselected → add as green
         const updated = await fetchApi<UserInterest[] | { data: UserInterest[] }>(`/profile/me/interests/${interestId}`, { method: 'POST' })
         setUserInterests(normalise(updated))
         const refreshed = await fetchApi<Profile>('/profile/me')
         setProfile(refreshed)
+      } else if (existing.is_green) {
+        // green → red
+        const updated = await fetchApi<UserInterest[] | { data: UserInterest[] }>(`/profile/me/interests/${interestId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ is_green: false }),
+        })
+        setUserInterests(normalise(updated))
+      } else {
+        // red → remove
+        const updated = await fetchApi<UserInterest[] | { data: UserInterest[] }>(`/profile/me/interests/${interestId}`, { method: 'DELETE' })
+        setUserInterests(normalise(updated))
       }
     } catch {
       // silent — user can retry
@@ -464,7 +474,7 @@ export default function ProfilePage() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const selectedIds = new Set(userInterests.map((ui) => ui.interest_id))
+  const selectedInterestMap = new Map(userInterests.map((ui) => [ui.interest_id, ui.is_green]))
 
   const nicknameChangedAt = profile?.nicknameChangedAt ?? null
   const nicknameChangedWithinYear = nicknameChangedAt
@@ -921,12 +931,19 @@ export default function ProfilePage() {
             <h3 className="text-xs font-medium text-on-surface-variant mb-3 text-center uppercase tracking-wide">
               {t.profile.interests}
             </h3>
+            {editMode && (
+              <p className="text-xs text-on-surface-variant text-center mb-3">
+                {t.profile.interestFlagHint}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2 justify-center">
               {editMode ? (
                 allInterests.length > 0 ? (
                   allInterests.map((i) => {
-                    const selected = selectedIds.has(i.id)
-                    const pending  = interestLoading === i.id
+                    const flagValue = selectedInterestMap.get(i.id)
+                    const selected  = flagValue !== undefined
+                    const isGreen   = flagValue === true
+                    const pending   = interestLoading === i.id
                     return (
                       <button
                         key={i.id}
@@ -934,15 +951,25 @@ export default function ProfilePage() {
                         onClick={() => handleToggleInterest(i.id)}
                         disabled={interestLoading !== null}
                         aria-pressed={selected}
-                        className={`px-4 py-2 rounded-full text-sm transition-colors disabled:cursor-not-allowed ${
-                          selected
-                            ? 'bg-primary-fixed-dim text-on-primary-container'
-                            : 'bg-surface-container-high text-on-surface hover:opacity-80 disabled:opacity-50'
+                        title={selected ? (isGreen ? t.profile.interestFlagGreen : t.profile.interestFlagRed) : undefined}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all disabled:cursor-not-allowed flex items-center gap-1.5 ${
+                          !selected
+                            ? 'bg-surface-container-high text-on-surface hover:opacity-80 disabled:opacity-50'
+                            : isGreen
+                            ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/50'
+                            : 'bg-red-500/20 text-red-400 ring-1 ring-red-500/50'
                         }`}
                       >
-                        {pending
-                          ? <Loader2 className="h-3 w-3 animate-spin inline" aria-hidden="true" />
-                          : i.name_de}
+                        {pending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <>
+                            {selected && (
+                              <span aria-hidden="true">{isGreen ? '💚' : '🚩'}</span>
+                            )}
+                            {i.name_de}
+                          </>
+                        )}
                       </button>
                     )
                   })
@@ -954,8 +981,13 @@ export default function ProfilePage() {
                   userInterests.map((ui) => (
                     <span
                       key={ui.interest_id}
-                      className="px-4 py-2 rounded-full bg-surface-container-high text-on-surface text-sm"
+                      className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 ${
+                        ui.is_green
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
                     >
+                      <span aria-hidden="true">{ui.is_green ? '💚' : '🚩'}</span>
                       {ui.interest.name_de}
                     </span>
                   ))
