@@ -728,6 +728,13 @@ Posts to `POST /hidden/beef/dev/quick-fight` (backend returns 404 in production)
 
 ## Changelog
 
+### 2026-06-09 — Sidebar UI Cleanup & Notification Routing
+- Notifications-Tab ersetzt die Glocke in der Desktop-Sidebar; Tabs zeigen Unread-Badges mit einstellbarem Glow (`--color-nav-badge-glow`)
+- Beef-Notifications (Ergebnisse) landen im Notifications-Tab statt am Beef-Tab
+- Status + Coins oben in der Sidebar (über der Navigation), StatusPicker-Dropdown klappt korrekt nach unten auf
+- Abmelden-Button-Farbe über `--color-logout` in allen Themes und im Color-Panel einstellbar
+- Mobile Bell-Badge nutzt dieselbe Glow-Farbe wie die Desktop-Tab-Badges
+
 ### 2026-06-08 — Beef Game System: Game Components & Bugfixes
 - fix(reaction): `ReactionGame` registers `game:go` listener **before** emitting `game:reaction_ready` — prevents missed GO signal if backend fires immediately; click payload is `{ beefId }` only (userId from JWT, never from frontend)
 - fix(overlay): `GameOverlay` uses `phaseRef` — 5-s pre-game countdown starts only once on `waiting` → `in_game` transition, not on every `game:board_update`
