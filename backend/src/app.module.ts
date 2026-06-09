@@ -25,6 +25,7 @@ import { CoinModule } from './modules/hidden/coin/coin.module';
 import { TeethModule } from './modules/hidden/teeth/teeth.module';
 import { BadgeModule } from './modules/hidden/badge/badge.module';
 import { SharedModule } from './modules/shared/shared.module';
+import { MatchingModule } from './modules/core/matching/matching.module';
 
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -77,6 +78,7 @@ import databaseConfig from './config/database.config';
     CoinModule,
     TeethModule,
     BadgeModule,
+    MatchingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
