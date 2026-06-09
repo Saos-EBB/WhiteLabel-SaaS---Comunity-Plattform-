@@ -8,17 +8,12 @@
 #  - photo_file:  Dateiname in $DEMO_MEDIA_PATH/demoPfp/ (leer = kein Bild)
 #  - audio_file:  Dateiname in $DEMO_MEDIA_PATH/demoAudio/ (leer = kein Audio)
 #  - interests:   Freitext-Tags, werden in interests-Tabelle angelegt falls noetig
+#                 String = Green Flag (mag ich), { name, is_green: false } = Red Flag (hasse ich)
 #  - birthdate:   Format YYYY-MM-DD
 #  - gender:      male | female | non_binary | diverse | not_specified
 #  - looking_for: friendship | relationship | exchange | all
 #  - status:      available | looking_for_chat | looking_for_date | busy | do_not_disturb
 #  - role:        user | admin | org | owner
-#
-#  HINWEIS DB-Constraint:
-#  chk_media_file_url (media_uploads.file_url ~ '^https://') wurde beim letzten
-#  Seed-Lauf entfernt, weil BACKEND_URL lokal auf http:// zeigt.
-#  Wiederherstellen (nur wenn alle file_url-Eintraege https:// sind):
-#    ALTER TABLE media_uploads ADD CONSTRAINT chk_media_file_url CHECK (file_url ~ '^https://');
 # =============================================================================
 
 users:
@@ -45,8 +40,13 @@ users:
       - Programmieren
       - Gaming
       - Kaffee
+      - Open Source
+      - Craft Beer
+      - Brettspiele
+      - KI & Machine Learning
       - { name: Bürokratie, is_green: false }
       - { name: Unordnung, is_green: false }
+      - { name: Fake News, is_green: false }
 
   - id: admin2
     email: admin2@demo.example.com
@@ -66,8 +66,13 @@ users:
       - Yoga
       - Lesen
       - Reisen
+      - Astrologie
+      - Journaling
+      - K-Pop
+      - Kältebad
       - { name: Lärm, is_green: false }
       - { name: Unordnung, is_green: false }
+      - { name: Passiv-Aggression, is_green: false }
 
   # ===========================================================================
   #  OWNER
@@ -91,8 +96,13 @@ users:
       - Programmieren
       - Kaffee
       - Musik
+      - Philosophie
+      - Sauna
+      - Vinyl
+      - Geschichte
       - { name: Ungeduld, is_green: false }
       - { name: Drama, is_green: false }
+      - { name: Oberflächlichkeit, is_green: false }
 
   # ===========================================================================
   #  DIVERSE
@@ -118,6 +128,10 @@ users:
       - Fotografie
       - Programmieren
       - Musik
+      - Siebdruck
+      - Keramik
+      - Schauspiel
+      - { name: Micromanagement, is_green: false }
 
   # ===========================================================================
   #  FEMALE
@@ -142,6 +156,10 @@ users:
       - Meditation
       - Natur
       - Wandern
+      - Kalligraphie
+      - Zeichnen
+      - Kältebad
+      - Nachhaltigkeit
 
   - id: f2
     email: f2@demo.example.com
@@ -161,6 +179,10 @@ users:
       - Fotografie
       - Kunst
       - Mode
+      - Illustration
+      - Anime
+      - Zeichnen
+      - { name: Arroganz, is_green: false }
 
   - id: f3
     email: f3@demo.example.com
@@ -180,6 +202,11 @@ users:
       - Musik
       - Tanzen
       - Kino
+      - Hip-Hop
+      - Karaoke
+      - Anime
+      - { name: Engstirnigkeit, is_green: false }
+      - { name: Überheblichkeit, is_green: false }
 
   - id: f4
     email: f4@demo.example.com
@@ -199,6 +226,12 @@ users:
       - Lesen
       - Podcasts
       - Kaffee
+      - Manga
+      - Anime
+      - Comics
+      - Schreiben
+      - { name: Spoiler, is_green: false }
+      - { name: Handysucht, is_green: false }
 
   - id: f5
     email: f5@demo.example.com
@@ -218,6 +251,11 @@ users:
       - Kochen
       - Backen
       - Reisen
+      - BBQ
+      - Veganes Kochen
+      - Nachhaltigkeit
+      - Tee
+      - Minimalismus
 
   - id: f6
     email: f6@demo.example.com
@@ -237,6 +275,11 @@ users:
       - Fitness
       - Sport
       - Klettern
+      - Kampfsport
+      - Schwimmen
+      - Tennis
+      - { name: Faulheit, is_green: false }
+      - { name: Ausreden, is_green: false }
 
   - id: f7
     email: f7@demo.example.com
@@ -256,8 +299,12 @@ users:
       - Musik
       - Tanzen
       - Film & Serien
+      - Techno
+      - Vinyl
+      - Theater
       - { name: Kontrollverlust, is_green: false }
       - { name: Drama, is_green: false }
+      - { name: Unzuverlässigkeit, is_green: false }
 
   - id: f8
     email: f8@demo.example.com
@@ -278,8 +325,12 @@ users:
       - Sprachen
       - Reisen
       - Kunst
+      - Theater
+      - Geschichte
+      - Philosophie
       - { name: Ignoranz, is_green: false }
       - { name: Drama, is_green: false }
+      - { name: Klatsch & Tratsch, is_green: false }
 
   - id: f9
     email: f9@demo.example.com
@@ -299,6 +350,10 @@ users:
       - Yoga
       - Meditation
       - Backen
+      - Tee
+      - Keramik
+      - Minimalismus
+      - { name: Unzuverlässigkeit, is_green: false }
 
   - id: f10
     email: f10@demo.example.com
@@ -318,6 +373,11 @@ users:
       - Gaming
       - Film & Serien
       - Kino
+      - Anime
+      - Manga
+      - K-Pop
+      - Comics
+      - { name: Spoiler, is_green: false }
 
   - id: f11
     email: f11@demo.example.com
@@ -337,6 +397,9 @@ users:
       - Fotografie
       - DIY
       - Mode
+      - Schauspiel
+      - Zeichnen
+      - Siebdruck
 
   - id: f12
     email: f12@demo.example.com
@@ -356,6 +419,11 @@ users:
       - Reisen
       - Sprachen
       - Musik
+      - Astrologie
+      - Geschichte
+      - Astronomie
+      - { name: Engstirnigkeit, is_green: false }
+      - { name: Negativität, is_green: false }
 
   - id: f13
     email: f13@demo.example.com
@@ -376,6 +444,9 @@ users:
       - Kaffee
       - Natur
       - Wandern
+      - Tee
+      - Minimalismus
+      - Nachhaltigkeit
 
   # ===========================================================================
   #  MALE
@@ -399,8 +470,12 @@ users:
       - Fotografie
       - Musik
       - Reisen
+      - Jazz
+      - Vinyl
+      - Konzerte
       - { name: Lärm, is_green: false }
       - { name: Unordnung, is_green: false }
+      - { name: Zu spät kommen, is_green: false }
 
   - id: m2
     email: m2@demo.example.com
@@ -420,6 +495,11 @@ users:
       - Gaming
       - Programmieren
       - Film & Serien
+      - Startups
+      - KI & Machine Learning
+      - Cybersecurity
+      - { name: Bürokratie, is_green: false }
+      - { name: Micromanagement, is_green: false }
 
   - id: m3
     email: m3@demo.example.com
@@ -440,6 +520,9 @@ users:
       - Fitness
       - Wandern
       - Natur
+      - Fußball
+      - Basketball
+      - Tennis
 
   - id: m4
     email: m4@demo.example.com
@@ -459,6 +542,10 @@ users:
       - Kochen
       - Backen
       - Kaffee
+      - BBQ
+      - Streetfood
+      - Craft Beer
+      - Brotbacken
 
   - id: m5
     email: m5@demo.example.com
@@ -479,6 +566,9 @@ users:
       - Fotografie
       - Kunst
       - Musik
+      - Theater
+      - Museen
+      - Geschichte
 
   - id: m6
     email: m6@demo.example.com
@@ -497,6 +587,12 @@ users:
     interests:
       - Gaming
       - Film & Serien
+      - Metal
+      - Anime
+      - Comics
+      - Manga
+      - { name: Fake News, is_green: false }
+      - { name: Oberflächlichkeit, is_green: false }
 
   - id: m7
     email: m7@demo.example.com
@@ -516,6 +612,10 @@ users:
       - Fitness
       - Klettern
       - Wandern
+      - MTB
+      - Bogenschießen
+      - Tauchen
+      - Camping
 
   - id: m8
     email: m8@demo.example.com
@@ -535,6 +635,11 @@ users:
       - Programmieren
       - Podcasts
       - Kaffee
+      - Smart Home
+      - Hardware
+      - Open Source
+      - 3D-Druck
+      - { name: Pedanterie, is_green: false }
 
   - id: m9
     email: m9@demo.example.com
@@ -554,6 +659,9 @@ users:
       - Sport
       - Radfahren
       - Natur
+      - Kampfsport
+      - MTB
+      - Kanufahren
 
   - id: m10
     email: m10@demo.example.com
@@ -574,6 +682,11 @@ users:
       - Musik
       - Meditation
       - Sprachen
+      - Philosophie
+      - Astrologie
+      - Kalligraphie
+      - { name: Oberflächlichkeit, is_green: false }
+      - { name: Handysucht, is_green: false }
 
   - id: m11
     email: m11@demo.example.com
@@ -593,6 +706,9 @@ users:
       - Gaming
       - Film & Serien
       - Kino
+      - Brettspiele
+      - Escape Rooms
+      - Comics
 
   - id: m12
     email: m12@demo.example.com
@@ -612,6 +728,11 @@ users:
       - Fotografie
       - Reisen
       - Mode
+      - Vinyl
+      - Jazz
+      - Karaoke
+      - Konzerte
+      - { name: Eifersucht, is_green: false }
 
   - id: m13
     email: m13@demo.example.com
@@ -631,6 +752,10 @@ users:
       - Kochen
       - Backen
       - DIY
+      - BBQ
+      - Craft Beer
+      - Brotbacken
+      - { name: Engstirnigkeit, is_green: false }
 
   - id: m14
     email: m14@demo.example.com
@@ -650,6 +775,10 @@ users:
       - Musik
       - Tanzen
       - Kino
+      - Hip-Hop
+      - Techno
+      - Karaoke
+      - Konzerte
 
   - id: m15
     email: m15@demo.example.com
@@ -670,6 +799,9 @@ users:
       - Natur
       - Meditation
       - Yoga
+      - Tauchen
+      - Camping
+      - Klettersteig
 
   - id: m16
     email: m16@demo.example.com
@@ -689,6 +821,10 @@ users:
       - Sport
       - Fitness
       - Klettern
+      - Fußball
+      - Basketball
+      - Kampfsport
+      - { name: Ausreden, is_green: false }
 
   - id: m17
     email: m17@demo.example.com
@@ -708,6 +844,10 @@ users:
       - Lesen
       - Podcasts
       - Kaffee
+      - Geschichte
+      - Theater
+      - Philosophie
+      - Astronomie
 
   - id: m18
     email: m18@demo.example.com
@@ -726,6 +866,10 @@ users:
     interests:
       - Gaming
       - Programmieren
+      - KI & Machine Learning
+      - Startups
+      - 3D-Druck
+      - Cybersecurity
 
   - id: m19
     email: m19@demo.example.com
@@ -746,6 +890,9 @@ users:
       - Natur
       - Wandern
       - Sport
+      - Camping
+      - Kanufahren
+      - MTB
 
   - id: m20
     email: m20@demo.example.com
@@ -765,6 +912,11 @@ users:
       - Lesen
       - Sprachen
       - Reisen
+      - Geschichte
+      - Philosophie
+      - Kalligraphie
+      - { name: Klatsch & Tratsch, is_green: false }
+      - { name: Oberflächlichkeit, is_green: false }
 
   - id: m21
     email: m21@demo.example.com
@@ -783,6 +935,10 @@ users:
     interests:
       - Musik
       - Tanzen
+      - Hip-Hop
+      - Manga
+      - Anime
+      - { name: Zu spät kommen, is_green: false }
 
   - id: m22
     email: m22@demo.example.com
@@ -803,6 +959,10 @@ users:
       - Backen
       - Kaffee
       - Mode
+      - Sushi
+      - Veganes Kochen
+      - Streetfood
+      - Wein
 
   - id: m23
     email: m23@demo.example.com
@@ -822,6 +982,10 @@ users:
       - Fotografie
       - Kunst
       - DIY
+      - Schauspiel
+      - Zeichnen
+      - Siebdruck
+      - Illustration
 
   - id: m24
     email: m24@demo.example.com
@@ -841,6 +1005,11 @@ users:
       - Gaming
       - Film & Serien
       - Kino
+      - Metal
+      - Comics
+      - Manga
+      - Anime
+      - { name: Drama, is_green: false }
 
   - id: m25
     email: m25@demo.example.com
@@ -861,6 +1030,9 @@ users:
       - Sport
       - Klettern
       - Wandern
+      - Basketball
+      - Fußball
+      - Kampfsport
 
   - id: m26
     email: m26@demo.example.com
@@ -880,6 +1052,10 @@ users:
       - Musik
       - Podcasts
       - Kaffee
+      - Techno
+      - Vinyl
+      - Jazz
+      - Konzerte
 
   - id: m27
     email: m27@demo.example.com
@@ -899,6 +1075,10 @@ users:
       - Reisen
       - Fotografie
       - Sprachen
+      - Camping
+      - MTB
+      - Klettersteig
+      - Surfen
 
   - id: m28
     email: m28@demo.example.com
@@ -918,3 +1098,9 @@ users:
       - Kochen
       - Yoga
       - Meditation
+      - Sauna
+      - Kältebad
+      - Journaling
+      - Nachhaltigkeit
+      - { name: Negativität, is_green: false }
+      - { name: Arroganz, is_green: false }
