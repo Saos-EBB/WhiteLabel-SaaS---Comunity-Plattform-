@@ -150,6 +150,7 @@ function SwipeTab({ onMatch }: { onMatch: (nickname: string) => void }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [limitError, setLimitError] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [swiping, setSwiping] = useState(false)
   const [swipeDir, setSwipeDir] = useState<'like' | 'skip' | null>(null)
   const swipeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -252,6 +253,18 @@ function SwipeTab({ onMatch }: { onMatch: (nickname: string) => void }) {
     )
   }
 
+  async function handleResetSkips() {
+    setResetting(true)
+    try {
+      await fetchApi('/discover/swipes/skips', { method: 'DELETE' })
+      await loadDeck()
+    } catch {
+      // ignore
+    } finally {
+      setResetting(false)
+    }
+  }
+
   if (!hasMore) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
@@ -264,6 +277,14 @@ function SwipeTab({ onMatch }: { onMatch: (nickname: string) => void }) {
           style={{ background: 'var(--color-primary-fixed-dim)', color: 'var(--color-on-primary-container)' }}
         >
           <RefreshCw size={14} aria-hidden /> Neu laden
+        </button>
+        <button
+          onClick={handleResetSkips}
+          disabled={resetting}
+          className="px-6 py-2.5 rounded-full font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity flex items-center gap-2 border border-outline-variant text-on-surface-variant disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={resetting ? 'animate-spin' : ''} aria-hidden />
+          Ablehnungen zurücksetzen
         </button>
       </div>
     )

@@ -77,6 +77,12 @@ Active development. Core feature set is functional; currently in final integrati
 
 ## Changelog
 
+### 2026-06-10
+- Matching: "Ablehnungen zurücksetzen"-Button im leeren Deck-State (löscht eigene Skips, nicht Likes) + Backend-Endpoint `DELETE /discover/swipes/skips`
+- Bug fix: Request-Notification-Badge zeigte falsche Zahl — ID-Mismatch zwischen Socket-Event und Page behoben, Notifications werden beim Öffnen der Anfragen-Seite korrekt geleert
+- Öffentliche Profilseite zeigt jetzt 💚/🚩 Flags bei Interessen (Green-/Red-Flag-System)
+- Migration 039: setzt alle User mit abgeschlossenem Onboarding auf `is_published = true`
+
 ### 2026-06-09
 - Custom-Theme wird jetzt sofort beim Seitenstart wiederhergestellt, nicht erst wenn das Color-Panel geöffnet wird
 - Selbst gespeicherte Custom-Themes im Color-Panel bleiben nach F5 und Re-Login aktiv (aktives Theme wird in localStorage gemerkt und beim Start wiederhergestellt)

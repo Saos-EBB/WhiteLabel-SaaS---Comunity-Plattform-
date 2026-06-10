@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../../../common/guards/jwt.guard';
 import { MatchingService } from './matching.service';
 import { SwipeService } from './swipe.service';
@@ -28,5 +28,12 @@ export class DiscoverController {
     async swipe(@Req() req: any, @Body() dto: SwipeDto) {
         const userId: string = req.user.sub;
         return this.swipeService.swipe(userId, dto);
+    }
+
+    @Delete('swipes/skips')
+    async resetSkips(@Req() req: any) {
+        const userId: string = req.user.sub;
+        await this.swipeService.resetSkips(userId);
+        return { ok: true };
     }
 }

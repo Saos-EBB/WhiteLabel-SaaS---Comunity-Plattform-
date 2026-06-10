@@ -72,7 +72,7 @@ export function useSocketBus(isReady: boolean) {
 
       contact_request: (request: any) => {
         useNotificationStore.getState().addOrUpdateNotification({
-          id: `temp-req-${request.id}`,
+          id: request.id,
           type: 'request',
           content: 'Neue Kontaktanfrage',
           is_read: false,
