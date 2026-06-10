@@ -78,6 +78,7 @@ Active development. Core feature set is functional; currently in final integrati
 ## Changelog
 
 ### 2026-06-10
+- Discover: Radius-Filter auf max. 5000 km erhöht (vorher 500 km) — Frontend-Slider und Backend-Validierung
 - Docs: Alle 40 Migrations-Dateien haben jetzt einen Kommentar-Header der kurz erklärt was die Migration macht
 - Migration 040: fehlende Interessen (~80 neue Einträge) nachträglich in die DB eingefügt — kompletter Katalog jetzt verfügbar
 - Fix: PostGIS-Location-Filter im Matching-Deck repariert — Profile ohne gesetzten Standort wurden fälschlicherweise komplett ausgeblendet (45 von 49 Profilen betroffen); Deck zeigt jetzt alle published Profile, Distanz wird nur angezeigt wenn vorhanden

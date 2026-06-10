@@ -367,7 +367,7 @@ function SearchTab() {
         <div className={`flex items-center gap-3${filters.lat == null ? ' opacity-40' : ''}`}>
           <MapPin className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden />
           <input
-            type="range" min={10} max={500} step={10} value={filters.radius}
+            type="range" min={10} max={5000} step={10} value={filters.radius}
             disabled={filters.lat == null}
             onChange={(e) => setFilters(f => ({ ...f, radius: Number(e.target.value) }))}
             className="flex-1 accent-primary-fixed-dim disabled:cursor-not-allowed"
