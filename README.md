@@ -78,6 +78,9 @@ Active development. Core feature set is functional; currently in final integrati
 ## Changelog
 
 ### 2026-06-10
+- Fix: PostGIS-Location-Filter im Matching-Deck repariert — Profile ohne gesetzten Standort wurden fälschlicherweise komplett ausgeblendet (45 von 49 Profilen betroffen); Deck zeigt jetzt alle published Profile, Distanz wird nur angezeigt wenn vorhanden
+- Fix: Reset-Button löscht jetzt alle Swipes (Likes + Skips), nicht nur Skips; Endpoint umbenannt zu `DELETE /discover/swipes`
+- Backfill: `npm run backfill:locations` ausgeführt — 39/45 Profile mit PostGIS-Koordinaten befüllt; Discover-Radius-Filter funktioniert jetzt korrekt
 - Matching: "Ablehnungen zurücksetzen"-Button im leeren Deck-State (löscht eigene Skips, nicht Likes) + Backend-Endpoint `DELETE /discover/swipes/skips`
 - Bug fix: Request-Notification-Badge zeigte falsche Zahl — ID-Mismatch zwischen Socket-Event und Page behoben, Notifications werden beim Öffnen der Anfragen-Seite korrekt geleert
 - Öffentliche Profilseite zeigt jetzt 💚/🚩 Flags bei Interessen (Green-/Red-Flag-System)

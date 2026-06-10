@@ -69,12 +69,16 @@ export class MatchingService {
                     p.gender,
                     p.looking_for,
                     DATE_PART('year', AGE(p.birthdate::date)) AS age,
-                    ROUND(
-                        ST_Distance(
-                            (SELECT location FROM viewer_location)::geography,
-                            p.location::geography
-                        ) / 1000
-                    )::int AS distance_km,
+                    CASE
+                        WHEN p.location IS NOT NULL THEN
+                            ROUND(
+                                ST_Distance(
+                                    (SELECT location FROM viewer_location)::geography,
+                                    p.location::geography
+                                ) / 1000
+                            )::int
+                        ELSE NULL
+                    END AS distance_km,
                     mu.file_url AS photo_url
                 FROM profiles p
                 JOIN users u ON u.id = p.user_id
@@ -84,11 +88,13 @@ export class MatchingService {
                     ON mu.id = p.photo_id AND mu.moderation_status = 'approved'
                 WHERE p.user_id <> $1
                   AND p.is_published = true
-                  AND p.location IS NOT NULL
-                  AND ST_DWithin(
-                      (SELECT location FROM viewer_location)::geography,
-                      p.location::geography,
-                      $2
+                  AND (
+                      p.location IS NULL
+                      OR ST_DWithin(
+                          (SELECT location FROM viewer_location)::geography,
+                          p.location::geography,
+                          $2
+                      )
                   )
                   -- exclude already-swiped: likes are permanent, skips expire after 30 days
                   AND NOT EXISTS (
@@ -116,7 +122,11 @@ export class MatchingService {
             )
             SELECT
                 c.*,
-                COALESCE(iss.interest_score, 0) + GREATEST(0, 10 - c.distance_km::float / 10) AS match_score
+                COALESCE(iss.interest_score, 0) +
+                CASE
+                    WHEN c.distance_km IS NOT NULL THEN GREATEST(0, 10 - c.distance_km::float / 10)
+                    ELSE 0
+                END AS match_score
             FROM candidates c
             LEFT JOIN interest_scores iss ON iss.user_id = c.user_id
             ORDER BY match_score DESC

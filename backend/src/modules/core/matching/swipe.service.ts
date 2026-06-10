@@ -110,9 +110,9 @@ export class SwipeService {
         return { matched: true, conversation_id: savedConv.id };
     }
 
-    async resetSkips(userId: string): Promise<void> {
+    async resetSwipes(userId: string): Promise<void> {
         await this.dataSource.query(
-            `DELETE FROM swipes WHERE swiper_id = $1 AND action = 'skip'`,
+            `DELETE FROM swipes WHERE swiper_id = $1`,
             [userId],
         );
     }

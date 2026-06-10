@@ -503,7 +503,7 @@ CREATE TABLE profiles (
 
     photo_id                UUID NULL REFERENCES media_uploads(id) ON DELETE SET NULL,
     city                    VARCHAR(100) NULL,
-    location                GEOGRAPHY(Point, 4326) NULL,
+    location                GEOGRAPHY(Point, 4326) NULL, -- nach Erstbefüllung: npm run backfill:locations (geocodiert city → PostGIS-Punkt; 2026-06-10 ausgeführt: 39/45 Profile)
     search_radius_km        INTEGER NOT NULL DEFAULT 20,
     CONSTRAINT chk_profiles_radius
         CHECK (search_radius_km > 0 AND search_radius_km <= 500),

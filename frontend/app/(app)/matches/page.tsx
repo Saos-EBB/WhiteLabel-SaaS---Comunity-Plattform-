@@ -253,10 +253,10 @@ function SwipeTab({ onMatch }: { onMatch: (nickname: string) => void }) {
     )
   }
 
-  async function handleResetSkips() {
+  async function handleResetSwipes() {
     setResetting(true)
     try {
-      await fetchApi('/discover/swipes/skips', { method: 'DELETE' })
+      await fetchApi('/discover/swipes', { method: 'DELETE' })
       await loadDeck()
     } catch {
       // ignore
@@ -279,12 +279,12 @@ function SwipeTab({ onMatch }: { onMatch: (nickname: string) => void }) {
           <RefreshCw size={14} aria-hidden /> Neu laden
         </button>
         <button
-          onClick={handleResetSkips}
+          onClick={handleResetSwipes}
           disabled={resetting}
           className="px-6 py-2.5 rounded-full font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity flex items-center gap-2 border border-outline-variant text-on-surface-variant disabled:opacity-50"
         >
           <RefreshCw size={14} className={resetting ? 'animate-spin' : ''} aria-hidden />
-          Ablehnungen zurücksetzen
+          Swipes zurücksetzen
         </button>
       </div>
     )

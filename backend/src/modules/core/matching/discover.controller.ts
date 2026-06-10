@@ -30,10 +30,10 @@ export class DiscoverController {
         return this.swipeService.swipe(userId, dto);
     }
 
-    @Delete('swipes/skips')
-    async resetSkips(@Req() req: any) {
+    @Delete('swipes')
+    async resetSwipes(@Req() req: any) {
         const userId: string = req.user.sub;
-        await this.swipeService.resetSkips(userId);
+        await this.swipeService.resetSwipes(userId);
         return { ok: true };
     }
 }
