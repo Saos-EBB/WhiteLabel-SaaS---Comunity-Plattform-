@@ -1,3 +1,8 @@
+-- 006_admin_tickets_profanity_flags.sql
+-- Legt das Admin-Moderationssystem an: admin_tickets (Meldungen zu Nickname,
+-- Bild, Audio, Sonstigem) und profanity_flags (automatisch erkannte Wörter
+-- mit Kontext für Moderatoren).
+
 CREATE TYPE ticket_type AS ENUM ('nickname', 'image', 'audio', 'other');
 CREATE TYPE ticket_status AS ENUM ('open', 'reviewed', 'resolved', 'dismissed');
 
