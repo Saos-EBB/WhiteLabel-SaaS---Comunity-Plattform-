@@ -77,6 +77,10 @@ Active development. Core feature set is functional; currently in final integrati
 
 ## Changelog
 
+### 2026-06-13
+- Hidden Zone: Master-Passwort auf "YourBrand" geändert
+- Docker: `DEMO_MEDIA_PATH=/app` im nestjs-Service eingetragen — Demo-Medien (Profilbilder, Audio) werden vom Seed-Script gefunden
+
 ### 2026-06-10
 - Discover: Radius-Filter auf max. 5000 km erhöht (vorher 500 km) — Frontend-Slider und Backend-Validierung
 - Docs: Alle 40 Migrations-Dateien haben jetzt einen Kommentar-Header der kurz erklärt was die Migration macht

@@ -43,6 +43,7 @@ services:
       DB_USER:     ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET:  ${JWT_SECRET}
+      DEMO_MEDIA_PATH: /app
     ports:
       - "3000:3000"
     depends_on:

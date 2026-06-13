@@ -28,7 +28,7 @@ export function stopHiddenAudio(): void {
 
 // ─── Password ─────────────────────────────────────────────────────────────────
 
-export const MASTER_KEY = 'DoNotTalkAboutTheFightClub'
+export const MASTER_KEY = 'YourBrand'
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
