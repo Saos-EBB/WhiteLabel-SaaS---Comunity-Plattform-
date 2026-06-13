@@ -291,18 +291,11 @@ export default function RequestsPage() {
         })
         setNicknames(map)
 
-        // Inject a notification for each pending request not already in the store (idempotent by id)
-        for (const r of incomingList) {
-          if (r.status !== 'pending') continue
-          useNotificationStore.getState().addNotification({
-            id: r.id,
-            type: 'request',
-            content: 'Neue Kontaktanfrage',
-            is_read: false,
-            created_at: r.created_at,
-            _local: true,
-          })
-        }
+        // User is viewing the requests page — clear all local request notifications
+        const store = useNotificationStore.getState()
+        store.notifications
+          .filter(n => n.type === 'request' && n._local)
+          .forEach(n => store.removeNotification(n.id))
       } catch (err) {
         if (err instanceof Error && err.message === 'Session expired') return
         setError(err instanceof Error ? err.message : 'Fehler beim Laden')

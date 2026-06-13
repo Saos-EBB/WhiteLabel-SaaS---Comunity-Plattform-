@@ -3,12 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { MapPin, Users, UserRoundX, ChevronDown } from 'lucide-react'
+import {
+  MapPin, Users, UserRoundX, ChevronDown,
+} from 'lucide-react'
 import { fetchApi } from '@/lib/api'
 import { OnlineIndicator, getStatusColor } from '@/components/ui/OnlineIndicator'
 import { useConnectionAction, type ConnectionStatus } from '@/hooks/useConnectionAction'
 import { CityAutocomplete } from '@/components/ui/CityAutocomplete'
 import { useTranslation } from '@/lib/i18n'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ProfileInterest {
   id: string
@@ -16,14 +20,13 @@ interface ProfileInterest {
   category: string | null
 }
 
-interface Profile {
+interface SearchProfile {
   id: string
   user_id: string
   nickname: string
   birthdate: string | null
   city: string | null
   bio: string | null
-  photo_id: string | null
   photo_url: string | null
   photo_needs_review?: boolean
   is_online: boolean
@@ -38,9 +41,7 @@ interface Profile {
   request_id: string | null
 }
 
-interface ProfilesResponse {
-  data: Profile[]
-}
+// ─── Search Tab ───────────────────────────────────────────────────────────────
 
 const DEFAULT_FILTERS = {
   city: '',
@@ -57,9 +58,7 @@ const DEFAULT_FILTERS = {
 
 function calcAge(birthdate: string | null | undefined): number | null {
   if (!birthdate) return null
-  return Math.floor(
-    (Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-  )
+  return Math.floor((Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
 }
 
 function buildQuery(f: typeof DEFAULT_FILTERS): string {
@@ -84,21 +83,18 @@ function buildQuery(f: typeof DEFAULT_FILTERS): string {
 function Spinner() {
   return (
     <span className="inline-flex items-center justify-center gap-2">
-      <span
-        className="h-3.5 w-3.5 rounded-full border-2 border-on-primary-container/30 border-t-on-primary-container animate-spin"
-        aria-hidden="true"
-      />
+      <span className="h-3.5 w-3.5 rounded-full border-2 border-on-primary-container/30 border-t-on-primary-container animate-spin" aria-hidden />
       Sende…
     </span>
   )
 }
 
-function ProfileCard({
+function SearchProfileCard({
   profile,
   onUpdate,
 }: {
-  profile: Profile
-  onUpdate: (userId: string, changes: Partial<Profile>) => void
+  profile: SearchProfile
+  onUpdate: (userId: string, changes: Partial<SearchProfile>) => void
 }) {
   const router = useRouter()
   const { t } = useTranslation()
@@ -141,14 +137,12 @@ function ProfileCard({
             onClick={() => conn.conversationId && router.push(`/chat/${conn.conversationId}`)}
             disabled={!conn.conversationId}
             className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            aria-label={t.discover.chatWithAriaLabel.replace('{nickname}', profile.nickname)}
           >
             {t.publicProfile.chat}
           </button>
           <button
             onClick={() => setDisconnectConfirmOpen(true)}
             className="w-full py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-xs sm:text-sm font-medium min-h-[44px] hover:bg-surface-container-high active:scale-95 transition-all"
-            aria-label={t.discover.disconnectAriaLabel.replace('{nickname}', profile.nickname)}
           >
             {t.discover.disconnectLabel}
           </button>
@@ -157,11 +151,7 @@ function ProfileCard({
     }
     if (cs === 'SENT') {
       return (
-        <div
-          className="w-full py-2.5 rounded-full bg-surface-container-high text-primary-fixed-dim text-xs sm:text-sm font-semibold text-center"
-          role="status"
-          aria-live="polite"
-        >
+        <div className="w-full py-2.5 rounded-full bg-surface-container-high text-primary-fixed-dim text-xs sm:text-sm font-semibold text-center" role="status">
           {t.discover.requestSent}
         </div>
       )
@@ -172,7 +162,6 @@ function ProfileCard({
           onClick={handleAccept}
           disabled={conn.isLoading}
           className="w-full py-2.5 rounded-full bg-tertiary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          aria-label={t.discover.acceptAriaLabel.replace('{nickname}', profile.nickname)}
         >
           {conn.isLoading ? <Spinner /> : t.discover.acceptRequest}
         </button>
@@ -183,7 +172,6 @@ function ProfileCard({
         onClick={handleConnect}
         disabled={conn.isLoading}
         className="w-full py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-xs sm:text-sm font-semibold min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        aria-label={t.discover.connectAriaLabel.replace('{nickname}', profile.nickname)}
       >
         {conn.isLoading ? <Spinner /> : t.publicProfile.connect}
       </button>
@@ -191,17 +179,8 @@ function ProfileCard({
   }
 
   return (
-    <article
-      className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden flex flex-col"
-      aria-label={age !== null
-          ? t.discover.profileAriaLabel.replace('{nickname}', profile.nickname).replace('{age}', String(age))
-          : t.discover.profileAriaLabelNoAge.replace('{nickname}', profile.nickname)}
-    >
-      {/* Photo or placeholder */}
-      <div
-        className="aspect-[3/4] bg-surface-container-high flex items-center justify-center overflow-hidden relative"
-        aria-hidden="true"
-      >
+    <article className="rounded-2xl bg-surface-container border border-outline-variant overflow-hidden flex flex-col">
+      <div className="aspect-[3/4] bg-surface-container-high flex items-center justify-center overflow-hidden relative" aria-hidden>
         {profile.photo_url ? (
           <img
             src={profile.photo_url.replace('http://localhost:3000', '')}
@@ -220,12 +199,11 @@ function ProfileCard({
           <span
             className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full ring-2 ring-surface-container"
             style={{ backgroundColor: getStatusColor(profile.is_online, profile.status_message) }}
-            aria-hidden="true"
+            aria-hidden
           />
         )}
       </div>
 
-      {/* Info */}
       <div className="p-3 sm:p-4 flex flex-col gap-3 flex-1">
         <div>
           <p className="font-semibold text-on-surface text-sm sm:text-base leading-tight">
@@ -236,17 +214,13 @@ function ProfileCard({
           </p>
           {profile.city && (
             <div className="flex items-center gap-1 mt-1">
-              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
+              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-on-surface-variant flex-shrink-0" aria-hidden />
               <p className="text-xs text-on-surface-variant truncate">{profile.city}</p>
             </div>
           )}
           {profile.status_message && (
             <div className="mt-1">
-              <OnlineIndicator
-                is_online={profile.is_online}
-                status_message={profile.status_message}
-                size="sm"
-              />
+              <OnlineIndicator is_online={profile.is_online} status_message={profile.status_message} size="sm" />
             </div>
           )}
         </div>
@@ -254,10 +228,7 @@ function ProfileCard({
         {profile.interests.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {profile.interests.slice(0, 3).map((i) => (
-              <span
-                key={i.id}
-                className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-medium"
-              >
+              <span key={i.id} className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-medium">
                 {i.name_de}
               </span>
             ))}
@@ -266,28 +237,16 @@ function ProfileCard({
 
         <div className="mt-auto space-y-2">
           {renderAction()}
-          {conn.error && (
-            <p className="text-xs text-error text-center leading-tight" role="alert">
-              {conn.error}
-            </p>
-          )}
+          {conn.error && <p className="text-xs text-error text-center leading-tight" role="alert">{conn.error}</p>}
         </div>
       </div>
 
-      {/* Disconnect confirmation modal */}
       {disconnectConfirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t.discover.disconnectLabel}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" role="dialog" aria-modal="true">
           <div className="bg-surface-container-high rounded-2xl p-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <p className="font-semibold text-on-surface">{t.publicProfile.disconnectTitle}</p>
-              <p className="text-sm text-on-surface-variant">
-                {t.discover.disconnectDesc}
-              </p>
+              <p className="text-sm text-on-surface-variant">{t.discover.disconnectDesc}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <button
@@ -295,9 +254,7 @@ function ProfileCard({
                 disabled={conn.isLoading}
                 className="flex-1 py-3 rounded-full bg-error-container text-error font-semibold text-sm min-h-[44px] hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
-                {conn.isLoading && (
-                  <span className="h-3.5 w-3.5 rounded-full border-2 border-error/30 border-t-error animate-spin" aria-hidden="true" />
-                )}
+                {conn.isLoading && <span className="h-3.5 w-3.5 rounded-full border-2 border-error/30 border-t-error animate-spin" aria-hidden />}
                 {t.publicProfile.disconnect}
               </button>
               <button
@@ -330,12 +287,12 @@ function SkeletonCard() {
   )
 }
 
-export default function DiscoverPage() {
+function SearchTab() {
   const { t } = useTranslation()
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
-  const [filters, setFilters]   = useState(DEFAULT_FILTERS)
+  const [profiles, setProfiles] = useState<SearchProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
 
   const receivedCount = profiles.filter(p => p.connection_status === 'RECEIVED').length
 
@@ -343,7 +300,7 @@ export default function DiscoverPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetchApi<Profile[] | ProfilesResponse>(buildQuery(f))
+      const res = await fetchApi<SearchProfile[] | { data: SearchProfile[] }>(buildQuery(f))
       setProfiles(Array.isArray(res) ? res : (res?.data ?? []))
     } catch (err) {
       if (err instanceof Error && err.message === 'Session expired') return
@@ -355,236 +312,170 @@ export default function DiscoverPage() {
 
   useEffect(() => { loadProfiles(DEFAULT_FILTERS) }, [])
 
-  function handleApply() { loadProfiles(filters) }
-
-  function handleReset() {
-    setFilters(DEFAULT_FILTERS)
-    loadProfiles(DEFAULT_FILTERS)
-  }
-
-  function handleProfileUpdate(userId: string, changes: Partial<Profile>) {
+  function handleProfileUpdate(userId: string, changes: Partial<SearchProfile>) {
     setProfiles(ps => ps.map(p => p.user_id === userId ? { ...p, ...changes } : p))
   }
 
   return (
-    <main className="min-h-screen bg-background p-4 sm:p-6 pb-24 sm:pb-8 space-y-5">
-
-      {/* Header + filter panel */}
-      <div className="space-y-3">
-        <h1 className="text-2xl font-bold text-on-surface">{t.discover.title}</h1>
-
-        <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 space-y-3">
-
-          {/* Row 1: City · Gender · Suche nach */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-
-            {/* City — full width on mobile */}
-            <div className="col-span-2 relative">
-              <MapPin
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none z-10"
-                aria-hidden="true"
-              />
-              <CityAutocomplete
-                value={filters.city}
-                onSelect={(city) => setFilters(f => ({ ...f, city: city.name, lat: Number(city.lat), lng: Number(city.lng) }))}
-                onClear={() => setFilters(f => ({ ...f, city: '', lat: null, lng: null }))}
-                placeholder={t.discover.cityPlaceholder}
-                ariaLabel={t.discover.cityAriaLabel}
-                inputClassName="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
-              />
-            </div>
-
-            {/* Gender */}
-            <div className="relative">
-              <select
-                value={filters.gender}
-                onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
-                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
-                aria-label="Nach Geschlecht filtern"
-              >
-                <option value="">{t.discover.filterAll}</option>
-                <option value="male">{t.onboarding.genderMale}</option>
-                <option value="female">{t.onboarding.genderFemale}</option>
-                <option value="non_binary">{t.onboarding.genderNonBinary}</option>
-                <option value="diverse">{t.onboarding.genderDiverse}</option>
-                <option value="not_specified">{t.onboarding.noChoice}</option>
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
-            </div>
-
-            {/* Looking for */}
-            <div className="relative">
-              <select
-                value={filters.looking_for}
-                onChange={(e) => setFilters(f => ({ ...f, looking_for: e.target.value }))}
-                className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
-                aria-label="Nach Suchanliegen filtern"
-              >
-                <option value="">{t.discover.filterAll}</option>
-                <option value="friendship">{t.publicProfile.lookingForFriendship}</option>
-                <option value="relationship">{t.publicProfile.lookingForRelationship}</option>
-                <option value="exchange">{t.publicProfile.lookingForExchange}</option>
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
-            </div>
-          </div>
-
-          {/* Radius slider */}
-          <div className={`flex items-center gap-3${filters.lat == null ? ' opacity-40' : ''}`}>
-            <MapPin className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden="true" />
-            <input
-              type="range"
-              min={10}
-              max={500}
-              step={10}
-              value={filters.radius}
-              disabled={filters.lat == null}
-              onChange={(e) => setFilters(f => ({ ...f, radius: Number(e.target.value) }))}
-              className="flex-1 accent-primary-fixed-dim disabled:cursor-not-allowed"
-              aria-label="Umkreis in km"
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="rounded-2xl bg-surface-container border border-outline-variant p-4 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="col-span-2 relative">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none z-10" aria-hidden />
+            <CityAutocomplete
+              value={filters.city}
+              onSelect={(city) => setFilters(f => ({ ...f, city: city.name, lat: Number(city.lat), lng: Number(city.lng) }))}
+              onClear={() => setFilters(f => ({ ...f, city: '', lat: null, lng: null }))}
+              placeholder={t.discover.cityPlaceholder}
+              ariaLabel={t.discover.cityAriaLabel}
+              inputClassName="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
             />
-            <span className="text-sm text-on-surface-variant w-40 text-right">
-              {filters.lat != null
-                ? t.discover.radiusWithCity.replace('{radius}', String(filters.radius))
-                : t.discover.radiusNoCity}
+          </div>
+          <div className="relative">
+            <select
+              value={filters.gender}
+              onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
+              className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
+              aria-label="Nach Geschlecht filtern"
+            >
+              <option value="">{t.discover.filterAll}</option>
+              <option value="male">{t.onboarding.genderMale}</option>
+              <option value="female">{t.onboarding.genderFemale}</option>
+              <option value="non_binary">{t.onboarding.genderNonBinary}</option>
+              <option value="diverse">{t.onboarding.genderDiverse}</option>
+              <option value="not_specified">{t.onboarding.noChoice}</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden />
+          </div>
+          <div className="relative">
+            <select
+              value={filters.looking_for}
+              onChange={(e) => setFilters(f => ({ ...f, looking_for: e.target.value }))}
+              className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
+              aria-label="Nach Suchanliegen filtern"
+            >
+              <option value="">{t.discover.filterAll}</option>
+              <option value="friendship">{t.publicProfile.lookingForFriendship}</option>
+              <option value="relationship">{t.publicProfile.lookingForRelationship}</option>
+              <option value="exchange">{t.publicProfile.lookingForExchange}</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden />
+          </div>
+        </div>
+
+        <div className={`flex items-center gap-3${filters.lat == null ? ' opacity-40' : ''}`}>
+          <MapPin className="h-4 w-4 text-on-surface-variant flex-shrink-0" aria-hidden />
+          <input
+            type="range" min={10} max={5000} step={10} value={filters.radius}
+            disabled={filters.lat == null}
+            onChange={(e) => setFilters(f => ({ ...f, radius: Number(e.target.value) }))}
+            className="flex-1 accent-primary-fixed-dim disabled:cursor-not-allowed"
+            aria-label="Umkreis in km"
+          />
+          <span className="text-sm text-on-surface-variant w-40 text-right">
+            {filters.lat != null
+              ? t.discover.radiusWithCity.replace('{radius}', String(filters.radius))
+              : t.discover.radiusNoCity}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="number" value={filters.min_age}
+            onChange={(e) => setFilters(f => ({ ...f, min_age: e.target.value }))}
+            placeholder={t.discover.ageFrom} min={18} max={99}
+            className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
+            aria-label="Mindestalter"
+          />
+          <span className="text-on-surface-variant text-sm" aria-hidden>–</span>
+          <input
+            type="number" value={filters.max_age}
+            onChange={(e) => setFilters(f => ({ ...f, max_age: e.target.value }))}
+            placeholder={t.discover.ageTo} min={18} max={99}
+            className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
+            aria-label="Höchstalter"
+          />
+          <div className="relative">
+            <select
+              value={filters.connection_status}
+              onChange={(e) => setFilters(f => ({ ...f, connection_status: e.target.value }))}
+              className="appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
+              aria-label="Nach Verbindungsstatus filtern"
+            >
+              <option value="">{t.discover.connectionAll}</option>
+              <option value="CONNECTED">{t.discover.connectedFilter}</option>
+              <option value="SENT">{t.discover.requestSent}</option>
+              <option value="RECEIVED">
+                {receivedCount > 0 ? `${t.discover.requestReceived} (${receivedCount})` : t.discover.requestReceived}
+              </option>
+              <option value="NONE">{t.discover.noConnection}</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none ml-1">
+            <input type="checkbox" checked={filters.online_only}
+              onChange={(e) => setFilters(f => ({ ...f, online_only: e.target.checked }))}
+              className="sr-only"
+            />
+            <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${filters.online_only ? 'bg-primary-fixed-dim' : 'bg-surface-container-highest'}`}>
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-sm ring-0 transition duration-200 ease-in-out ${filters.online_only ? 'translate-x-4' : 'translate-x-0'}`} />
             </span>
-          </div>
-
-          {/* Row 2: Age range · Verbindung · Online toggle · Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-
-            {/* Age inputs */}
-            <input
-              type="number"
-              value={filters.min_age}
-              onChange={(e) => setFilters(f => ({ ...f, min_age: e.target.value }))}
-              placeholder={t.discover.ageFrom}
-              min={18}
-              max={99}
-              className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
-              aria-label="Mindestalter"
-            />
-            <span className="text-on-surface-variant text-sm" aria-hidden="true">–</span>
-            <input
-              type="number"
-              value={filters.max_age}
-              onChange={(e) => setFilters(f => ({ ...f, max_age: e.target.value }))}
-              placeholder={t.discover.ageTo}
-              min={18}
-              max={99}
-              className="w-[7.5rem] px-3 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors"
-              aria-label="Höchstalter"
-            />
-
-            {/* Connection status filter */}
-            <div className="relative">
-              <select
-                value={filters.connection_status}
-                onChange={(e) => setFilters(f => ({ ...f, connection_status: e.target.value }))}
-                className="appearance-none pl-3 pr-8 py-2.5 rounded-xl bg-surface-container-high border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary-fixed-dim min-h-[44px] transition-colors cursor-pointer"
-                aria-label="Nach Verbindungsstatus filtern"
-              >
-                <option value="">{t.discover.connectionAll}</option>
-                <option value="CONNECTED">{t.discover.connectedFilter}</option>
-                <option value="SENT">{t.discover.requestSent}</option>
-                <option value="RECEIVED">
-                  {receivedCount > 0 ? `${t.discover.requestReceived} (${receivedCount})` : t.discover.requestReceived}
-                </option>
-                <option value="NONE">{t.discover.noConnection}</option>
-              </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant pointer-events-none" aria-hidden="true" />
-            </div>
-
-            {/* Online toggle */}
-            <label className="flex items-center gap-2 cursor-pointer select-none ml-1">
-              <input
-                type="checkbox"
-                checked={filters.online_only}
-                onChange={(e) => setFilters(f => ({ ...f, online_only: e.target.checked }))}
-                className="sr-only"
-              />
-              <span
-                className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${
-                  filters.online_only ? 'bg-primary-fixed-dim' : 'bg-surface-container-highest'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    filters.online_only ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </span>
-              <span className="text-sm text-on-surface whitespace-nowrap">{t.discover.onlineNow}</span>
-            </label>
-
-            {/* Push buttons to the right */}
-            <div className="flex-1" />
-
-            <button
-              onClick={handleReset}
-              className="px-4 py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium min-h-[44px] hover:bg-surface-container-high transition-colors"
-            >
-              {t.discover.reset}
-            </button>
-            <button
-              onClick={handleApply}
-              disabled={loading}
-              className="px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold min-h-[44px] hover:opacity-90 disabled:opacity-50 transition-opacity"
-            >
-              {t.discover.applyFilter}
-            </button>
-          </div>
+            <span className="text-sm text-on-surface whitespace-nowrap">{t.discover.onlineNow}</span>
+          </label>
+          <div className="flex-1" />
+          <button onClick={() => { setFilters(DEFAULT_FILTERS); loadProfiles(DEFAULT_FILTERS) }}
+            className="px-4 py-2.5 rounded-full border border-outline-variant text-on-surface-variant text-sm font-medium min-h-[44px] hover:bg-surface-container-high transition-colors">
+            {t.discover.reset}
+          </button>
+          <button onClick={() => loadProfiles(filters)} disabled={loading}
+            className="px-4 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container text-sm font-semibold min-h-[44px] hover:opacity-90 disabled:opacity-50 transition-opacity">
+            {t.discover.applyFilter}
+          </button>
         </div>
       </div>
 
-      {/* Grid / states */}
+      {/* Results */}
       {loading ? (
-        <div
-          className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
-          aria-label="Lädt Profile"
-          aria-busy="true"
-        >
-          {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4" aria-busy="true">
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : error ? (
-        <div
-          className="flex flex-col items-center justify-center py-20 text-center space-y-3"
-          role="alert"
-        >
-          <UserRoundX className="h-12 w-12 text-error" aria-hidden="true" />
+        <div className="flex flex-col items-center justify-center py-20 text-center space-y-3" role="alert">
+          <UserRoundX className="h-12 w-12 text-error" aria-hidden />
           <p className="text-on-surface font-semibold">Fehler beim Laden</p>
           <p className="text-on-surface-variant text-sm">{error}</p>
-          <button
-            onClick={() => loadProfiles(filters)}
-            className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity"
-          >
+          <button onClick={() => loadProfiles(filters)}
+            className="px-6 py-2.5 rounded-full bg-primary-fixed-dim text-on-primary-container font-semibold text-sm min-h-[44px] hover:opacity-90 transition-opacity">
             Erneut versuchen
           </button>
         </div>
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
-          <Users className="h-12 w-12 text-on-surface-variant" aria-hidden="true" />
+          <Users className="h-12 w-12 text-on-surface-variant" aria-hidden />
           <p className="text-on-surface font-semibold">Keine Profile gefunden</p>
           <p className="text-on-surface-variant text-sm">Versuche andere Filtereinstellungen</p>
         </div>
       ) : (
-        <div
-          className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
-          role="list"
-          aria-label="Entdeckte Profile"
-        >
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4" role="list">
           {profiles.map((profile) => (
-            <ProfileCard
-              key={profile.id}
-              profile={profile}
-              onUpdate={handleProfileUpdate}
-            />
+            <SearchProfileCard key={profile.id} profile={profile} onUpdate={handleProfileUpdate} />
           ))}
         </div>
       )}
+    </div>
+  )
+}
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function DiscoverPage() {
+  const { t } = useTranslation()
+
+  return (
+    <main className="min-h-screen bg-background p-4 sm:p-6 pb-24 sm:pb-8 space-y-5">
+      <h1 className="text-2xl font-bold text-on-surface">{t.discover.title}</h1>
+      <SearchTab />
     </main>
   )
 }

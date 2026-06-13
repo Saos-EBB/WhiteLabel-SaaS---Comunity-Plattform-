@@ -28,6 +28,9 @@ import { encryptField, hashEmail } from '../../common/crypto/crypto.helper';
 // Typen
 // ---------------------------------------------------------------------------
 
+// Interest can be a plain string (green by default) or an object with explicit is_green
+type InterestEntry = string | { name: string; is_green: boolean };
+
 interface DemoUser {
     id: string;
     email: string;
@@ -43,7 +46,7 @@ interface DemoUser {
     status: string;
     photo_file?: string;   // Dateiname in $DEMO_MEDIA_PATH/demoPfp/
     audio_file?: string;   // Dateiname in $DEMO_MEDIA_PATH/demoAudio/
-    interests: string[];
+    interests: InterestEntry[];
 }
 
 interface SeedFile {
@@ -242,13 +245,15 @@ async function main() {
 
         // --- Interessen anlegen ---
         if (u.interests?.length) {
-            for (const tag of u.interests) {
-                const interestId = await getOrCreateInterest(ds, tag);
+            for (const entry of u.interests) {
+                const name     = typeof entry === 'string' ? entry : entry.name;
+                const is_green = typeof entry === 'string' ? true  : entry.is_green;
+                const interestId = await getOrCreateInterest(ds, name);
                 await ds.query(
-                    `INSERT INTO user_interests (user_id, interest_id)
-                     VALUES ($1, $2)
-                     ON CONFLICT DO NOTHING`,
-                    [userId, interestId],
+                    `INSERT INTO user_interests (user_id, interest_id, is_green)
+                     VALUES ($1, $2, $3)
+                     ON CONFLICT (user_id, interest_id) DO UPDATE SET is_green = EXCLUDED.is_green`,
+                    [userId, interestId, is_green],
                 );
             }
         }

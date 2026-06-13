@@ -22,6 +22,7 @@ export interface Translations {
   nav: {
     home: string
     discover: string
+    matches: string
     requests: string
     chat: string
     notifications: string
@@ -220,6 +221,9 @@ export interface Translations {
     interests: string
     noInterestsAvailable: string
     noInterestsAdded: string
+    interestFlagGreen: string
+    interestFlagRed: string
+    interestFlagHint: string
     cancel: string
     save: string
     edit: string
@@ -295,6 +299,35 @@ export interface Translations {
     disconnectAriaLabel: string
     profileAriaLabel: string
     profileAriaLabelNoAge: string
+    // Swipe / Match tab
+    tabSwipe: string
+    tabSearch: string
+    swipeLike: string
+    swipeSkip: string
+    swipeEmpty: string
+    swipeEmptyDesc: string
+    swipeError: string
+    swipeLimitReached: string
+    swipeLimitDesc: string
+    matchTitle: string
+    matchDesc: string
+    matchOpenChat: string
+    matchContinue: string
+    interestNudge: string
+    interestNudgeLink: string
+    greenFlag: string
+    redFlag: string
+    km: string
+    age: string
+  }
+  matches: {
+    title: string
+    empty: string
+    emptyDesc: string
+    matchedOn: string
+    openChat: string
+    chatUnavailable: string
+    loadError: string
   }
   requests: {
     title: string

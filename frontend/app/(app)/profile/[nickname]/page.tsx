@@ -47,6 +47,7 @@ interface UserInterest {
   id: string
   user_id: string
   interest_id: string
+  is_green: boolean
   interest: Interest
 }
 
@@ -317,8 +318,13 @@ export default function PublicProfilePage() {
                 {interests.map((ui) => (
                   <span
                     key={ui.interest_id}
-                    className="px-4 py-2 rounded-full bg-surface-container-high text-on-surface text-sm"
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm ${
+                      ui.is_green
+                        ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/40'
+                        : 'bg-red-500/20 text-red-400 ring-1 ring-red-500/40'
+                    }`}
                   >
+                    <span aria-hidden="true">{ui.is_green ? '💚' : '🚩'}</span>
                     {locale === 'en' && ui.interest.name_en ? ui.interest.name_en : ui.interest.name_de}
                   </span>
                 ))}

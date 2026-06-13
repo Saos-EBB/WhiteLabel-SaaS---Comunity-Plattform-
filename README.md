@@ -77,6 +77,18 @@ Active development. Core feature set is functional; currently in final integrati
 
 ## Changelog
 
+### 2026-06-10
+- Discover: Radius-Filter auf max. 5000 km erhöht (vorher 500 km) — Frontend-Slider und Backend-Validierung
+- Docs: Alle 40 Migrations-Dateien haben jetzt einen Kommentar-Header der kurz erklärt was die Migration macht
+- Migration 040: fehlende Interessen (~80 neue Einträge) nachträglich in die DB eingefügt — kompletter Katalog jetzt verfügbar
+- Fix: PostGIS-Location-Filter im Matching-Deck repariert — Profile ohne gesetzten Standort wurden fälschlicherweise komplett ausgeblendet (45 von 49 Profilen betroffen); Deck zeigt jetzt alle published Profile, Distanz wird nur angezeigt wenn vorhanden
+- Fix: Reset-Button löscht jetzt alle Swipes (Likes + Skips), nicht nur Skips; Endpoint umbenannt zu `DELETE /discover/swipes`
+- Backfill: `npm run backfill:locations` ausgeführt — 39/45 Profile mit PostGIS-Koordinaten befüllt; Discover-Radius-Filter funktioniert jetzt korrekt
+- Matching: "Ablehnungen zurücksetzen"-Button im leeren Deck-State (löscht eigene Skips, nicht Likes) + Backend-Endpoint `DELETE /discover/swipes/skips`
+- Bug fix: Request-Notification-Badge zeigte falsche Zahl — ID-Mismatch zwischen Socket-Event und Page behoben, Notifications werden beim Öffnen der Anfragen-Seite korrekt geleert
+- Öffentliche Profilseite zeigt jetzt 💚/🚩 Flags bei Interessen (Green-/Red-Flag-System)
+- Migration 039: setzt alle User mit abgeschlossenem Onboarding auf `is_published = true`
+
 ### 2026-06-09
 - Custom-Theme wird jetzt sofort beim Seitenstart wiederhergestellt, nicht erst wenn das Color-Panel geöffnet wird
 - Selbst gespeicherte Custom-Themes im Color-Panel bleiben nach F5 und Re-Login aktiv (aktives Theme wird in localStorage gemerkt und beim Start wiederhergestellt)

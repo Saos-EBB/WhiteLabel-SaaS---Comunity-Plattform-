@@ -1,4 +1,6 @@
--- Seed default subscription prices into system_settings.
+-- 020_subscription_prices.sql
+-- Initialbefüllung der System-Settings mit den Standard-Abo-Preisen
+-- (monatlich, jährlich, lifetime). Überschreibt keine vorhandenen Werte (ON CONFLICT DO NOTHING).
 INSERT INTO system_settings (key, value)
 VALUES
     ('subscription_price_monthly',  '9.99'),

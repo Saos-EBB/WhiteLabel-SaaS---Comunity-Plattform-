@@ -117,3 +117,55 @@ The feature area containing Beef, Coin, Teeth, and Badge. Accessible only to aut
 ## Emote Mode
 
 During `in_game` and `game_pending` states, community members may post comments (emotes/reactions) but cannot place new Bets. Comment coin rewards still apply (up to 3 comments per user per Beef).
+
+---
+
+## Discover
+
+The dedicated screen/tab where authenticated users browse potential connections via Swipes. Accessible via a sidebar tab on web and a dedicated button on mobile. Lives under `src/modules/core/matching/`.
+
+---
+
+## Swipe
+
+A single decision a user makes on another user's profile in the Discover screen. Either a **Like** (wants to connect) or a **Skip** (not interested). Skips expire after 30 days so skipped users can re-appear — intentional design for smaller communities where the local pool is limited.
+
+**Like** — positive Swipe. If the other user has also Liked back, a Match is created automatically.
+
+**Skip** — negative Swipe. The swiped user is hidden from the Discover deck for 30 days.
+
+---
+
+## Match
+
+Created when two users have both Liked each other. Triggers automatic Conversation creation — no additional confirmation needed. A Match is the mutual consent to connect; it replaces the manual ContactRequest flow for users who meet via Discover.
+
+---
+
+## Interest Flag
+
+A property on a **UserInterest** (`is_green BOOLEAN NOT NULL`). `true` = the user likes/loves this interest (Green Flag). `false` = the user dislikes/hates this interest (Red Flag). Shared Green Flags and shared Red Flags both increase the Match Score between two users; a clash (one Green, one Red on the same interest) slightly reduces it.
+
+---
+
+## Match Score
+
+The numeric value used to rank candidates in the Discover deck. Composed of:
+- `+2` per shared Green Flag interest
+- `+2` per shared Red Flag interest
+- `-1` per clashing interest (one Green, one Red)
+- Distance component: `max(0, 10 - km/10)`
+
+Computed on-demand when a user opens Discover. Calculated by the **Matching Engine**.
+
+---
+
+## Matching Engine
+
+The isolated service (`MatchingService` in `src/modules/core/matching/`) that computes Match Scores and builds the Discover deck. Designed to be swappable — the rest of the system depends only on its interface, not its implementation.
+
+---
+
+## Swipe Limit
+
+Free users are limited to 20 Swipes within any rolling 24-hour window. Premium users have no limit. Enforced by counting rows in `swipes` where `swiper_id = current user` and `swiped_at > now() - interval '24 hours'`.

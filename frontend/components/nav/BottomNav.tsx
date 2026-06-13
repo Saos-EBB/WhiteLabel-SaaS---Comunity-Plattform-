@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Compass, Heart, MessageCircle, User, Shield, Swords } from 'lucide-react'
+import { Home, Compass, Heart, Sparkles, MessageCircle, User, Shield, Swords } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
 import { useHiddenStore } from '@/lib/store/hiddenStore'
 import { useTranslation } from '@/lib/i18n'
@@ -27,7 +27,7 @@ export default function BottomNav() {
   const navItems = [
     { href: '/dashboard', label: t.nav.home,     Icon: Home },
     { href: '/discover',  label: t.nav.discover,  Icon: Compass },
-    { href: '/requests',  label: t.nav.requests,  Icon: Heart },
+    { href: '/matches',   label: t.nav.matches,   Icon: Sparkles },
     { href: '/chat',      label: t.nav.chat,       Icon: MessageCircle },
     { href: '/profile',   label: t.nav.profile,   Icon: User },
   ]
