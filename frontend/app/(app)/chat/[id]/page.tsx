@@ -541,8 +541,8 @@ export default function ConversationPage() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* Conversation header — sticky below TopNav */}
-      <div className="sticky top-16 z-10 bg-background/95 backdrop-blur-sm border-b border-outline-variant px-4 py-3 flex items-center gap-3">
+      {/* Conversation header — sticky below TopNav on mobile, at top on desktop (TopNav is md:hidden) */}
+      <div className="sticky top-16 md:top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-outline-variant px-4 py-3 flex items-center gap-3">
         <Link
           href="/chat"
           className="flex items-center justify-center h-9 w-9 rounded-full hover:bg-surface-container transition-colors flex-shrink-0"

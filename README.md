@@ -77,6 +77,10 @@ Active development. Core feature set is functional; currently in final integrati
 
 ## Changelog
 
+### 2026-06-14
+- Fix: Chat-Kopfzeile in der Web-Ansicht klebt jetzt ganz oben (war vorher 64px zu tief, weil die mobile TopNav auf Desktop versteckt ist)
+- Fix: Interessen-Namen mit Umlauten (ü, ö, ä, ß) waren durch falsche Encoding beim Seed korrumpiert — Migration 041 korrigiert alle 11 betroffenen Einträge direkt in der DB
+
 ### 2026-06-13
 - Hidden Zone: Master-Passwort auf "YourBrand" geändert
 - Docker: `DEMO_MEDIA_PATH=/app` im nestjs-Service eingetragen — Demo-Medien (Profilbilder, Audio) werden vom Seed-Script gefunden
