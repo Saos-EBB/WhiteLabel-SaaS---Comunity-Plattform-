@@ -47,8 +47,8 @@ const WAGER_PRESETS = [1, 5, 10, 50, 100]
 
 function parsePassage(raw: string): { nickname: string; content: string }[] {
   return raw.split('\n').filter(Boolean).map(line => {
-    const m = line.match(/^\[(.+?)\]: (.+)$/)
-    return m ? { nickname: m[1], content: m[2] } : { nickname: '', content: line }
+    const m = line.match(/^([^:]+): (.+)$/)
+    return m ? { nickname: m[1].trim(), content: m[2] } : { nickname: '', content: line }
   })
 }
 
@@ -329,17 +329,18 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
             <p className="text-xs text-on-surface-variant mb-3">Chat Passage</p>
             <div className="flex flex-col gap-2">
               {parsePassage(beef.chat_passage).map((line, i) => {
-                const isOwn = ownNickname != null && line.nickname === ownNickname
+                const isOwn        = ownNickname != null && line.nickname === ownNickname
+                const isInitiator  = line.nickname === beef.initiator_nickname
+                const isTarget     = line.nickname === beef.target_nickname
+                const bubbleBg     = isInitiator ? 'bg-rose-500/20'  : isTarget ? 'bg-sky-500/20'  : 'bg-surface-container'
+                const nameColor    = isInitiator ? 'text-rose-400'   : isTarget ? 'text-sky-400'   : 'text-on-surface-variant'
+                const roundedCorner = isOwn ? 'rounded-br-sm' : 'rounded-bl-sm'
                 return (
                   <div key={i} className={`flex flex-col gap-0.5 ${isOwn ? 'items-end' : 'items-start'}`}>
-                    <span className={`text-[10px] font-semibold px-1 ${isOwn ? 'text-primary-fixed-dim' : 'text-on-surface-variant'}`}>
+                    <span className={`text-[10px] font-semibold px-1 ${nameColor}`}>
                       {line.nickname || '?'}
                     </span>
-                    <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-snug ${
-                      isOwn
-                        ? 'rounded-br-sm bg-surface-container text-on-surface'
-                        : 'rounded-bl-sm bg-primary-fixed-dim/20 text-on-surface'
-                    }`}>
+                    <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-snug text-on-surface ${bubbleBg} ${roundedCorner}`}>
                       {line.content}
                     </div>
                   </div>
