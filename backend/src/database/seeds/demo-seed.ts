@@ -66,6 +66,7 @@ const ds = new DataSource({
     password: process.env.DB_PASSWORD ?? '',
     synchronize: false,
     logging: false,
+    extra: { options: '-c client_encoding=UTF8' },
 });
 
 const demoMediaPath = process.env.DEMO_MEDIA_PATH ?? '';

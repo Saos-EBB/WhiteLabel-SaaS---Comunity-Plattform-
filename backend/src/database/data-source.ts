@@ -11,4 +11,5 @@ export const AppDataSource = new DataSource({
     entities:   ['src/**/*.entity.ts'],
     migrations: ['src/database/migrations/*.ts'],
     migrationsTableName: 'typeorm_migrations',
+    extra: { options: '-c client_encoding=UTF8' },
 });

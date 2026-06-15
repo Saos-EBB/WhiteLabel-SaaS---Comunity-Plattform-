@@ -82,6 +82,7 @@ const ds = new DataSource({
   password: process.env.DB_PASSWORD ?? '',
   synchronize: false,
   logging: false,
+  extra: { options: '-c client_encoding=UTF8' },
 });
 
 // ---------------------------------------------------------------------------
