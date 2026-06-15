@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import type { Socket } from 'socket.io-client'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export function ReactionGame({
   const goAt = useRef<number>(0)
   const rafRef = useRef<number>(0)
 
+  const { t } = useTranslation()
   const iAmParticipant = isParticipant && currentUserId !== null
 
   // ── Live ms counter while waiting for click ──────────────────────────────
@@ -119,12 +121,12 @@ export function ReactionGame({
       {/* Instructions */}
       <div className="text-center">
         <p className="text-xs text-on-surface-variant uppercase tracking-widest font-semibold">
-          Reaktionstest
+          {t.beef.reactionTitle}
         </p>
         <p className="text-xs text-on-surface-variant mt-1">
-          {phase === 'wait' ? 'Warte auf das GO-Signal...' :
-           phase === 'go'   ? 'JETZT DRÜCKEN!' :
-                              'Ergebnis wird berechnet...'}
+          {phase === 'wait' ? t.beef.reactionWait :
+           phase === 'go'   ? t.beef.reactionGo :
+                              t.beef.reactionCalculating}
         </p>
       </div>
 
@@ -143,7 +145,7 @@ export function ReactionGame({
         >
           {phase === 'wait' ? '🔴  WAIT' :
            phase === 'go'   ? '🟢  GO!' :
-                              '✓ Registriert'}
+                              t.beef.reactionDone}
         </button>
       ) : (
         /* Spectator view */
@@ -152,7 +154,7 @@ export function ReactionGame({
           phase === 'go'   ? 'bg-green-500 text-white animate-pulse' :
                              'bg-surface-container-high text-on-surface-variant'
         }`}>
-          {phase === 'wait' ? '🔴  WAIT' : phase === 'go' ? '🟢  GO!' : '✓ Fertig'}
+          {phase === 'wait' ? '🔴  WAIT' : phase === 'go' ? '🟢  GO!' : t.beef.reactionDoneSpectator}
         </div>
       )}
 
@@ -170,7 +172,7 @@ export function ReactionGame({
         {myTime !== null && (
           <div className="flex items-center justify-between bg-primary-fixed-dim/10 border border-primary-fixed-dim rounded-2xl p-4">
             <span className="text-sm font-semibold text-on-surface">
-              {iAmParticipant ? 'Deine Zeit' : currentUserId === initiatorId ? initiatorNickname : targetNickname}
+              {iAmParticipant ? t.beef.myTime : currentUserId === initiatorId ? initiatorNickname : targetNickname}
             </span>
             <span className="font-mono font-bold text-primary-fixed-dim text-lg tabular-nums">
               {formatMs(myTime)}
@@ -191,13 +193,13 @@ export function ReactionGame({
 
         {myTime === null && opponentTime === null && phase === 'done' && (
           <p className="text-center text-xs text-on-surface-variant">
-            Warte auf Ergebnisse...
+            {t.beef.reactionWaitingResults}
           </p>
         )}
       </div>
 
       {!iAmParticipant && (
-        <p className="text-center text-xs text-on-surface-variant">Zuschauer — read only</p>
+        <p className="text-center text-xs text-on-surface-variant">{t.beef.spectatorHint}</p>
       )}
     </div>
   )

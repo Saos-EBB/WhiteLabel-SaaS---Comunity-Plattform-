@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { Socket } from 'socket.io-client'
 import { fetchApi } from '@/lib/api'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,16 +36,6 @@ export interface RpsGameProps {
   isParticipant: boolean
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const CHOICES: { value: RpsChoice; emoji: string; label: string }[] = [
-  { value: 'rock',     emoji: '✊', label: 'Stein' },
-  { value: 'paper',    emoji: '✋', label: 'Papier' },
-  { value: 'scissors', emoji: '✌️',  label: 'Schere' },
-  { value: 'lizard',   emoji: '🦎', label: 'Eidechse' },
-  { value: 'spock',    emoji: '🖖', label: 'Spock' },
-]
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function RpsGame({
@@ -57,6 +48,14 @@ export function RpsGame({
   targetNickname,
   isParticipant,
 }: RpsGameProps) {
+  const { t } = useTranslation()
+  const CHOICES: { value: RpsChoice; emoji: string; label: string }[] = [
+    { value: 'rock',     emoji: '✊', label: t.beef.rpsRock },
+    { value: 'paper',    emoji: '✋', label: t.beef.rpsPaper },
+    { value: 'scissors', emoji: '✌️',  label: t.beef.rpsScissors },
+    { value: 'lizard',   emoji: '🦎', label: t.beef.rpsLizard },
+    { value: 'spock',    emoji: '🖖', label: t.beef.rpsSpock },
+  ]
   const [myChoice, setMyChoice] = useState<RpsChoice | null>(null)
   const [opponentChose, setOpponentChose] = useState(false)
   const [revealed, setRevealed] = useState<{
@@ -129,7 +128,7 @@ export function RpsGame({
       setMyChoice(choice)
       setOpponentChose(false) // reset; board_update will re-set if opponent already chose
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Fehler')
+      setError(e instanceof Error ? e.message : t.common.error)
     } finally {
       setSubmitting(false)
     }
@@ -141,7 +140,7 @@ export function RpsGame({
   }
 
   function roundWinnerName(id: string | null) {
-    if (!id) return 'Unentschieden'
+    if (!id) return ''
     if (id === initiatorId) return initiatorNickname
     if (id === targetId) return targetNickname
     return id
@@ -154,10 +153,10 @@ export function RpsGame({
       {/* Round indicator */}
       <div className="text-center">
         <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
-          Runde {round}
+          {t.beef.roundLabel.replace('{n}', String(round))}
         </span>
         {!isParticipant && (
-          <p className="text-xs text-on-surface-variant mt-1">Zuschauer — read only</p>
+          <p className="text-xs text-on-surface-variant mt-1">{t.beef.spectatorHint}</p>
         )}
       </div>
 
@@ -184,17 +183,17 @@ export function RpsGame({
                 : 'bg-error-container text-on-error-container'
           }`}>
             {revealed.roundWinner === null
-              ? '🤝 Unentschieden — neue Runde!'
+              ? t.beef.rpsDrawNewRound
               : revealed.roundWinner === currentUserId
-                ? '🏆 Du gewinnst diese Runde!'
-                : `${roundWinnerName(revealed.roundWinner)} gewinnt diese Runde`}
+                ? t.beef.rpsYouWinRound
+                : t.beef.rpsWinsRound.replace('{name}', roundWinnerName(revealed.roundWinner))}
           </div>
         </div>
       ) : (
         /* Choice buttons */
         <div className="flex flex-col gap-4">
           {isParticipant && !myChoice && (
-            <p className="text-center text-sm text-on-surface">Wähle deine Waffe:</p>
+            <p className="text-center text-sm text-on-surface">{t.beef.rpsChoose}</p>
           )}
 
           <div className="flex gap-3 justify-center">
@@ -223,17 +222,17 @@ export function RpsGame({
           {/* Status messages */}
           {myChoice && !opponentChose && (
             <p className="text-center text-xs text-on-surface-variant">
-              Deine Wahl: {choiceEmoji(myChoice)} — warte auf Gegner...
+              {t.beef.rpsWaiting.replace('{emoji}', choiceEmoji(myChoice))}
             </p>
           )}
           {myChoice && opponentChose && (
             <p className="text-center text-xs text-on-surface-variant animate-pulse">
-              Beide haben gewählt — Ergebnis wird enthüllt...
+              {t.beef.rpsBothChosen}
             </p>
           )}
           {!myChoice && opponentChose && isParticipant && (
             <p className="text-center text-xs text-primary-fixed-dim font-semibold animate-pulse">
-              Dein Gegner hat gewählt — du bist dran!
+              {t.beef.rpsOpponentChose}
             </p>
           )}
 

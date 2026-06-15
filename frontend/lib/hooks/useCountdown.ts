@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react'
 
-export function useCountdown(endsAt: string | Date | null): string {
-  const [remaining, setRemaining] = useState('')
+export function useCountdown(endsAt: string | Date | null): string | null {
+  const [remaining, setRemaining] = useState<string | null>(null)
 
   useEffect(() => {
     if (!endsAt) return
     function tick() {
       const diff = new Date(endsAt as string | Date).getTime() - Date.now()
-      if (diff <= 0) { setRemaining('Vorbei'); return }
+      if (diff <= 0) { setRemaining(null); return }
       const h = Math.floor(diff / 3600000)
       const m = Math.floor((diff % 3600000) / 60000)
       const s = Math.floor((diff % 60000) / 1000)

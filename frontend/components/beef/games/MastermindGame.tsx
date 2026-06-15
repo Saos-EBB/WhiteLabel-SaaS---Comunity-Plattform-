@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import type { Socket } from 'socket.io-client'
 import { fetchApi } from '@/lib/api'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -190,6 +191,7 @@ function PlayerBoard({
   onClear: () => void
   onSubmit: () => void
 }) {
+  const { t } = useTranslation()
   const canSubmit = isMe && !playerState.solved && currentSlots.every(Boolean)
 
   return (
@@ -201,7 +203,7 @@ function PlayerBoard({
         </span>
         {playerState.solved && (
           <span className="text-xs font-bold text-primary-fixed-dim bg-primary-fixed-dim/10 px-2 py-0.5 rounded-full">
-            ✓ Gelöst!
+            {t.beef.mmSolved}
           </span>
         )}
       </div>
@@ -213,11 +215,11 @@ function PlayerBoard({
             {playerState.attempts}
           </span>
           <span className="text-xs text-on-surface-variant">
-            {playerState.attempts === 1 ? 'Versuch' : 'Versuche'}
+            {playerState.attempts === 1 ? t.beef.mmAttempt : t.beef.mmAttempts}
           </span>
           {playerState.solved && (
             <span className="text-xs font-bold text-primary-fixed-dim bg-primary-fixed-dim/10 px-2 py-0.5 rounded-full mt-1">
-              ✓ Gelöst!
+              {t.beef.mmSolved}
             </span>
           )}
         </div>
@@ -278,7 +280,7 @@ function PlayerBoard({
 
           {/* Fallback: tap-to-place palette */}
           <div className="flex flex-col items-center gap-2">
-            <p className="text-[10px] text-on-surface-variant">Oder tippe Farbe zum Platzieren:</p>
+            <p className="text-[10px] text-on-surface-variant">{t.beef.mmTapColor}</p>
             <ColorPalette onPick={onColorPick} disabled={submitting} />
           </div>
 
@@ -290,7 +292,7 @@ function PlayerBoard({
               className="flex-1 py-2 rounded-xl border border-outline-variant text-on-surface-variant
                 text-sm font-semibold hover:bg-surface-container-high transition-colors disabled:opacity-40"
             >
-              Leeren
+              {t.beef.mmClear}
             </button>
             <button
               onClick={onSubmit}
@@ -298,7 +300,7 @@ function PlayerBoard({
               className="flex-1 py-2 rounded-xl bg-primary-fixed-dim text-on-primary-container
                 font-bold text-sm disabled:opacity-40 transition-opacity"
             >
-              {submitting ? '...' : 'Raten'}
+              {submitting ? '...' : t.beef.mmGuess}
             </button>
           </div>
         </div>
@@ -319,6 +321,7 @@ export function MastermindGame({
   targetNickname,
   isParticipant,
 }: MastermindGameProps) {
+  const { t } = useTranslation()
   const [initiatorState, setInitiatorState] = useState<MmPlayerState>({ guesses: [], solved: false, attempts: 0 })
   const [targetState, setTargetState] = useState<MmPlayerState>({ guesses: [], solved: false, attempts: 0 })
   const [currentSlots, setCurrentSlots] = useState<(MmColor | null)[]>(Array(CODE_LENGTH).fill(null))
@@ -395,7 +398,7 @@ export function MastermindGame({
       })
       setCurrentSlots(Array(CODE_LENGTH).fill(null))
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Fehler')
+      alert(e instanceof Error ? e.message : t.common.error)
     } finally {
       setSubmitting(false)
     }
@@ -408,7 +411,7 @@ export function MastermindGame({
   return (
     <div className="flex flex-col gap-4 max-w-sm mx-auto w-full">
       <p className="text-center text-xs text-on-surface-variant uppercase tracking-widest font-semibold">
-        Beide raten gleichzeitig
+        {t.beef.mmBothGuessing}
       </p>
 
       {/* Two boards side by side */}
@@ -448,7 +451,7 @@ export function MastermindGame({
       </div>
 
       {!isParticipant && (
-        <p className="text-center text-xs text-on-surface-variant">Zuschauer — read only</p>
+        <p className="text-center text-xs text-on-surface-variant">{t.beef.spectatorHint}</p>
       )}
     </div>
   )

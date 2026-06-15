@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Socket } from 'socket.io-client'
 import { X } from 'lucide-react'
 import { fetchApi } from '@/lib/api'
+import { useTranslation } from '@/lib/i18n'
 import { RpsGame } from './games/RpsGame'
 import { TicTacToeGame } from './games/TicTacToeGame'
 import { MastermindGame } from './games/MastermindGame'
@@ -87,6 +88,8 @@ function PlayerTile({
   isCurrentUser,
   onReady,
   readying,
+  readyLabel,
+  waitingLabel,
 }: {
   label: string
   nickname: string
@@ -95,6 +98,8 @@ function PlayerTile({
   isCurrentUser: boolean
   onReady: () => void
   readying: boolean
+  readyLabel: string
+  waitingLabel: string
 }) {
   return (
     <div className={`flex-1 flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${
@@ -119,11 +124,11 @@ function PlayerTile({
           className="px-4 py-2 rounded-xl bg-primary-fixed-dim text-on-primary-container
             font-bold text-sm disabled:opacity-40 transition-opacity"
         >
-          {readying ? '...' : 'Bereit!'}
+          {readying ? '...' : readyLabel}
         </button>
       ) : (
         <span className="text-xs text-on-surface-variant bg-surface-container-high px-3 py-1 rounded-full">
-          Wartet...
+          {waitingLabel}
         </span>
       )}
     </div>
@@ -132,18 +137,18 @@ function PlayerTile({
 
 // ─── Countdown Display ───────────────────────────────────────────────────────
 
-function CountdownDisplay({ seconds }: { seconds: number }) {
+function CountdownDisplay({ seconds, countdownLabel, getReadyLabel }: { seconds: number; countdownLabel: string; getReadyLabel: string }) {
   return (
     <div className="flex flex-col items-center gap-4">
       <p className="text-on-surface-variant text-sm font-semibold uppercase tracking-widest">
-        Das Spiel beginnt in
+        {countdownLabel}
       </p>
       <div className="w-28 h-28 rounded-full border-4 border-primary-fixed-dim flex items-center justify-center">
         <span className="text-5xl font-bold text-primary-fixed-dim tabular-nums">
           {seconds}
         </span>
       </div>
-      <p className="text-on-surface-variant text-xs">Mach dich bereit!</p>
+      <p className="text-on-surface-variant text-xs">{getReadyLabel}</p>
     </div>
   )
 }
@@ -164,6 +169,13 @@ export function GameOverlay({
   socket,
   onClose,
 }: GameOverlayProps) {
+  const { t } = useTranslation()
+  const gameLabels: Record<GameType, string> = {
+    rps: 'Rock Paper Scissors',
+    tictactoe: 'Tic Tac Toe',
+    mastermind: 'Mastermind',
+    reaction: t.beef.reactionTitle,
+  }
   const [phase, setPhase] = useState<GamePhase>('waiting')
   const phaseRef = useRef<GamePhase>('waiting')
   const [initiatorReady, setInitiatorReady] = useState(false)
@@ -251,7 +263,7 @@ export function GameOverlay({
       if (isInitiator) setInitiatorReady(true)
       if (isTarget) setTargetReady(true)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Fehler'
+      const msg = e instanceof Error ? e.message : t.common.error
       alert(msg)
     } finally {
       setReadying(false)
@@ -271,7 +283,7 @@ export function GameOverlay({
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant bg-surface-container-high">
         <span className="font-bold text-on-surface text-sm uppercase tracking-widest">
-          {GAME_LABELS[gameType]}
+          {gameLabels[gameType]}
         </span>
         {(!isParticipant || phase === 'finished') && (
           <button
@@ -289,47 +301,51 @@ export function GameOverlay({
         {phase === 'waiting' && (
           <div className="flex flex-col p-4 gap-6">
             <p className="text-center text-xs text-on-surface-variant uppercase tracking-widest font-semibold pt-2">
-              Warte auf beide Spieler
+              {t.beef.waitingForPlayers}
             </p>
 
             {/* Player tiles */}
             <div className="flex gap-3">
               <PlayerTile
-                label="Initiator"
+                label={t.beef.roleInitiator}
                 nickname={initiatorNickname}
                 photoUrl={initiatorPhotoUrl}
                 isReady={initiatorReady}
                 isCurrentUser={isInitiator}
                 onReady={handleReady}
                 readying={readying}
+                readyLabel={t.beef.readyBtn}
+                waitingLabel={t.beef.waitingBtn}
               />
               <div className="flex items-center justify-center flex-shrink-0">
                 <span className="text-2xl font-bold text-on-surface-variant">VS</span>
               </div>
               <PlayerTile
-                label="Target"
+                label={t.beef.roleTarget}
                 nickname={targetNickname}
                 photoUrl={targetPhotoUrl}
                 isReady={targetReady}
                 isCurrentUser={isTarget}
                 onReady={handleReady}
                 readying={readying}
+                readyLabel={t.beef.readyBtn}
+                waitingLabel={t.beef.waitingBtn}
               />
             </div>
 
             {/* Spectator hint */}
             {!isParticipant && (
               <p className="text-center text-xs text-on-surface-variant">
-                Du schaust zu — das Spiel startet wenn beide bereit sind
+                {t.beef.spectatorWait}
               </p>
             )}
 
             {/* Pot info */}
             <div className="bg-surface-container-high border border-outline-variant rounded-2xl p-4 text-center">
-              <p className="text-xs text-on-surface-variant mb-1">Im Pot</p>
+              <p className="text-xs text-on-surface-variant mb-1">{t.beef.potLabel}</p>
               <p className="text-2xl font-bold text-primary-fixed-dim">{potCoins} 🪙</p>
               <p className="text-xs text-on-surface-variant mt-1">
-                Winner erhält 30% · Wetter erhalten 60%
+                {t.beef.potDistributionDesc}
               </p>
             </div>
           </div>
@@ -338,7 +354,7 @@ export function GameOverlay({
         {/* ── COUNTDOWN PHASE ── */}
         {phase === 'countdown' && (
           <div className="flex items-center justify-center py-10">
-            <CountdownDisplay seconds={countdown} />
+            <CountdownDisplay seconds={countdown} countdownLabel={t.beef.countdownLabel} getReadyLabel={t.beef.getReady} />
           </div>
         )}
 
@@ -419,10 +435,3 @@ export function GameOverlay({
   )
 }
 
-// ── Label map ────────────────────────────────────────────────────────────────
-const GAME_LABELS: Record<GameType, string> = {
-  rps: 'Rock Paper Scissors',
-  tictactoe: 'Tic Tac Toe',
-  mastermind: 'Mastermind',
-  reaction: 'Reaktionstest',
-}

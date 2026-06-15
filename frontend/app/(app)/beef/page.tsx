@@ -69,16 +69,17 @@ const DURATION_OPTIONS = [
   { label: '48 Stunden',  value: 172800 },
 ]
 
-const GAME_OPTIONS: { value: GameType; label: string; desc: string; emoji: string }[] = [
-  { value: 'rps',        label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',      emoji: '✊' },
-  { value: 'tictactoe', label: 'Tic Tac Toe',          desc: 'Best of 3 — X vs O',                  emoji: '⬛' },
-  { value: 'mastermind', label: 'Mastermind',           desc: 'Knack den Code — 4 Farben, 10 Runden', emoji: '🎨' },
-  { value: 'reaction',  label: 'Reaktionstest',         desc: 'Wer drückt schneller auf GO!',         emoji: '⚡' },
-]
 
 export default function BeefPage() {
   const { t } = useTranslation()
   const router   = useRouter()
+
+  const gameOptions: { value: GameType; label: string; desc: string; emoji: string }[] = [
+    { value: 'rps',        label: 'Rock Paper Scissors', desc: t.beef.rpsGameDesc,      emoji: '✊' },
+    { value: 'tictactoe', label: 'Tic Tac Toe',          desc: t.beef.tttGameDesc,      emoji: '⬛' },
+    { value: 'mastermind', label: 'Mastermind',           desc: t.beef.mmGameDesc,       emoji: '🎨' },
+    { value: 'reaction',  label: t.beef.reactionTitle,    desc: t.beef.reactionGameDesc, emoji: '⚡' },
+  ]
   const isHidden     = useHiddenStore((s) => s.isHidden)
   const token        = useAuthStore((s) => s.accessToken)
   const currentUserId = useAuthStore((s) => s.user?.id ?? '')
@@ -181,7 +182,7 @@ export default function BeefPage() {
       localStorage.removeItem('coin_return_url')
       setTimeout(() => router.push(returnUrl), 2500)
     }).catch(() => {
-      setCoinError('Coin-Kauf konnte nicht gutgeschrieben werden. Bitte Support kontaktieren.')
+      setCoinError(t.beef.coinPurchaseError)
     })
   }, [])
 
@@ -275,7 +276,7 @@ export default function BeefPage() {
       await load()
       setTimeout(() => { setCreateSuccess(false); setTab('mine') }, 2000)
     } catch (e: unknown) {
-      setCreateError(e instanceof Error ? e.message : 'Fehler beim Erstellen')
+      setCreateError(e instanceof Error ? e.message : t.beef.createError)
     } finally { setCreating(false) }
   }
 
@@ -299,7 +300,7 @@ export default function BeefPage() {
     { key: 'mine',      label: t.beef.tabMine,      icon: <Flame size={15}/> },
     { key: 'public',    label: t.beef.tabPublic,    icon: <Users size={15}/> },
     { key: 'highscore', label: t.beef.tabHighscore, icon: <Trophy size={15}/> },
-    { key: 'create',    label: 'Beef starten',       icon: <Plus size={15}/> },
+    { key: 'create',    label: t.beef.createTab,     icon: <Plus size={15}/> },
   ]
 
   return (
@@ -400,7 +401,7 @@ export default function BeefPage() {
                         text-on-primary-container font-bold text-sm
                         disabled:opacity-40 transition-opacity"
                     >
-                      🥊 Fight
+                      {t.beef.fight}
                     </button>
                     <button
                       onClick={() => respond(beef.id, 'chicken')}
@@ -409,7 +410,7 @@ export default function BeefPage() {
                         border border-outline-variant text-on-surface-variant
                         font-bold text-sm disabled:opacity-40 transition-opacity"
                     >
-                      🐔 Chicken
+                      {t.beef.chicken}
                     </button>
                   </div>
                 </div>
@@ -444,7 +445,7 @@ export default function BeefPage() {
                         <span className="text-xs font-bold text-yellow-400
                           bg-yellow-400/10 border border-yellow-400/30
                           px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
-                          {beef.status === 'in_game' ? '🎮 Spielt!' : '🎮 Spiel wartet'}
+                          {beef.status === 'in_game' ? t.beef.gameActive : t.beef.gameWaiting}
                         </span>
                       ) : beef.ends_at ? (
                         <span className="text-xs text-on-surface-variant
@@ -488,7 +489,7 @@ export default function BeefPage() {
                         <span className="text-xs font-bold text-yellow-400
                           bg-yellow-400/10 border border-yellow-400/30
                           px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
-                          {beef.status === 'in_game' ? '🎮 Live!' : '🎮 Startet...'}
+                          {beef.status === 'in_game' ? t.beef.gameLive : t.beef.gameStarting}
                         </span>
                       ) : beef.ends_at ? (
                         <span className="text-xs text-on-surface-variant
@@ -554,14 +555,14 @@ export default function BeefPage() {
               {/* Success banner */}
               {createSuccess && (
                 <div className="bg-tertiary-container text-on-tertiary-container rounded-xl p-4 text-sm font-semibold text-center">
-                  🥊 Beef erstellt! Warte auf Genehmigung...
+                  {t.beef.createSuccess}
                 </div>
               )}
 
               {/* Target user search */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Gegner auswählen
+                  {t.beef.selectOpponent}
                 </label>
 
                 {createForm.targetUserId ? (
@@ -586,7 +587,7 @@ export default function BeefPage() {
                           setUserSearch(e.target.value)
                           searchUsers(e.target.value)
                         }}
-                        placeholder="Nickname suchen..."
+                        placeholder={t.beef.searchPlaceholder}
                         className="flex-1 bg-transparent text-on-surface text-sm outline-none placeholder:text-on-surface-variant"
                       />
                     </div>
@@ -628,14 +629,14 @@ export default function BeefPage() {
               {/* TLDR */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Worum geht's? (TLDR)
+                  {t.beef.tldrLabel}
                 </label>
                 <input
                   type="text"
                   value={createForm.tldr}
                   onChange={(e) => setCreateForm(f => ({ ...f, tldr: e.target.value }))}
                   maxLength={120}
-                  placeholder="z.B. Kevin hat den letzten Slice Pizza genommen"
+                  placeholder={t.beef.tldrPlaceholder}
                   className="bg-surface-container border border-outline-variant rounded-xl px-4 py-3
                     text-on-surface text-sm outline-none focus:border-primary-fixed-dim placeholder:text-on-surface-variant"
                 />
@@ -645,7 +646,7 @@ export default function BeefPage() {
               {/* Duration */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Dauer des Beefs
+                  {t.beef.durationLabel}
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {DURATION_OPTIONS.map(opt => (
@@ -668,13 +669,13 @@ export default function BeefPage() {
               {/* Chat Passage Picker */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Chat-Ausschnitt als Beweis
+                  {t.beef.chatEvidenceLabel}
                 </label>
 
                 {!createForm.targetUserId ? (
                   <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
                     text-center text-sm text-on-surface-variant">
-                    Erst einen Gegner auswählen
+                    {t.beef.chatEvidenceNoOpponent}
                   </div>
                 ) : loadingChat ? (
                   <div className="flex justify-center py-6">
@@ -683,20 +684,20 @@ export default function BeefPage() {
                 ) : noConversation ? (
                   <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
                     text-center text-sm text-on-surface-variant">
-                    Kein Chat mit <span className="font-bold text-on-surface">{createForm.targetNickname}</span> vorhanden
+                    {t.beef.noChat.replace('{name}', createForm.targetNickname)}
                   </div>
                 ) : chatMessages.length === 0 ? (
                   <div className="bg-surface-container border border-outline-variant rounded-xl px-4 py-6
                     text-center text-sm text-on-surface-variant">
-                    Keine Textnachrichten im Chat
+                    {t.beef.noTextMessages}
                   </div>
                 ) : (
                   <>
                     <p className="text-xs text-on-surface-variant">
-                      Tippe auf Nachrichten um sie auszuwählen
+                      {t.beef.tapToSelect}
                       {selectedMsgIds.size > 0 && (
                         <span className="ml-1 font-semibold text-primary-fixed-dim">
-                          ({selectedMsgIds.size} ausgewählt)
+                          {t.beef.selectedCount.replace('{count}', String(selectedMsgIds.size))}
                         </span>
                       )}
                     </p>
@@ -733,7 +734,7 @@ export default function BeefPage() {
                     {selectedMsgIds.size > 0 && (
                       <div className="bg-surface-container-low border border-outline-variant rounded-xl p-3">
                         <p className="text-[10px] text-on-surface-variant mb-1 font-semibold uppercase tracking-widest">
-                          Vorschau Passage
+                          {t.beef.passagePreview}
                         </p>
                         <p className="text-xs text-on-surface font-mono whitespace-pre-line leading-relaxed">
                           {createForm.chatPassage}
@@ -747,10 +748,10 @@ export default function BeefPage() {
               {/* Game type selection */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                  Mini-Game auswählen
+                  {t.beef.selectGame}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {GAME_OPTIONS.map((g) => (
+                  {gameOptions.map((g) => (
                     <button
                       key={g.value}
                       onClick={() => setCreateForm(f => ({ ...f, gameType: g.value }))}
@@ -782,11 +783,11 @@ export default function BeefPage() {
                 className="w-full py-4 rounded-2xl bg-primary-fixed-dim text-on-primary-container
                   font-bold text-sm disabled:opacity-40 transition-opacity"
               >
-                {creating ? '...' : '🥊 Beef einreichen'}
+                {creating ? '...' : t.beef.submit}
               </button>
 
               <p className="text-xs text-on-surface-variant text-center">
-                Dein Beef wird nach Admin-Prüfung freigegeben.
+                {t.beef.submitHint}
               </p>
             </div>
           )}

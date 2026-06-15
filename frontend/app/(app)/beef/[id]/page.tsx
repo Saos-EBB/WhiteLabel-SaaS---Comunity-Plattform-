@@ -11,6 +11,7 @@ import { connectHiddenBeef, disconnectHiddenBeef } from '@/lib/socket'
 import { GameOverlay } from '@/components/beef/GameOverlay'
 import type { GameType } from '@/components/beef/GameOverlay'
 import { useCountdown } from '@/lib/hooks/useCountdown'
+import { useTranslation } from '@/lib/i18n'
 
 interface BeefDetail {
   id: string
@@ -55,6 +56,7 @@ function parsePassage(raw: string): { nickname: string; content: string }[] {
 
 export default function LiveBeefPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { t } = useTranslation()
   const router = useRouter()
   const isHidden = useHiddenStore((s) => s.isHidden)
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -188,7 +190,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
       })
       await load()
     } catch (e: any) {
-      alert(e?.message ?? 'Fehler beim Voten')
+      alert(e?.message ?? t.beef.voteError)
     } finally { setVoting(false) }
   }
 
@@ -248,7 +250,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
         {isClosed && (
           <span className="text-xs font-bold text-primary-fixed-dim bg-primary-fixed-dim/20
             px-2 py-1 rounded-full">
-            CLOSED
+            {t.beef.statusClosed}
           </span>
         )}
       </div>
@@ -279,7 +281,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
             }`}>
               {beef.initiator_nickname ?? '???'}
             </span>
-            <span className="text-xs text-on-surface-variant">Initiator</span>
+            <span className="text-xs text-on-surface-variant">{t.beef.roleInitiator}</span>
             {isClosed && beef.winner_id === beef.initiator_id && (
               <Trophy size={14} className="text-primary-fixed-dim"/>
             )}
@@ -310,7 +312,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
             }`}>
               {beef.target_nickname ?? '???'}
             </span>
-            <span className="text-xs text-on-surface-variant">Target</span>
+            <span className="text-xs text-on-surface-variant">{t.beef.roleTarget}</span>
             {isClosed && beef.winner_id === beef.target_id && (
               <Trophy size={14} className="text-primary-fixed-dim"/>
             )}
@@ -326,7 +328,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
           currentUserId === beef.target_id    ? beef.target_nickname    : null
         return (
           <div className="bg-surface-container-low border border-outline-variant rounded-2xl p-4 mb-4">
-            <p className="text-xs text-on-surface-variant mb-3">Chat Passage</p>
+            <p className="text-xs text-on-surface-variant mb-3">{t.beef.chatPassageSection}</p>
             <div className="flex flex-col gap-2">
               {parsePassage(beef.chat_passage).map((line, i) => {
                 const isOwn        = ownNickname != null && line.nickname === ownNickname
@@ -356,9 +358,9 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
         <div className="bg-surface-container border border-outline-variant
           rounded-2xl p-4 mb-4">
           <div className="flex justify-between text-xs text-on-surface-variant mb-2">
-            <span>{beef.initiator_coins} Coins</span>
-            <span className="text-on-surface">{totalCoins} total</span>
-            <span>{beef.target_coins} Coins</span>
+            <span>{beef.initiator_coins} 🪙</span>
+            <span className="text-on-surface">{totalCoins} {t.beef.totalLabel}</span>
+            <span>{beef.target_coins} 🪙</span>
           </div>
           <div className="h-3 rounded-full overflow-hidden flex">
             <div
@@ -369,7 +371,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
           </div>
           <div className="flex justify-between text-xs text-on-surface-variant mt-1">
             <span>{initPct}%</span>
-            <span>{beef.total_votes} Votes</span>
+            <span>{beef.total_votes} {t.beef.votesLabel}</span>
             <span>{100 - initPct}%</span>
           </div>
         </div>
@@ -379,8 +381,8 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
       {isClosed && beef.winner_id === null && (
         <div className="bg-surface-container border border-outline-variant
           rounded-2xl p-4 mb-4 text-center">
-          <p className="font-bold text-on-surface text-lg">💥 DOUBLE KO</p>
-          <p className="text-sm text-on-surface-variant">Unentschieden — alles ans Haus</p>
+          <p className="font-bold text-on-surface text-lg">{t.beef.doubleKo}</p>
+          <p className="text-sm text-on-surface-variant">{t.beef.doubleKoDesc}</p>
         </div>
       )}
 
@@ -411,7 +413,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
         <div className="bg-surface-container border border-outline-variant
           rounded-2xl p-4 mb-4">
           <p className="text-sm font-semibold text-on-surface mb-3">
-            🗳️ Voten — {balance !== null ? `${balance} Coins verfügbar` : ''}
+            {t.beef.voteHeader}{balance !== null ? ` — ${t.beef.coinsAvailable.replace('{balance}', String(balance))}` : ''}
           </p>
 
           {/* Wager presets */}
@@ -453,12 +455,11 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
         <div className="bg-primary-fixed-dim/10 border border-primary-fixed-dim
           rounded-2xl p-4 mb-4 text-center">
           <p className="text-sm text-on-surface">
-            Du hast {beef.user_vote.coins_wagered} 🪙 auf{' '}
-            <span className="font-bold">
-              {beef.user_vote.side === 'initiator'
-                ? beef.initiator_nickname ?? 'Initiator'
-                : beef.target_nickname ?? 'Target'}
-            </span> gesetzt
+            {t.beef.alreadyVotedFor
+              .replace('{coins}', String(beef.user_vote.coins_wagered))
+              .replace('{nickname}', beef.user_vote.side === 'initiator'
+                ? (beef.initiator_nickname ?? t.beef.roleInitiator)
+                : (beef.target_nickname ?? t.beef.roleTarget))}
           </p>
         </div>
       )}
@@ -466,12 +467,12 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
       {/* Comments */}
       <div className="flex flex-col gap-3">
         <p className="text-sm font-semibold text-on-surface">
-          Kommentare ({comments.length})
+          {t.beef.commentsHeader.replace('{count}', String(comments.length))}
         </p>
 
         {comments.length === 0 ? (
           <p className="text-xs text-on-surface-variant text-center py-4">
-            Noch keine Kommentare
+            {t.beef.noComments}
           </p>
         ) : (
           <div className="flex flex-col gap-2">
@@ -508,7 +509,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
               <div className="flex items-center justify-center gap-2 bg-surface-container-high
                 border border-outline-variant rounded-xl px-3 py-2 mt-1">
                 <span className="text-xs text-on-surface-variant">
-                  🕐 Kommentare schließen in
+                  {t.beef.commentWindowLabel}
                 </span>
                 <span className="text-xs font-mono font-bold text-primary-fixed-dim">
                   {commentWindowCountdown}
@@ -522,7 +523,7 @@ export default function LiveBeefPage({ params }: { params: Promise<{ id: string 
                 onChange={(e) => setComment(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleComment()}
                 maxLength={500}
-                placeholder="Kommentar..."
+                placeholder={t.beef.commentPlaceholder}
                 className="flex-1 bg-surface-container-low border border-outline-variant
                   rounded-lg px-4 py-2.5 text-on-surface text-sm outline-none
                   focus:border-primary-fixed-dim"

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Socket } from 'socket.io-client'
 import { fetchApi } from '@/lib/api'
+import { useTranslation } from '@/lib/i18n'
 
 const TURN_MS = 25_000
 
@@ -76,6 +77,7 @@ export function TicTacToeGame({
   const turnStartRef = useRef<number>(0)
 
   // Initiator = X, Target = O
+  const { t } = useTranslation()
   const myMark: Cell = currentUserId === initiatorId ? 'X' : currentUserId === targetId ? 'O' : null
   const isMyTurn = currentUserId === currentTurn
 
@@ -139,7 +141,7 @@ export function TicTacToeGame({
         body: JSON.stringify({ move: { position: index } }),
       })
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Fehler')
+      alert(e instanceof Error ? e.message : t.common.error)
     } finally {
       setSubmitting(false)
     }
@@ -178,8 +180,8 @@ export function TicTacToeGame({
           <span className="text-[10px] text-on-surface-variant font-mono">X</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-xs text-on-surface-variant">Spiel {gameNumber}/3</span>
-          <span className="text-sm font-bold text-on-surface">Best of 3</span>
+          <span className="text-xs text-on-surface-variant">{t.beef.tttGameLabel.replace('{n}', String(gameNumber))}</span>
+          <span className="text-sm font-bold text-on-surface">{t.beef.tttBestOf3}</span>
         </div>
         <div className="flex flex-col items-center flex-1">
           <span className="text-xs text-on-surface-variant">{targetNickname}</span>
@@ -192,23 +194,23 @@ export function TicTacToeGame({
       {gameWinner ? (
         <div className="text-center bg-primary-fixed-dim/10 border border-primary-fixed-dim rounded-xl p-3">
           <p className="font-bold text-primary-fixed-dim">
-            🏆 {winnerName(gameWinner)} gewinnt den Beef!
+            {t.beef.tttWinsBeef.replace('{name}', winnerName(gameWinner))}
           </p>
         </div>
       ) : roundOver ? (
         <div className="text-center rounded-xl p-3 border-2 border-yellow-400/60 bg-yellow-400/10 animate-pulse">
           {roundWinner === 'draw' ? (
-            <p className="font-bold text-yellow-400">🤝 Unentschieden — Runde {gameNumber} wiederholt!</p>
+            <p className="font-bold text-yellow-400">{t.beef.tttDrawRepeat.replace('{n}', String(gameNumber))}</p>
           ) : (
             <p className="font-bold text-yellow-400">
-              🏆 {roundWinnerName()} gewinnt Runde {gameNumber}!
+              {t.beef.tttWinsRound.replace('{name}', roundWinnerName() ?? '').replace('{n}', String(gameNumber))}
             </p>
           )}
-          <p className="text-xs text-on-surface-variant mt-1">Nächste Runde startet...</p>
+          <p className="text-xs text-on-surface-variant mt-1">{t.beef.tttNextRound}</p>
         </div>
       ) : isDraw ? (
         <div className="text-center bg-surface-container-high border border-outline-variant rounded-xl p-3">
-          <p className="font-bold text-on-surface">🤝 Unentschieden — Extra-Runde!</p>
+          <p className="font-bold text-on-surface">{t.beef.tttDrawExtra}</p>
         </div>
       ) : (
         <div className={`text-center py-3 px-4 rounded-xl border-2 transition-colors ${
@@ -221,9 +223,9 @@ export function TicTacToeGame({
           }`}>
             {isParticipant
               ? isMyTurn
-                ? `Du bist dran (${myMark})`
-                : `${turnName()} ist dran`
-              : `${turnName()} ist dran`}
+                ? t.beef.tttMyTurn.replace('{mark}', myMark ?? '')
+                : t.beef.tttTheirTurn.replace('{name}', turnName())
+              : t.beef.tttTheirTurn.replace('{name}', turnName())}
           </p>
         </div>
       )}
@@ -271,13 +273,13 @@ export function TicTacToeGame({
             />
           </div>
           <span className="text-xs text-on-surface-variant">
-            {isMyTurn && isParticipant ? 'Sekunden zum Ziehen' : 'Verbleibende Zeit'}
+            {isMyTurn && isParticipant ? t.beef.tttSecondsToMove : t.beef.tttTimeLeft}
           </span>
         </div>
       )}
 
       {!isParticipant && (
-        <p className="text-center text-xs text-on-surface-variant">Zuschauer — read only</p>
+        <p className="text-center text-xs text-on-surface-variant">{t.beef.spectatorHint}</p>
       )}
     </div>
   )

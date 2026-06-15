@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Trophy } from 'lucide-react'
 import { useCountdown } from '@/lib/hooks/useCountdown'
+import { useTranslation } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -79,12 +80,13 @@ export function WinnerScreen({
   currentUserId,
   onClose,
 }: WinnerScreenProps) {
+  const { t } = useTranslation()
   // Stable deadline: 5 min from first render
   const [closesAt] = useState(() => new Date(Date.now() + 5 * 60 * 1000).toISOString())
   const countdown = useCountdown(closesAt)
 
   useEffect(() => {
-    if (countdown === 'Vorbei') onClose()
+    if (countdown === null) onClose()
   }, [countdown, onClose])
 
   // ── Derived values ───────────────────────────────────────────────────────
@@ -111,7 +113,7 @@ export function WinnerScreen({
       <div className="flex flex-col items-center gap-1 pt-4">
         <Trophy size={36} className="text-primary-fixed-dim" />
         <h2 className="text-2xl font-bold text-on-surface">
-          {winnerId ? 'Gewinner!' : '💥 Unentschieden'}
+          {winnerId ? t.beef.winnerTitle : t.beef.drawTitle}
         </h2>
       </div>
 
@@ -122,9 +124,9 @@ export function WinnerScreen({
           <div className="text-center">
             <p className="text-xl font-bold text-on-surface">{winnerNickname}</p>
             {isWinner ? (
-              <p className="text-sm text-primary-fixed-dim font-semibold mt-1">Das bist du! 🎉</p>
+              <p className="text-sm text-primary-fixed-dim font-semibold mt-1">{t.beef.youWon}</p>
             ) : (
-              <p className="text-sm text-on-surface-variant mt-1">gewinnt diesen Beef</p>
+              <p className="text-sm text-on-surface-variant mt-1">{t.beef.winsThisBeef}</p>
             )}
           </div>
         </div>
@@ -133,7 +135,7 @@ export function WinnerScreen({
         <div className="flex flex-col items-center gap-2">
           <span className="text-6xl">🥊</span>
           <p className="text-sm text-on-surface-variant text-center">
-            Keiner gewinnt — Coins gehen ans Haus
+            {t.beef.noWinnerDesc}
           </p>
         </div>
       )}
@@ -142,7 +144,7 @@ export function WinnerScreen({
       {winnerId && (
         <div className="w-full flex flex-col gap-2">
           <p className="text-xs text-on-surface-variant uppercase tracking-widest font-semibold text-center mb-1">
-            Coin-Verteilung
+            {t.beef.coinDistribution}
           </p>
           <CoinRow
             label={`${winnerNickname ?? 'Winner'} (30%)`}
@@ -150,12 +152,12 @@ export function WinnerScreen({
             highlight
           />
           <CoinRow
-            label="Wetter (60%)"
+            label={t.beef.betters}
             amount={betterCoins}
           />
           <div className="text-center mt-1">
             <span className="text-xs text-on-surface-variant">
-              Gesamt im Pot: {potCoins} 🪙
+              {t.beef.potTotal.replace('{coins}', String(potCoins))}
             </span>
           </div>
         </div>
@@ -164,14 +166,14 @@ export function WinnerScreen({
       {/* Auto-close info */}
       <div className="mt-auto flex flex-col items-center gap-3">
         <p className="text-xs text-on-surface-variant">
-          Schließt automatisch in {countdown}
+          {t.beef.closesIn.replace('{countdown}', countdown ?? '')}
         </p>
         <button
           onClick={onClose}
           className="px-8 py-3 rounded-2xl bg-primary-fixed-dim text-on-primary-container
             font-bold text-sm hover:opacity-90 transition-opacity"
         >
-          Schließen
+          {t.common.close}
         </button>
       </div>
     </div>
