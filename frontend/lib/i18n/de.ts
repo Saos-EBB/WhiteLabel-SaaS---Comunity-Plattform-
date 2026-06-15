@@ -445,6 +445,11 @@ export const de = {
     reactionDoneSpectator: '✓ Fertig',
     myTime: 'Deine Zeit',
     reactionWaitingResults: 'Warte auf Ergebnisse...',
+    nextPassage: 'Weiter → Passage wählen',
+    nextGame: 'Weiter → Spiel wählen',
+    tapFirstMsg: 'Erste Nachricht antippen',
+    tapLastMsg: 'Letzte Nachricht antippen',
+    exileWarning: 'Du bist im Exil bis {until}.\nExil verlassen und Beef starten?',
   },
 
   footer: {

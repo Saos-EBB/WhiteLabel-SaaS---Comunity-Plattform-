@@ -434,6 +434,11 @@ export const en = {
     reactionDoneSpectator: '✓ Done',
     myTime: 'Your time',
     reactionWaitingResults: 'Waiting for results...',
+    nextPassage: 'Next → Choose passage',
+    nextGame: 'Next → Choose game',
+    tapFirstMsg: 'Tap first message',
+    tapLastMsg: 'Tap last message',
+    exileWarning: 'You are in exile until {until}.\nLeave exile and start beef?',
   },
 
   footer: {

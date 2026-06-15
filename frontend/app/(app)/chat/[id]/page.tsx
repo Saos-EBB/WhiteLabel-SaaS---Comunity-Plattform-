@@ -166,13 +166,13 @@ export default function ConversationPage() {
 
   const DURATION_OPTIONS = [
     // TODO: DELETE BEFORE SHIPMENT — dev/demo only
-    { label: '1 Min (DEV)',  value: 60 },
-    { label: '15 Min',     value: 900 },
-    { label: '1 Stunde',   value: 3600 },
-    { label: '6 Stunden',  value: 21600 },
-    { label: '12 Stunden', value: 43200 },
-    { label: '24 Stunden', value: 86400 },
-    { label: '48 Stunden', value: 172800 },
+    { label: '1 Min (DEV)', value: 60 },
+    { label: '15 Min',      value: 900 },
+    { label: '1h',          value: 3600 },
+    { label: '6h',          value: 21600 },
+    { label: '12h',         value: 43200 },
+    { label: '24h',         value: 86400 },
+    { label: '48h',         value: 172800 },
   ]
 
   const isHidden = useHiddenStore((s) => s.isHidden)
@@ -187,10 +187,10 @@ export default function ConversationPage() {
   const [beefError, setBeefError]           = useState<string | null>(null)
 
   const GAME_OPTIONS = [
-    { value: 'rps'        as const, label: 'Rock Paper Scissors', desc: 'Klassisch — Stein Papier Schere',       emoji: '✊' },
-    { value: 'tictactoe'  as const, label: 'Tic Tac Toe',          desc: 'Best of 3 — X vs O',                   emoji: '⬛' },
-    { value: 'mastermind' as const, label: 'Mastermind',           desc: 'Knack den Code — 4 Farben, 10 Runden',  emoji: '🎨' },
-    { value: 'reaction'   as const, label: 'Reaktionstest',         desc: 'Wer drückt schneller auf GO!',          emoji: '⚡' },
+    { value: 'rps'        as const, label: 'Rock Paper Scissors', desc: t.beef.rpsGameDesc,      emoji: '✊' },
+    { value: 'tictactoe'  as const, label: 'Tic Tac Toe',         desc: t.beef.tttGameDesc,      emoji: '⬛' },
+    { value: 'mastermind' as const, label: 'Mastermind',           desc: t.beef.mmGameDesc,       emoji: '🎨' },
+    { value: 'reaction'   as const, label: t.beef.reactionTitle,   desc: t.beef.reactionGameDesc, emoji: '⚡' },
   ]
 
   const [messages, setMessages] = useState<LocalMessage[]>([])
@@ -500,7 +500,7 @@ export default function ConversationPage() {
               { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
           : ''
         const leave = window.confirm(
-          `Du bist im Exil bis ${until}.\nExil verlassen und Beef starten?`
+          t.beef.exileWarning.replace('{until}', until)
         )
         if (!leave) { setBeefSubmitting(false); return }
         await fetchApi('/hidden/beef/exile/leave', { method: 'POST' }).catch(() => {})
@@ -525,7 +525,7 @@ export default function ConversationPage() {
       })
       closeBeef()
     } catch {
-      setBeefError('Fehler beim Senden — versuch nochmal')
+      setBeefError(t.beef.createError)
     } finally {
       setBeefSubmitting(false)
     }
@@ -588,7 +588,7 @@ export default function ConversationPage() {
           <button
             onClick={() => setBeefOpen(true)}
             className="p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
-            aria-label="Beef starten"
+            aria-label={t.beef.createTab}
           >
             <Swords size={20} aria-hidden />
           </button>
@@ -875,10 +875,10 @@ export default function ConversationPage() {
             {/* Header */}
             <div className="flex items-center justify-between flex-shrink-0">
               <span className="font-bold text-on-surface flex items-center gap-2">
-                <Swords size={18}/> Beef starten
+                <Swords size={18}/> {t.beef.createTab}
               </span>
               <button onClick={closeBeef} className="text-on-surface-variant text-sm hover:text-on-surface">
-                Abbrechen
+                {t.common.cancel}
               </button>
             </div>
 
@@ -886,7 +886,7 @@ export default function ConversationPage() {
             {beefStep === 'tldr' && (
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-on-surface-variant">
-                  Worum geht's? (max. 50 Zeichen)
+                  {t.beef.tldrLabel}
                 </p>
                 <div className="relative">
                   <input
@@ -894,7 +894,7 @@ export default function ConversationPage() {
                     maxLength={50}
                     value={beefTldr}
                     onChange={(e) => setBeefTldr(e.target.value)}
-                    placeholder="z.B. er hat mich disrespected"
+                    placeholder={t.beef.tldrPlaceholder}
                     className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface text-sm outline-none focus:border-primary-fixed-dim"
                     autoFocus
                   />
@@ -904,7 +904,7 @@ export default function ConversationPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <p className="text-xs text-on-surface-variant">
-                    Dauer des Beefs
+                    {t.beef.durationLabel}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {DURATION_OPTIONS.map(opt => (
@@ -927,7 +927,7 @@ export default function ConversationPage() {
                   disabled={beefTldr.trim().length === 0}
                   className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
                 >
-                  Weiter → Passage wählen
+                  {t.beef.nextPassage}
                 </button>
               </div>
             )}
@@ -958,14 +958,14 @@ export default function ConversationPage() {
                   <div className="flex items-center justify-between flex-shrink-0">
                     <button onClick={() => setBeefStep('tldr')}
                       className="text-xs text-on-surface-variant hover:text-on-surface">
-                      ← zurück
+                      {t.common.back}
                     </button>
                     <span className="text-xs text-on-surface-variant">
                       {rangeStart === null
-                        ? 'Erste Nachricht antippen'
+                        ? t.beef.tapFirstMsg
                         : rangeEnd === null
-                        ? 'Letzte Nachricht antippen'
-                        : `${selectedCount} Nachricht${selectedCount > 1 ? 'en' : ''} gewählt`}
+                        ? t.beef.tapLastMsg
+                        : t.beef.selectedCount.replace('{count}', String(selectedCount))}
                     </span>
                   </div>
 
@@ -1019,7 +1019,9 @@ export default function ConversationPage() {
                     disabled={rangeStart === null}
                     className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity flex-shrink-0"
                   >
-                    {`Weiter → Spiel wählen${selectedCount > 0 ? ` (${selectedCount} Msg)` : ''}`}
+                    {selectedCount > 0
+                      ? `${t.beef.nextGame} (${selectedCount} Msg)`
+                      : t.beef.nextGame}
                   </button>
 
                 </div>
@@ -1032,9 +1034,9 @@ export default function ConversationPage() {
                 <div className="flex items-center justify-between flex-shrink-0">
                   <button onClick={() => setBeefStep('passage')}
                     className="text-xs text-on-surface-variant hover:text-on-surface">
-                    ← zurück
+                    {t.common.back}
                   </button>
-                  <span className="text-xs text-on-surface-variant">Mini-Game auswählen</span>
+                  <span className="text-xs text-on-surface-variant">{t.beef.selectGame}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -1064,7 +1066,7 @@ export default function ConversationPage() {
                   disabled={beefSubmitting}
                   className="w-full py-3 rounded-lg bg-primary-fixed-dim text-on-primary-container font-semibold text-sm disabled:opacity-40 transition-opacity"
                 >
-                  {beefSubmitting ? 'Sende...' : '🥊 Beef starten'}
+                  {beefSubmitting ? t.common.loading : t.beef.fight}
                 </button>
               </div>
             )}

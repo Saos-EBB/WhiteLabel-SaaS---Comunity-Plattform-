@@ -434,6 +434,11 @@ export const deEasy = {
     reactionDoneSpectator: '✓ Fertig',
     myTime: 'Deine Zeit',
     reactionWaitingResults: 'Warte auf Ergebnisse...',
+    nextPassage: 'Weiter: Passage wählen',
+    nextGame: 'Weiter: Spiel wählen',
+    tapFirstMsg: 'Klicke auf die erste Nachricht',
+    tapLastMsg: 'Klicke auf die letzte Nachricht',
+    exileWarning: 'Du bist im Exil bis {until}. Willst du das Exil verlassen und einen Beef starten?',
   },
 
   footer: {

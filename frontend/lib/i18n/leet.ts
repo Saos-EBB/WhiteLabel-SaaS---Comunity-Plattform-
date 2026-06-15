@@ -421,6 +421,11 @@ export const leetspeak = {
     reactionDoneSpectator: '✓ D0n3',
     myTime: 'Y0ur 71m3',
     reactionWaitingResults: 'W4171n6 f0r r35ul75...',
+    nextPassage: 'N3x7 → Ch0053 p4554g3',
+    nextGame: 'N3x7 → Ch0053 g4m3',
+    tapFirstMsg: 'T4p f1r57 m3554g3',
+    tapLastMsg: 'T4p l457 m3554g3',
+    exileWarning: 'Y0ur 1n 3x1l3 7111 {until}.\nL34v3 4nd 574r7 b33f?',
   },
   footer: {
     impressum: '1mpr1n7',

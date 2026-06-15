@@ -465,6 +465,12 @@ export interface Translations {
     reactionDoneSpectator: string
     myTime: string
     reactionWaitingResults: string
+    // Chat beef modal
+    nextPassage: string
+    nextGame: string
+    tapFirstMsg: string
+    tapLastMsg: string
+    exileWarning: string
   }
   footer: {
     impressum: string
