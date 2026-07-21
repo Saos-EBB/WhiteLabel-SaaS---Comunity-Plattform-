@@ -40,9 +40,15 @@ export function useBootstrap() {
         setIsReady(true)
       })
       .catch((err: unknown) => {
-        if (!(err instanceof Error && err.message === 'Session expired')) {
-          console.error('[AuthProvider] profile fetch failed:', err)
+        if (err instanceof Error && err.message === 'Session expired') {
+          setIsLoading(false)
+          return
         }
+        if (err instanceof Error && err.message === 'Profil nicht gefunden') {
+          useAuthStore.getState().logout()
+          return
+        }
+        console.error('[AuthProvider] profile fetch failed:', err)
         setIsLoading(false)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps

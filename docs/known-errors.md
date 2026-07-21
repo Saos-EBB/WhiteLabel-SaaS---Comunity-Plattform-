@@ -4,6 +4,16 @@ Wiederkehrende Fehler mit Ursache und Fix. Neue Einträge oben anhängen.
 
 ---
 
+## [FE] Console Error "Profil nicht gefunden" — at fetchApi (lib/api.ts:79)
+
+**Wann:** App-Start (`useBootstrap` → `GET /profile/me`), meist wenn ein Test-Account während einer offenen Session gelöscht wurde.
+
+**Ursache:** `JwtGuard` prüft nur Signatur + Ablauf des Access Tokens, nicht ob der User in der DB noch existiert. Wird der Account hart gelöscht (z.B. `delete-user.ts`), bleibt der Token bis zu 15 Min gültig — `/profile/me` liefert dann 404, weil `users`/`profiles`-Zeile weg ist. `useBootstrap` behandelte nur den 401-Fall ("Session expired") speziell, ein 404 landete unbehandelt in `console.error` und der Client blieb in einem halb-eingeloggten Zustand hängen.
+
+**Fix:** `useBootstrap.ts` behandelt `'Profil nicht gefunden'` jetzt wie eine abgelaufene Session: `useAuthStore.getState().logout()` (Store leeren + Redirect auf `/login`).
+
+---
+
 ## [BE] Endlos-401-Loop nach Login: chat/conversations, profile/me, auth/refresh
 
 **Wann:** Nach Login (oder beim Öffnen einer geschützten Seite mit einem alten Browser-Cookie) feuern `GET /chat/conversations`, `GET /profile/me` und `POST /auth/refresh` im Sekundentakt 401, Access Token wird nie erneuert.
