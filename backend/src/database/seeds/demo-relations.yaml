@@ -1533,3 +1533,590 @@ blocks:
   # — ironischerweise nicht ganz falsch → trotzdem geblockt
   - blocker: makima
     blocked: infowarrior
+
+
+# -----------------------------------------------------------------------------
+# BEEF INTERACTIONS: Votes + Comments
+# Jeder Beef hat min. 15 verschiedene Voter aus dem User-Set.
+# Jeder Voter hat auch mindestens einen Kommentar verfasst.
+#
+# Struktur pro Eintrag:
+#   beef_initiator / beef_target → Eindeutige Identifikation des Beefs
+#   votes[].voter   → Nickname des Voters
+#   votes[].side    → 'initiator' | 'target'
+#   votes[].coins_wagered → Einsatz (default: 1)
+#   comments[].user     → Nickname des Kommentators
+#   comments[].content  → Kommentartext
+#   comments[].minutes_ago → Zeitstempel (NOW() - X Minuten)
+# -----------------------------------------------------------------------------
+
+beef_interactions:
+
+  # ---------------------------------------------------------------------------
+  # BEEF 1: theMac vs theeagle — Pineapple on Pizza
+  # 17 Voter — Community ist gespalten. Leichte Mehrheit gegen Ananas.
+  # ---------------------------------------------------------------------------
+  - beef_initiator: theMac
+    beef_target: theeagle
+
+    votes:
+      - voter: roro
+        side: target
+        coins_wagered: 2
+      - voter: tifa
+        side: initiator
+        coins_wagered: 3
+      - voter: denji
+        side: initiator
+        coins_wagered: 1
+      - voter: gutz
+        side: target
+        coins_wagered: 2
+      - voter: saos43
+        side: initiator
+        coins_wagered: 2
+      - voter: dualapeep
+        side: initiator
+        coins_wagered: 1
+      - voter: infowarrior
+        side: target
+        coins_wagered: 1
+      - voter: gandalf
+        side: target
+        coins_wagered: 3
+      - voter: 50cent
+        side: target
+        coins_wagered: 2
+      - voter: princeofdarkness
+        side: initiator
+        coins_wagered: 1
+      - voter: frankwhite
+        side: target
+        coins_wagered: 2
+      - voter: orangensaft
+        side: initiator
+        coins_wagered: 1
+      - voter: slash
+        side: target
+        coins_wagered: 2
+      - voter: hinata
+        side: initiator
+        coins_wagered: 1
+      - voter: yenn
+        side: initiator
+        coins_wagered: 1
+      - voter: banger
+        side: target
+        coins_wagered: 2
+      - voter: makima
+        side: target
+        coins_wagered: 3
+
+    comments:
+      - user: roro
+        content: "fruit does not go on pizza. this is not a difficult question."
+        minutes_ago: 1380
+      - user: tifa
+        content: "the sweet and salty combo is objectively good. theeagle is wrong."
+        minutes_ago: 1320
+      - user: denji
+        content: "pineapple pizza slaps. I ate three slices last tuesday and I felt powerful."
+        minutes_ago: 1260
+      - user: gutz
+        content: "theeagle is right. pineapple on pizza is a category error."
+        minutes_ago: 1200
+      - user: saos43
+        content: "sweet + savory is a valid flavor profile. this has been scientifically verified."
+        minutes_ago: 1100
+      - user: dualapeep
+        content: "pineapple on pizza is delicious and I will not apologize for this opinion."
+        minutes_ago: 1000
+      - user: infowarrior
+        content: "the deep state put pineapple on pizza to distract us from the real issues. theeagle sees through it."
+        minutes_ago: 900
+      - user: gandalf
+        content: "one does not simply put fruit on a pizza."
+        minutes_ago: 800
+      - user: 50cent
+        content: "pineapple on pizza is a crime. theeagle got it right. this is not debatable."
+        minutes_ago: 700
+      - user: princeofdarkness
+        content: "I bit the head off a bat. I can handle pineapple on pizza. theMac has my full support."
+        minutes_ago: 600
+      - user: frankwhite
+        content: "a pizza should have dignity. pineapple removes that dignity entirely."
+        minutes_ago: 500
+      - user: orangensaft
+        content: "bro pineapple pizza hits different after midnight. theMac is right."
+        minutes_ago: 400
+      - user: slash
+        content: "some things don't belong together. pineapple and pizza is one of them."
+        minutes_ago: 300
+      - user: hinata
+        content: "I love pineapple pizza!! it's sweet and good!! theMac is right!!"
+        minutes_ago: 200
+      - user: yenn
+        content: "theeagle's argument is weak. fruit on pizza is a valid creative choice."
+        minutes_ago: 150
+      - user: banger
+        content: "pineapple pizza is disrespectful to the craft. I won't stand for it."
+        minutes_ago: 80
+      - user: makima
+        content: "theeagle is correct. certain things don't belong where they have been placed."
+        minutes_ago: 25
+
+
+  # ---------------------------------------------------------------------------
+  # BEEF 2: denji vs roro — Who handles 3 weapons better?
+  # 17 Voter — klare Mehrheit für roro. Denji hat loyale Minderheit.
+  # ---------------------------------------------------------------------------
+  - beef_initiator: denji
+    beef_target: roro
+
+    votes:
+      - voter: theMac
+        side: target
+        coins_wagered: 3
+      - voter: tifa
+        side: target
+        coins_wagered: 2
+      - voter: dualapeep
+        side: target
+        coins_wagered: 2
+      - voter: gutz
+        side: target
+        coins_wagered: 2
+      - voter: saos43
+        side: target
+        coins_wagered: 2
+      - voter: makima
+        side: initiator
+        coins_wagered: 3
+      - voter: infowarrior
+        side: initiator
+        coins_wagered: 1
+      - voter: 50cent
+        side: target
+        coins_wagered: 2
+      - voter: gandalf
+        side: target
+        coins_wagered: 3
+      - voter: robin
+        side: target
+        coins_wagered: 2
+      - voter: chun_li
+        side: target
+        coins_wagered: 2
+      - voter: slash
+        side: target
+        coins_wagered: 2
+      - voter: princeofdarkness
+        side: initiator
+        coins_wagered: 1
+      - voter: gojo
+        side: target
+        coins_wagered: 2
+      - voter: inusuke
+        side: initiator
+        coins_wagered: 1
+      - voter: banger
+        side: target
+        coins_wagered: 2
+      - voter: power
+        side: initiator
+        coins_wagered: 1
+
+    comments:
+      - user: theMac
+        content: "three different swords vs three chainsaws on the same body. roro wins this obviously."
+        minutes_ago: 1350
+      - user: tifa
+        content: "roro handles three swords with different reach, weight and technique. denji's are the same weapon."
+        minutes_ago: 1250
+      - user: dualapeep
+        content: "I'm not even a little bit biased when I say roro is absolutely correct about this."
+        minutes_ago: 1150
+      - user: gutz
+        content: "three swords with different styles > three chainsaws on different body parts. case closed."
+        minutes_ago: 1050
+      - user: saos43
+        content: "denji's logic here is genuinely broken and I say that with no personal bias whatsoever."
+        minutes_ago: 950
+      - user: makima
+        content: "denji is right. he has three weapons. I've verified this personally."
+        minutes_ago: 850
+      - user: infowarrior
+        content: "the mainstream weapon community doesn't want you to know that chainsaws are extremely versatile tools."
+        minutes_ago: 750
+      - user: 50cent
+        content: "roro wins this. different weapons require different techniques. denji just has one move three times."
+        minutes_ago: 650
+      - user: gandalf
+        content: "three swords of different weight, length and balance. this is not the same weapon thrice repeated."
+        minutes_ago: 550
+      - user: robin
+        content: "from an academic standpoint, denji's argument conflates weapon type with weapon placement."
+        minutes_ago: 450
+      - user: chun_li
+        content: "a fighter who trains three different weapons develops three distinct skill sets. denji trains one thing."
+        minutes_ago: 380
+      - user: slash
+        content: "roro. no contest."
+        minutes_ago: 310
+      - user: princeofdarkness
+        content: "I respect anyone who has chainsaws on their head. this is genuinely metal energy and I support it."
+        minutes_ago: 240
+      - user: gojo
+        content: "roro would last maybe thirty seconds against me but he's right about the weapon thing."
+        minutes_ago: 170
+      - user: inusuke
+        content: "denji uses his whole body as a weapon. that's actually more impressive than carrying swords around."
+        minutes_ago: 110
+      - user: banger
+        content: "three identical weapons on different body parts is still one weapon. roro is the clear answer."
+        minutes_ago: 60
+      - user: power
+        content: "more weapons on your body equals more dangerous. this is simple math and denji has it."
+        minutes_ago: 20
+
+
+  # ---------------------------------------------------------------------------
+  # BEEF 3: makima vs sylvanas — Whose pets are cuter?
+  # 17 Voter — knappe Mehrheit für makima. Sylvanas-Fans haben starke Argumente.
+  # ---------------------------------------------------------------------------
+  - beef_initiator: makima
+    beef_target: sylvanas
+
+    votes:
+      - voter: roro
+        side: target
+        coins_wagered: 2
+      - voter: robin
+        side: initiator
+        coins_wagered: 2
+      - voter: gojo
+        side: initiator
+        coins_wagered: 2
+      - voter: denji
+        side: initiator
+        coins_wagered: 3
+      - voter: levi
+        side: target
+        coins_wagered: 2
+      - voter: chun_li
+        side: target
+        coins_wagered: 2
+      - voter: gutz
+        side: initiator
+        coins_wagered: 2
+      - voter: saos43
+        side: target
+        coins_wagered: 2
+      - voter: gandalf
+        side: target
+        coins_wagered: 3
+      - voter: power
+        side: initiator
+        coins_wagered: 1
+      - voter: tifa
+        side: target
+        coins_wagered: 2
+      - voter: dualapeep
+        side: initiator
+        coins_wagered: 1
+      - voter: theMac
+        side: initiator
+        coins_wagered: 2
+      - voter: frankwhite
+        side: target
+        coins_wagered: 2
+      - voter: diobrando
+        side: initiator
+        coins_wagered: 2
+      - voter: winkler
+        side: target
+        coins_wagered: 1
+      - voter: goated
+        side: initiator
+        coins_wagered: 1
+
+    comments:
+      - user: roro
+        content: "wolves that chose you > dogs that follow you everywhere. sylvanas wins this."
+        minutes_ago: 1350
+      - user: robin
+        content: "makima's pets behave with remarkable precision. I've had occasion to observe this."
+        minutes_ago: 1280
+      - user: gojo
+        content: "I don't know what makima's dogs actually are but I'm voting for her anyway."
+        minutes_ago: 1200
+      - user: denji
+        content: "makima's dogs are the most loyal dogs in the world. I would know."
+        minutes_ago: 1100
+      - user: levi
+        content: "a wolf that chose to follow you is worth more than any trained pet. sylvanas."
+        minutes_ago: 1000
+      - user: chun_li
+        content: "sylvanas commands loyalty through strength and sacrifice. makima's situation is more complicated."
+        minutes_ago: 900
+      - user: gutz
+        content: "technically the platform already settled this. makima won. I'm just confirming the result."
+        minutes_ago: 800
+      - user: saos43
+        content: "undead wolves who chose to follow you is objectively more impressive than regular dogs."
+        minutes_ago: 700
+      - user: gandalf
+        content: "true loyalty is given freely. the question here is whether it was."
+        minutes_ago: 600
+      - user: power
+        content: "I'm voting for makima because her dogs are extremely well trained and I don't want any trouble."
+        minutes_ago: 500
+      - user: tifa
+        content: "wolves that fight with you by choice > dogs that can't leave even if they wanted to."
+        minutes_ago: 420
+      - user: dualapeep
+        content: "makima's pets clearly adore her. that's actually really sweet when you think about it."
+        minutes_ago: 350
+      - user: theMac
+        content: "makima's dogs show up every time. sylvanas' wolves show up every time. but makima's are more obedient."
+        minutes_ago: 280
+      - user: frankwhite
+        content: "an army of wolves you lead through sheer force of presence. that's the correct answer here."
+        minutes_ago: 210
+      - user: diobrando
+        content: "I appreciate control in all its forms. makima understands this on a level most do not."
+        minutes_ago: 140
+      - user: winkler
+        content: "sylvanas. obviously. this should not be a close vote."
+        minutes_ago: 80
+      - user: goated
+        content: "makima clearly loves her pets so much and that love is returned tenfold!! voting makima!!"
+        minutes_ago: 30
+
+
+  # ---------------------------------------------------------------------------
+  # BEEF 4: infowarrior vs robin — "She is a WITCH"
+  # 17 Voter — Klare Mehrheit für robin. Infowarrior hat drei Verbündete.
+  # ---------------------------------------------------------------------------
+  - beef_initiator: infowarrior
+    beef_target: robin
+
+    votes:
+      - voter: gandalf
+        side: target
+        coins_wagered: 3
+      - voter: gutz
+        side: target
+        coins_wagered: 2
+      - voter: saos43
+        side: target
+        coins_wagered: 2
+      - voter: roro
+        side: target
+        coins_wagered: 3
+      - voter: makima
+        side: target
+        coins_wagered: 2
+      - voter: theMac
+        side: initiator
+        coins_wagered: 1
+      - voter: tifa
+        side: target
+        coins_wagered: 2
+      - voter: denji
+        side: target
+        coins_wagered: 1
+      - voter: 50cent
+        side: target
+        coins_wagered: 2
+      - voter: princeofdarkness
+        side: initiator
+        coins_wagered: 1
+      - voter: pfp_1
+        side: target
+        coins_wagered: 1
+      - voter: dualapeep
+        side: target
+        coins_wagered: 2
+      - voter: chun_li
+        side: target
+        coins_wagered: 2
+      - voter: gojo
+        side: target
+        coins_wagered: 2
+      - voter: lemmy
+        side: initiator
+        coins_wagered: 1
+      - voter: frankwhite
+        side: target
+        coins_wagered: 2
+      - voter: winkler
+        side: target
+        coins_wagered: 1
+
+    comments:
+      - user: gandalf
+        content: "I may have mentioned the Poneglyphs to infowarrior. I accept full responsibility. robin is not a witch."
+        minutes_ago: 1400
+      - user: gutz
+        content: "the witch allegation has been reviewed by moderation. there is no evidence. case closed."
+        minutes_ago: 1300
+      - user: saos43
+        content: "she's an archaeologist. she reads historical stones. this is not witchcraft by any definition."
+        minutes_ago: 1200
+      - user: roro
+        content: "she's my nakama. not a witch. I will not be elaborating further."
+        minutes_ago: 1100
+      - user: makima
+        content: "robin is many things. witch is not one of them. though I understand why someone might be confused."
+        minutes_ago: 1000
+      - user: theMac
+        content: "I've been to Ohara. actually I haven't but the chemtrails thing is starting to add up."
+        minutes_ago: 900
+      - user: tifa
+        content: "she can sprout arms from flat surfaces. but not a witch. anime logic is simply different."
+        minutes_ago: 800
+      - user: denji
+        content: "makima told me to vote for robin so I am voting for robin."
+        minutes_ago: 700
+      - user: 50cent
+        content: "the infowarrior allegations are unsubstantiated. robin is clearly an academic with a specialty."
+        minutes_ago: 600
+      - user: princeofdarkness
+        content: "I have read forbidden texts myself. I understand the fear. infowarrior may be onto something real."
+        minutes_ago: 500
+      - user: pfp_1
+        content: "I came here after seeing the profile picture proof and I'm sorry but that's just ruins. normal ruins."
+        minutes_ago: 420
+      - user: dualapeep
+        content: "the profile picture is not evidence of witchcraft. that's just Ohara. it's an archaeological site."
+        minutes_ago: 350
+      - user: chun_li
+        content: "a scholar who reads suppressed history is not a witch. she's just better informed than most."
+        minutes_ago: 280
+      - user: gojo
+        content: "I can sense cursed energy. robin has none. infowarrior has whatever the opposite of cursed energy is."
+        minutes_ago: 210
+      - user: lemmy
+        content: "I've been accumulating grievances since 1968. some of them do involve suppressed knowledge. I'm listening."
+        minutes_ago: 140
+      - user: frankwhite
+        content: "Poneglyphs are historical artifacts carved in stone. infowarrior should be worried about more concrete things."
+        minutes_ago: 75
+      - user: winkler
+        content: "I'm voting for robin. she seems like someone who has her life completely together."
+        minutes_ago: 30
+
+
+  # ---------------------------------------------------------------------------
+  # BEEF 5: 50cent vs diddydone — We need to talk about your parties
+  # 17 Voter — Überwältigende Mehrheit für 50cent. Diddydone hat zwei Loyale.
+  # ---------------------------------------------------------------------------
+  - beef_initiator: 50cent
+    beef_target: diddydone
+
+    votes:
+      - voter: theMac
+        side: initiator
+        coins_wagered: 3
+      - voter: roro
+        side: initiator
+        coins_wagered: 2
+      - voter: gutz
+        side: initiator
+        coins_wagered: 2
+      - voter: saos43
+        side: initiator
+        coins_wagered: 2
+      - voter: gandalf
+        side: initiator
+        coins_wagered: 3
+      - voter: makima
+        side: initiator
+        coins_wagered: 2
+      - voter: robin
+        side: initiator
+        coins_wagered: 2
+      - voter: denji
+        side: initiator
+        coins_wagered: 1
+      - voter: orangensaft
+        side: target
+        coins_wagered: 1
+      - voter: frankwhite
+        side: initiator
+        coins_wagered: 2
+      - voter: infowarrior
+        side: initiator
+        coins_wagered: 1
+      - voter: levi
+        side: initiator
+        coins_wagered: 2
+      - voter: princeofdarkness
+        side: initiator
+        coins_wagered: 1
+      - voter: ironmike
+        side: target
+        coins_wagered: 1
+      - voter: tifa
+        side: initiator
+        coins_wagered: 2
+      - voter: gojo
+        side: initiator
+        coins_wagered: 2
+      - voter: theeagle
+        side: initiator
+        coins_wagered: 2
+
+    comments:
+      - user: theMac
+        content: "50 has had the receipts since 2016. it's completely over for diddydone."
+        minutes_ago: 1380
+      - user: roro
+        content: "diddydone said 'the vibes approved it'. that is not how any of this works."
+        minutes_ago: 1300
+      - user: gutz
+        content: "dry skin doesn't explain 1000 bottles delivered to a private island. this math simply does not work."
+        minutes_ago: 1200
+      - user: saos43
+        content: "diddydone's answers are getting objectively worse with every single message in that chat."
+        minutes_ago: 1100
+      - user: gandalf
+        content: "'I gotta go' is not a legal defense or a counter-argument. 50cent wins this on logic alone."
+        minutes_ago: 1000
+      - user: makima
+        content: "diddydone disappeared mid-conversation. that is always an admission of something."
+        minutes_ago: 900
+      - user: robin
+        content: "the evidence appears to be substantial and 50cent has presented it clearly."
+        minutes_ago: 800
+      - user: denji
+        content: "the baby oil receipts got me. 1000 bottles is too many bottles for one private island."
+        minutes_ago: 700
+      - user: orangensaft
+        content: "ayo let him cook. diddydone is in his comeback era. Love is going to be the album of the year."
+        minutes_ago: 600
+      - user: frankwhite
+        content: "50cent documented everything over years. diddydone has produced no counter-argument at any point."
+        minutes_ago: 500
+      - user: infowarrior
+        content: "the deep state protected diddydone for years. 50cent is exposing what they don't want us to see."
+        minutes_ago: 420
+      - user: levi
+        content: "'I gotta go.' Correct response. 50cent."
+        minutes_ago: 350
+      - user: princeofdarkness
+        content: "'approved by the vibes' is the worst legal defense I have ever heard in my entire life."
+        minutes_ago: 280
+      - user: ironmike
+        content: "diddydone's comeback album Love is going to be fire. positive energy only. new era."
+        minutes_ago: 210
+      - user: tifa
+        content: "the freak off invoices comment ended this beef before it even properly started."
+        minutes_ago: 140
+      - user: gojo
+        content: "I don't know what a freak off invoice is but 50cent said it with complete confidence so I believe him."
+        minutes_ago: 80
+      - user: theeagle
+        content: "I respect someone who documents everything. 50cent prepared for this moment."
+        minutes_ago: 30

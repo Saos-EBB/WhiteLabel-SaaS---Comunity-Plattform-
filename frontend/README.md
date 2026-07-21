@@ -71,6 +71,10 @@ Next.js app (App Router) for the XXX platform. Connects to the XXX NestJS backen
 
 ## Setup
 
+Via Docker (backend + frontend + Postgres together) — see [`../docker-compose.yml`](../docker-compose.yml) and the [root README](../README.md#running-locally). This is the recommended path.
+
+Without Docker:
+
 ```bash
 npm install
 npm run dev -- --port 3001
@@ -78,9 +82,9 @@ npm run dev -- --port 3001
 
 App runs on `http://localhost:3001`. The backend must be running on `http://localhost:3000`.
 
-Copy `.env.example` to `.env.local` and fill in the values.
+Copy `.env.example` to `.env` and fill in the values.
 
-`next.config.ts` proxies `/uploads/:path*` → `http://localhost:3000/uploads/:path*` so profile photos and audio files load without CORS issues.
+`next.config.ts` proxies `/uploads/:path*` → `${BACKEND_INTERNAL_URL}/uploads/:path*` (`NEXT_PUBLIC_*` vars are baked into the client bundle; `BACKEND_INTERNAL_URL` is server-to-server only, defaulting to `http://localhost:3000` and overridden to `http://nestjs:3000` inside docker-compose) so profile photos and audio files load without CORS issues.
 
 ---
 
@@ -89,6 +93,8 @@ Copy `.env.example` to `.env.local` and fill in the values.
 | Variable | Description |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Backend API base URL (e.g. `http://localhost:3000/api/v1`) |
+| `NEXT_PUBLIC_SOCKET_URL` | Backend Socket.io base URL (e.g. `http://localhost:3000`) |
+| `BACKEND_INTERNAL_URL` | Server-to-server only (not in the client bundle) — used by the `/uploads` rewrite in `next.config.ts`. `http://localhost:3000` outside Docker, `http://nestjs:3000` inside docker-compose |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for Embedded Checkout |
 | `NEXT_PUBLIC_BAN_SCREEN_TEXT` | Text shown on the ban overlay (falls back to `config/public.config.ts` default) |
 | `NEXT_PUBLIC_COMPANY_NAME` | Company name used in Impressum and Datenschutz pages |

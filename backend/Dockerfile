@@ -15,9 +15,10 @@ RUN npm install
 
 # 5. Jetzt den restlichen Code kopieren
 COPY . .
+RUN chmod +x docker-entrypoint.sh
 
 # 6. Port freigeben (NestJS läuft auf 3000)
 EXPOSE 3000
 
-# 7. Dev-Server starten mit Hot-Reload
-CMD ["npm", "run", "start:dev"]
+# 7. Demo-Daten seeden (idempotent) und Dev-Server mit Hot-Reload starten
+CMD ["./docker-entrypoint.sh"]

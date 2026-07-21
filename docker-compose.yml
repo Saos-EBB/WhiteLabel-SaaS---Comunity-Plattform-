@@ -1,7 +1,10 @@
 services:
 
   XXX_db:
-    image: postgis/postgis:16-3.4
+    build:
+      context: ./backend
+      dockerfile: db/Dockerfile
+    image: xxx_db:local
     container_name: XXX_db
     restart: unless-stopped
     environment:
@@ -12,6 +15,11 @@ services:
       - "5432:5432"
     volumes:
       - XXX_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     networks:
       - XXX_network
 
@@ -33,7 +41,7 @@ services:
 
   nestjs:
     build:
-      context: .
+      context: ./backend
     container_name: XXX_backend
     restart: unless-stopped
     environment:
@@ -47,10 +55,31 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - XXX_db
+      XXX_db:
+        condition: service_healthy
     volumes:
-      - .:/app
+      - ./backend:/app
       - /app/node_modules
+    networks:
+      - XXX_network
+
+  nextjs:
+    build:
+      context: ./frontend
+    container_name: XXX_frontend
+    restart: unless-stopped
+    environment:
+      # NEXT_PUBLIC_* stay browser-facing (localhost, published port) — set in frontend/.env.
+      # Only the server-to-server URL needs the docker-internal service name.
+      BACKEND_INTERNAL_URL: http://nestjs:3000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - nestjs
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
     networks:
       - XXX_network
 

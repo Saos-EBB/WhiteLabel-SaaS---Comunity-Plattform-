@@ -626,6 +626,10 @@ Copy `.env.example` to `.env` and fill in all values.
 
 ## Running Locally
 
+Via Docker (backend + frontend + Postgres together) — see [`../docker-compose.yml`](../docker-compose.yml) and the [root README](../README.md#running-locally). This is the recommended path.
+
+Without Docker:
+
 ```bash
 npm install
 ```
@@ -640,7 +644,7 @@ npm run start:dev
 npm run start:prod
 ```
 
-Migrations are plain SQL files in `migrations/`. Run them in order against your PostgreSQL database before starting the server.
+Migrations are plain SQL files in `migrations/`. Run them in order against your PostgreSQL database before starting the server. `schema_v4.sql` is a consolidated snapshot — it does **not** include every migration since; prefer running the individual `migrations/*.sql` files in order for a fully up-to-date schema.
 
 ---
 

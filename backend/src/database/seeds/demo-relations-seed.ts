@@ -62,11 +62,31 @@ interface Block {
   reason?: string;
 }
 
+interface BeefVoteEntry {
+  voter: string;
+  side: 'initiator' | 'target';
+  coins_wagered?: number;
+}
+
+interface BeefCommentEntry {
+  user: string;
+  content: string;
+  minutes_ago: number;
+}
+
+interface BeefInteraction {
+  beef_initiator: string;
+  beef_target: string;
+  votes: BeefVoteEntry[];
+  comments: BeefCommentEntry[];
+}
+
 interface SeedFile {
   contact_requests: ContactRequest[];
   conversations: Conversation[];
   beefs: Beef[];
   blocks: Block[];
+  beef_interactions?: BeefInteraction[];
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +392,71 @@ async function seedBeefs(beefs: Beef[]): Promise<void> {
   console.log(`  → ${created} angelegt, ${skipped} uebersprungen`);
 }
 
+async function seedBeefInteractions(interactions: BeefInteraction[]): Promise<void> {
+  console.log('\n── Beef Votes + Comments ─────────────────────────────');
+  let votesCreated   = 0;
+  let votesSkipped   = 0;
+  let commentsCreated = 0;
+  let commentsSkipped = 0;
+
+  for (const entry of interactions) {
+    const initiatorId = await getUserId(entry.beef_initiator);
+    const targetId    = await getUserId(entry.beef_target);
+
+    const beefRows = await ds.query(
+      `SELECT id FROM beefs WHERE initiator_id = $1 AND target_id = $2 LIMIT 1`,
+      [initiatorId, targetId],
+    );
+    if (!beefRows.length) {
+      console.warn(`  WARN  Beef ${entry.beef_initiator} vs ${entry.beef_target} nicht gefunden — uebersprungen`);
+      continue;
+    }
+    const beefId = beefRows[0].id;
+
+    for (const v of entry.votes) {
+      const voterId = await getUserId(v.voter);
+      const existing = await ds.query(
+        `SELECT id FROM beef_votes WHERE beef_id = $1 AND voter_id = $2 LIMIT 1`,
+        [beefId, voterId],
+      );
+      if (existing.length) {
+        votesSkipped++;
+        continue;
+      }
+      await ds.query(
+        `INSERT INTO beef_votes (id, beef_id, voter_id, side, coins_wagered, created_at)
+         VALUES (uuid_generate_v4(), $1, $2, $3, $4, NOW() - (random() * interval '20 hours'))`,
+        [beefId, voterId, v.side, v.coins_wagered ?? 1],
+      );
+      votesCreated++;
+    }
+
+    for (const c of entry.comments) {
+      const userId = await getUserId(c.user);
+      const existing = await ds.query(
+        `SELECT id FROM beef_comments WHERE beef_id = $1 AND user_id = $2 LIMIT 1`,
+        [beefId, userId],
+      );
+      if (existing.length) {
+        commentsSkipped++;
+        continue;
+      }
+      const createdAt = new Date(Date.now() - c.minutes_ago * 60 * 1000);
+      await ds.query(
+        `INSERT INTO beef_comments (id, beef_id, user_id, content, created_at)
+         VALUES (uuid_generate_v4(), $1, $2, $3, $4)`,
+        [beefId, userId, c.content, createdAt],
+      );
+      commentsCreated++;
+    }
+
+    console.log(`  OK    ${entry.beef_initiator} vs ${entry.beef_target}: ${entry.votes.length} Votes, ${entry.comments.length} Comments`);
+  }
+
+  console.log(`  → ${votesCreated} Votes angelegt, ${votesSkipped} uebersprungen`);
+  console.log(`  → ${commentsCreated} Comments angelegt, ${commentsSkipped} uebersprungen`);
+}
+
 async function seedBlocks(blocks: Block[]): Promise<void> {
   console.log('\n── Blocks ────────────────────────────────────────────');
   let created = 0;
@@ -429,6 +514,9 @@ async function main() {
   await seedConversations(seed.conversations, requestIdMap);
   await seedBeefs(seed.beefs);
   await seedBlocks(seed.blocks);
+  if (seed.beef_interactions?.length) {
+    await seedBeefInteractions(seed.beef_interactions);
+  }
 
   await ds.destroy();
   console.log('\nFertig ✓');

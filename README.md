@@ -63,9 +63,27 @@ Monorepo combining frontend and backend in subfolders, with the full commit hist
 └── backend/    # NestJS API + WebSocket gateway
 ```
 
-For setup, environment variables, and architecture details, see:
+For environment variables and architecture details, see:
 - [`frontend/README.md`](./frontend/README.md)
 - [`backend/README.md`](./backend/README.md)
+
+---
+
+## Running Locally
+
+```bash
+cp .env.example .env               # DB/pgAdmin/JWT values used by docker-compose.yml
+cp backend/.env.example backend/.env       # fill in Stripe/Resend/encryption/CORS values
+cp frontend/.env.example frontend/.env
+
+docker compose up --build
+```
+
+Starts four containers: Postgres+PostGIS (`XXX_db`, port 5432), pgAdmin (port 5050), the NestJS API (`XXX_backend`, port 3000) and the Next.js app (`XXX_frontend`, port 3001) — both app containers run in dev mode with hot-reload via bind mounts, so source changes on the host are picked up immediately.
+
+`.env` (root) and `backend/.env` both define `DB_NAME`/`DB_USER`/`DB_PASSWORD`/`JWT_SECRET` — keep them in sync, the root copy is what `docker-compose.yml` substitutes into the Postgres/pgAdmin/backend service definitions.
+
+The database starts empty. Load `backend/schema_v4.sql` for a quick baseline, or run the `backend/migrations/*.sql` files in order for the fully up-to-date schema (`schema_v4.sql` predates the newest migrations).
 
 ---
 
