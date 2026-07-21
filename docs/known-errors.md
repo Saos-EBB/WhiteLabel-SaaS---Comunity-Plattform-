@@ -4,6 +4,22 @@ Wiederkehrende Fehler mit Ursache und Fix. Neue Einträge oben anhängen.
 
 ---
 
+## [BE] Endlos-401-Loop nach Login: chat/conversations, profile/me, auth/refresh
+
+**Wann:** Nach Login (oder beim Öffnen einer geschützten Seite mit einem alten Browser-Cookie) feuern `GET /chat/conversations`, `GET /profile/me` und `POST /auth/refresh` im Sekundentakt 401, Access Token wird nie erneuert.
+
+**Ursache:** `refreshToken`-Lookup in der DB ohne `is_revoked`-Filter zeigte: die Zeile existierte gar nicht (nicht mal revoked). Kein Rotation-Race, kein Expiry-Bug — der Browser hielt einen `refreshToken`-Cookie (`httpOnly`, 30 Tage `maxAge`), der von dieser Backend-Instanz nie ausgestellt wurde (z.B. Rest eines DB-Resets). `AuthController.refresh()` warf bei ungültigem Token, bevor `res.cookie(...)` erreicht wurde — der tote Cookie wurde also nie gelöscht und hat bei jedem weiteren Seitenaufruf denselben 401-Zyklus erneut ausgelöst. Frontend-seitig existierten Single-Flight-Refresh, Ausschluss von `/auth/refresh` aus der 401-Retry-Logik und Hard-Redirect-auf-Login bei Fehlschlag bereits (`frontend/lib/api.ts`, `authStore.ts`) — das war nicht die Fundstelle.
+
+**Fix:** `AuthController.refresh()` löscht den Cookie im `catch`, wenn `authService.refresh()` wirft:
+```ts
+} catch (err) {
+    res.clearCookie('refreshToken', { path: '/' });
+    throw err;
+}
+```
+
+---
+
 ## [FE] TypeError: Failed to fetch — useBootstrap
 
 **Wann:** Frontend startet, sofort im Browser-Console.

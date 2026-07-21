@@ -42,9 +42,14 @@ export class AuthController {
     async refresh(@Req() req: any, @Res({ passthrough: true }) res: Response) {
         const token: string | undefined = req.cookies?.refreshToken;
         if (!token) throw new UnauthorizedException('Kein Refresh-Token vorhanden');
-        const { accessToken, rawRefreshToken } = await this.authService.refresh(token);
-        res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
-        return { accessToken };
+        try {
+            const { accessToken, rawRefreshToken } = await this.authService.refresh(token);
+            res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
+            return { accessToken };
+        } catch (err) {
+            res.clearCookie('refreshToken', { path: '/' });
+            throw err;
+        }
     }
 
     @Post('logout')
