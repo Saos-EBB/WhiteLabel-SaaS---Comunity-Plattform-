@@ -21,6 +21,28 @@ function chunk<T>(arr: T[], size: number): T[][] {
     return chunks;
 }
 
+// Handles quoted fields with embedded commas (e.g. "Macedonia, The former
+// Yugoslav Rep. of") and doubled-quote escaping per RFC 4180.
+function splitCsvLine(line: string): string[] {
+    const fields: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+            if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+            else if (ch === '"') inQuotes = false;
+            else cur += ch;
+        } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ',') { fields.push(cur); cur = ''; }
+            else cur += ch;
+        }
+    }
+    fields.push(cur);
+    return fields;
+}
+
 function parseCsv(filePath: string): CityRow[] {
     const content = fs.readFileSync(filePath, 'utf-8').replace(/^﻿/, '');
     const lines = content.split('\n').filter(l => l.trim().length > 0);
@@ -28,7 +50,7 @@ function parseCsv(filePath: string): CityRow[] {
     // Skip header row
     return lines.slice(1).map(line => {
         const [stadtName, land, region, einwohnerzahl, breitengrad, laengengrad, istHauptstadt] =
-            line.split(',');
+            splitCsvLine(line);
 
         const populationRaw = einwohnerzahl?.trim();
         const regionRaw = region?.trim();
@@ -48,16 +70,19 @@ function parseCsv(filePath: string): CityRow[] {
 async function main(): Promise<void> {
     await AppDataSource.initialize();
 
-    const csvPath = path.join(__dirname, 'autofill_inkl_ottensheim_style.csv');
+    const csvPath = path.join(__dirname, 'cities.csv');
     const rows = parseCsv(csvPath);
     console.log(`Parsed ${rows.length} rows from CSV`);
 
     const qr = AppDataSource.createQueryRunner();
     await qr.connect();
 
-    let inserted = 0;
-
     try {
+        // cities has no unique constraint to key an upsert off of, and it's
+        // pure reference data with nothing pointing to it via FK — truncate
+        // and reload instead of trying to diff against existing rows.
+        await qr.query('TRUNCATE TABLE cities RESTART IDENTITY');
+
         for (const batch of chunk(rows, 500)) {
             const params: (string | number | boolean | null)[] = [];
             const placeholders = batch.map((row, i) => {
@@ -74,21 +99,18 @@ async function main(): Promise<void> {
                 return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
             }).join(', ');
 
-            const result = await qr.query(
+            await qr.query(
                 `INSERT INTO cities (name, country, region, population, lat, lng, is_capital)
-                 VALUES ${placeholders}
-                 ON CONFLICT DO NOTHING`,
+                 VALUES ${placeholders}`,
                 params,
             );
-
-            inserted += result?.rowCount ?? 0;
         }
     } finally {
         await qr.release();
         await AppDataSource.destroy();
     }
 
-    console.log(`Done — inserted ${inserted} of ${rows.length} rows (${rows.length - inserted} skipped)`);
+    console.log(`Done — inserted ${rows.length} rows`);
 }
 
 main().catch(err => {

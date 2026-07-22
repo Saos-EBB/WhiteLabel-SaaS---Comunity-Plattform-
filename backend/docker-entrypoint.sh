@@ -1,10 +1,12 @@
 #!/bin/sh
 set -e
 
-# All four seed scripts are idempotent (skip existing nicknames/emails/beef
-# pairs/city rows/already-backfilled locations), so this is a no-op on a
-# volume that's already seeded — only a fresh `docker compose down -v && up
-# --build` actually populates anything.
+# demo-seed and demo-relations-seed are idempotent (skip existing
+# nicknames/emails/beef pairs) — no-op on an already-seeded volume.
+# seed-cities always truncates+reloads cities from the CSV (pure reference
+# data, nothing else has an FK on it), so it stays in sync with the CSV on
+# every restart. backfill-profile-locations only touches profiles with no
+# location set yet, so it's a no-op once everything is backfilled.
 # Demo beefs get ends_at = NOW() + 8h at seed time, so re-running this on a
 # fresh volume always produces currently-active beefs, not stale ones.
 # seed-cities must run before backfill-profile-locations, which looks up
