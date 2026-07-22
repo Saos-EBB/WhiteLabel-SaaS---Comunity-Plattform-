@@ -75,6 +75,8 @@ const PRESETS = [
   { label: 'light', cls: 'light' },
   { label: 'brick', cls: 'underground-brick' },
   { label: 'neon',  cls: 'underground-neon' },
+  { label: 'lavender', cls: 'lavender' },
+  { label: 'darkPink', cls: 'darkPink' },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────

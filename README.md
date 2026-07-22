@@ -95,6 +95,10 @@ Active development. Core feature set is functional; currently in final integrati
 
 ## Changelog
 
+### 2026-07-22
+- Theme: Zwei neue Farbschemata "lavender" und "darkPink" im Color Panel (Dev-Tool) verfügbar — übernommen aus dem b2b-cv/Whitelabel-Showcase (helles Purple-Theme + dunkles Pink-Theme)
+- Docker: Seed-Reihenfolge im Entrypoint ergänzt — `seed-cities` läuft jetzt vor `backfill-profile-locations`, da Letzteres Lat/Lng aus der Cities-Tabelle nachschlägt
+
 ### 2026-06-14
 - Fix: Chat-Kopfzeile in der Web-Ansicht klebt jetzt ganz oben (war vorher 64px zu tief, weil die mobile TopNav auf Desktop versteckt ist)
 - Fix: Interessen-Namen mit Umlauten (ü, ö, ä, ß) waren durch falsche Encoding beim Seed korrumpiert — Migration 041 korrigiert alle 11 betroffenen Einträge direkt in der DB

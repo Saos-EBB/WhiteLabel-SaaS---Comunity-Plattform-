@@ -93,6 +93,52 @@
   --color-logout:                    #ff0080;
 }
 
+/* ── Lavender ────────────────────────────────────────────────────────────── */
+.lavender {
+  --color-background:                #e4d8d8;
+  --color-surface-container-lowest:  #e4d8d8;
+  --color-surface-container-low:     #b29dbe;
+  --color-surface-container:         #e5dcea;
+  --color-surface-container-high:    #9973b0;
+  --color-surface-container-highest: #E6E0E9;
+  --color-on-surface:                #4d4a55;
+  --color-on-surface-variant:        #171618;
+  --color-primary-fixed-dim:         #826dba;
+  --color-primary-container:         #EADDFF;
+  --color-on-primary-container:      #ece9f1;
+  --color-secondary-container:       #d8dfd9;
+  --color-tertiary-fixed-dim:        #1f1e1e;
+  --color-outline:                   #79747E;
+  --color-outline-variant:           #CAC4D0;
+  --color-error:                     #B3261E;
+  --color-error-container:           #F9DEDC;
+  --color-nav-badge-glow:            #826dba;
+  --color-logout:                    #826dba;
+}
+
+/* ── Dark Pink ───────────────────────────────────────────────────────────── */
+.darkPink {
+  --color-background:                #141218;
+  --color-surface-container-lowest:  #0f0d13;
+  --color-surface-container-low:     #1d1b20;
+  --color-surface-container:         #211f26;
+  --color-surface-container-high:    #2b2930;
+  --color-surface-container-highest: #36343b;
+  --color-on-surface:                #cb20a9;
+  --color-on-surface-variant:        #d67fe1;
+  --color-primary-fixed-dim:         #9d429e;
+  --color-primary-container:         #4f378b;
+  --color-on-primary-container:      #c8c5ce;
+  --color-secondary-container:       #976c9d;
+  --color-tertiary-fixed-dim:        #b83d60;
+  --color-outline:                   #cb20b4;
+  --color-outline-variant:           #4f454f;
+  --color-error:                     #b5ebf2;
+  --color-error-container:           #b8aead;
+  --color-nav-badge-glow:            #cb20b4;
+  --color-logout:                    #cb20b4;
+}
+
 /* ── Desktop: angular design ─────────────────────────────────────────────── */
 /* Mobile stays rounded; desktop gets sharp edges as visual contrast          */
 @media (min-width: 768px) {
