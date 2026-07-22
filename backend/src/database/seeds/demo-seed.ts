@@ -214,6 +214,9 @@ async function main() {
         await ds.query(`UPDATE users SET public_id = $1 WHERE id = $2`, [publicId, userId]);
 
         // --- Profil anlegen ---
+        // saos43 bleibt bewusst un-onboarded (Test-Account fuer den Onboarding-Flow).
+        const isOnboarded = u.nickname !== 'saos43';
+
         await ds.query(
             `INSERT INTO profiles (
                 id, user_id, nickname, birthdate, bio, city,
@@ -226,7 +229,7 @@ async function main() {
              ) VALUES (
                 uuid_generate_v4(), $1, $2, $3, $4, $5,
                 $6, $7, $8,
-                true, true,
+                $9, $9,
                 true, true, true, true,
                 true, true,
                 true, true,
@@ -241,6 +244,7 @@ async function main() {
                 u.gender ?? null,
                 u.looking_for ?? null,
                 u.status ?? 'available',
+                isOnboarded,
             ],
         );
 
