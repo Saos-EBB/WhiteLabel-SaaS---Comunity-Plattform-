@@ -93,6 +93,15 @@ Active development. Core feature set is functional; currently in final integrati
 
 ---
 
+## Attribution
+
+- **GeoNames Geographical Database** von [GeoNames](https://www.geonames.org/) ist lizenziert unter [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+  - Quelle: https://www.geonames.org/
+  - Änderungen: gefiltert auf Österreich und Europa, gekürzt und Spalten angepasst
+  - Datei im Projekt: [`backend/src/database/seeds/autofill_inkl_ottensheim_style.csv`](backend/src/database/seeds/autofill_inkl_ottensheim_style.csv)
+
+---
+
 ## Changelog
 
 ### 2026-07-22
