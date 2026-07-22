@@ -650,6 +650,12 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
+### 2026-07-22 — City Search: Seed Pipeline Fix + Dataset Expansion
+- fix(docker): `seed-cities` and `backfill-profile-locations` were never wired into `docker-entrypoint.sh` — only `demo-seed`/`demo-relations-seed` ran automatically, so a fresh volume always had an empty `cities` table (dead city-search dropdown) and no PostGIS `location` on any demo profile
+- feat(seed): cities dataset expanded from 206 rows (AT/DE-filtered) to ~14k European cities across 44 countries (GeoNames, CC BY 4.0) — renamed `autofill_inkl_ottensheim_style.csv` → `cities.csv`
+- fix(seed): `seed-cities.ts` used a naive `line.split(',')` — broke on quoted fields with embedded commas present in the new CSV (e.g. `"Macedonia, The former Yugoslav Rep. of"`); added an RFC 4180-aware line splitter
+- fix(seed): `cities` has no unique constraint, so the old `INSERT ... ON CONFLICT DO NOTHING` never actually skipped anything — re-running the seed would have silently duplicated every row on each container restart; switched to truncate + reload (safe: pure reference data, nothing has an FK on it)
+
 ### 2026-06-09 — Matching Feature: Swipe Deck, Swipe Action, Matches List
 - feat(matching): new `MatchingModule` (`DiscoverController`, `MatchingService`) wired into `AppModule`
 - feat(matching): `GET /discover/deck` — scored candidate deck (interest overlap + PostGIS distance scoring); excludes self, banned/deleted, and already-swiped users (likes permanent, skips expire 30 days)
