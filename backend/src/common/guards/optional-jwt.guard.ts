@@ -12,7 +12,7 @@ export class OptionalJwtGuard {
         private readonly dataSource: DataSource,
     ) { }
 
-    canActivate(context: ExecutionContext): boolean {
+    async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<Request>();
         const token = this.extractToken(request);
 
@@ -22,6 +22,13 @@ export class OptionalJwtGuard {
             const payload = this.jwtService.verify(token, {
                 secret: process.env.JWT_SECRET,
             });
+
+            const [{ exists }] = await this.dataSource.query(
+                'SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL) AS exists',
+                [payload.sub],
+            );
+            if (!exists) return true;
+
             request['user'] = payload;
 
             this.dataSource.query(
@@ -29,7 +36,7 @@ export class OptionalJwtGuard {
                 [payload.sub],
             ).catch(() => {});
         } catch {
-            // invalid or expired token — leave req.user undefined
+            // invalid or expired token, or user no longer exists — leave req.user undefined
         }
 
         return true;

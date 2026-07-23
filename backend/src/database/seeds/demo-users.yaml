@@ -51,7 +51,7 @@ users:
   - id: admin2
     email: admin2@demo.example.com
     password: Demo1234!
-    role: admin
+    role: user
     is_verified: true
     nickname: saos43
     birthdate: "1993-07-22"

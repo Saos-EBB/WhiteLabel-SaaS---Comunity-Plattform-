@@ -747,6 +747,9 @@ Posts to `POST /hidden/beef/dev/quick-fight` (backend returns 404 in production)
 
 ## Changelog
 
+### 2026-07-23 — Onboarding: Fix Admin/Dashboard Redirect Loop
+- fix(onboarding): `/onboarding` force-redirected any `admin`/`owner` role straight to `/dashboard`, while `useBootstrap` force-redirects any account with `onboardingCompleted: false` back to `/onboarding` — an admin account with incomplete onboarding (e.g. the `saos43` demo/test account) bounced between the two routes on every render, tripping the global rate limiter (429s on dashboard/admin endpoints); removed the role-based redirect — onboarding completion is now the only gate for leaving `/onboarding`
+
 ### 2026-06-09 — Matching Page: Swipe + Matches tabs; nav rename
 - feat(matches): `/matches` page is now a two-tab Matching hub — "Swipen" (swipe deck with like/skip + match-flash banner) and "Matches" (mutual matches list with photo, age, city, chat button)
 - feat(matching): match-flash banner lifted to page level; shows on mutual match with a "Zu deinen Matches" button to switch tabs; card advances after 2 s

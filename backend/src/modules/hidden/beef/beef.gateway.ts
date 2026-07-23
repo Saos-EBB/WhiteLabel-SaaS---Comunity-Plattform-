@@ -6,6 +6,8 @@ import {
 import { Server, Socket } from 'socket.io'
 import { OnEvent } from '@nestjs/event-emitter'
 import { JwtService } from '@nestjs/jwt'
+import { InjectDataSource } from '@nestjs/typeorm'
+import { DataSource } from 'typeorm'
 import { AppEvents } from '../../shared/events/app-events'
 import type { BeefGameStateUpdateEvent, BeefGameFinishedEvent, BeefGameGoEvent, BeefGameBoardUpdateEvent } from '../../shared/events/app-events'
 import { BeefGameService } from './beef-game.service'
@@ -24,6 +26,8 @@ export class HiddenBeefGateway implements OnGatewayConnection {
   constructor(
     private readonly beefGameService: BeefGameService,
     private readonly jwtService: JwtService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   private extractUserId(client: Socket): string | null {
@@ -36,9 +40,16 @@ export class HiddenBeefGateway implements OnGatewayConnection {
     }
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     const userId = this.extractUserId(client)
     if (!userId) { client.disconnect(); return }
+
+    const [{ exists }] = await this.dataSource.query(
+      'SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL) AS exists',
+      [userId],
+    )
+    if (!exists) { client.disconnect(); return }
+
     client.data.userId = userId
   }
 

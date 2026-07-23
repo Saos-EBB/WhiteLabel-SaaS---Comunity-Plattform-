@@ -650,6 +650,11 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ## Changelog
 
+### 2026-07-23 — Auth: Phantom-Token Guard Fix + Demo Seed Role Change
+- fix(auth): `JwtGuard`/`OptionalJwtGuard` verified only the JWT signature, not whether the user still exists — a token surviving `docker compose down -v` (DB wiped, `JWT_SECRET` static across restarts) kept authenticating requests for a deleted user until it naturally expired; both guards now check `users.id ... AND deleted_at IS NULL` and reject (or, for the optional guard, leave `req.user` unset)
+- fix(chat, hidden/beef): `ChatGateway`/`HiddenBeefGateway` `handleConnection` had the same gap — sockets were accepted for a signature-valid but nonexistent user; both now disconnect immediately if the user no longer exists
+- fix(seed): `demo-users.yaml` — `saos43` changed from `role: admin` to `role: user`; combined with its (deliberately) incomplete onboarding state, the admin role was bouncing the account between `/onboarding` and `/dashboard` on the frontend (see frontend changelog)
+
 ### 2026-07-22 — City Search: Seed Pipeline Fix + Dataset Expansion
 - fix(docker): `seed-cities` and `backfill-profile-locations` were never wired into `docker-entrypoint.sh` — only `demo-seed`/`demo-relations-seed` ran automatically, so a fresh volume always had an empty `cities` table (dead city-search dropdown) and no PostGIS `location` on any demo profile
 - feat(seed): cities dataset expanded from 206 rows (AT/DE-filtered) to ~14k European cities across 44 countries (GeoNames, CC BY 4.0) — renamed `autofill_inkl_ottensheim_style.csv` → `cities.csv`

@@ -10,8 +10,8 @@ import {
 import { Server, Socket } from 'socket.io';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AppEvents } from '../../shared/events/app-events';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository, IsNull, Not } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Conversation } from './entities/conversation.entity';
 import { Message, MessageType } from './entities/message.entity';
@@ -30,6 +30,8 @@ export class ChatGateway implements OnGatewayConnection {
 
     constructor(
         private readonly jwtService: JwtService,
+        @InjectDataSource()
+        private readonly dataSource: DataSource,
         @InjectRepository(Conversation)
         private readonly conversationRepo: Repository<Conversation>,
         @InjectRepository(Message)
@@ -52,6 +54,15 @@ const payload = this.jwtService.verify<{ sub: string }>(token);
     async handleConnection(client: Socket) {
         const userId = this.extractUserId(client);
         if (!userId) {
+            client.disconnect();
+            return;
+        }
+
+        const [{ exists }] = await this.dataSource.query(
+            'SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL) AS exists',
+            [userId],
+        );
+        if (!exists) {
             client.disconnect();
             return;
         }

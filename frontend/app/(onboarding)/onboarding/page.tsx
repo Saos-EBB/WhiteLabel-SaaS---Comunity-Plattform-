@@ -637,44 +637,10 @@ function StepDone({
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getJwtRole(token: string | null): string | null {
-  if (!token) return null
-  try {
-    const part = token.split('.')[1]
-    if (!part) return null
-    const decoded = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string }
-    return decoded.role ?? null
-  } catch {
-    return null
-  }
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
-  const router = useRouter()
-  const { accessToken } = useAuthStore()
   const { t } = useTranslation()
-  const [hydrated, setHydrated] = useState(false)
-
-  useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true)
-    } else {
-      const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
-      return unsub
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated) return
-    const role = getJwtRole(accessToken)
-    if (role === 'admin' || role === 'owner') {
-      router.replace('/dashboard')
-    }
-  }, [hydrated, accessToken, router])
 
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<ProfileFormData>({
