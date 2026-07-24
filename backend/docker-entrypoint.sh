@@ -23,6 +23,7 @@ npx ts-node -r tsconfig-paths/register src/database/seeds/demo-relations-seed.ts
 npx ts-node -r tsconfig-paths/register src/database/seeds/seed-extra-users.ts
 npx ts-node -r tsconfig-paths/register src/database/seeds/seed-coin-transactions.ts
 npx ts-node -r tsconfig-paths/register src/database/seeds/seed-subscriptions-payments.ts
+npx ts-node -r tsconfig-paths/register src/database/seeds/seed-media.ts
 
 npx ts-node -r tsconfig-paths/register src/database/seeds/seed-cities.ts
 npx ts-node -r tsconfig-paths/register src/database/seeds/backfill-profile-locations.ts
