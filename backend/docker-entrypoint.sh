@@ -13,6 +13,15 @@ set -e
 # lat/lng from the cities table to set profiles.location.
 npx ts-node -r tsconfig-paths/register src/database/seeds/demo-seed.ts
 npx ts-node -r tsconfig-paths/register src/database/seeds/demo-relations-seed.ts
+
+# seed-extra-users/seed-coin-transactions/seed-subscriptions-payments/seed-media
+# are SEED_USERS/SEED_TX_PER_USER/SEED_MEDIA_PER_USER-gesteuert (default 0 = no-op)
+# und idempotent (per-User-Check, skip wenn schon vorhanden). SEED_RESET=true
+# loescht ihre jeweiligen Daten zuerst und baut sie neu auf. seed-extra-users
+# muss vor den anderen dreien laufen, damit deren "alle User"-Query auch die
+# frisch angelegten Fake-User sieht.
+npx ts-node -r tsconfig-paths/register src/database/seeds/seed-extra-users.ts
+
 npx ts-node -r tsconfig-paths/register src/database/seeds/seed-cities.ts
 npx ts-node -r tsconfig-paths/register src/database/seeds/backfill-profile-locations.ts
 
