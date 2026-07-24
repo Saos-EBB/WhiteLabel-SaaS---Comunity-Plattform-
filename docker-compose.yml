@@ -53,6 +53,7 @@ services:
       JWT_SECRET:  ${JWT_SECRET}
       DEMO_MEDIA_PATH: /app
       SEED_USERS:  ${SEED_USERS:-50}
+      SEED_TX_PER_USER: ${SEED_TX_PER_USER:-20}
       SEED_RESET:  ${SEED_RESET:-false}
     ports:
       - "3000:3000"
