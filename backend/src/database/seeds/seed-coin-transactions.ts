@@ -126,20 +126,25 @@ async function main() {
         finalBalances.set(user.id, sum);
     }
 
-    const tx = buildBulkInsert(txRows);
-    await ds.query(
-        `INSERT INTO coin_transactions (user_id, amount, type, beef_id, idempotency_key, created_at)
-         VALUES ${tx.placeholders}`,
-        tx.params,
-    );
+    // coin_transactions + user_coin_balance muessen atomar zusammen entstehen —
+    // sonst hinterlaesst ein Fehler Transaktionen ohne passende Balance, und der
+    // naechste Lauf uebersieht den User (idempotency_key existiert ja schon).
+    await ds.transaction(async manager => {
+        const tx = buildBulkInsert(txRows);
+        await manager.query(
+            `INSERT INTO coin_transactions (user_id, amount, type, beef_id, idempotency_key, created_at)
+             VALUES ${tx.placeholders}`,
+            tx.params,
+        );
 
-    const balances = buildBulkInsert([...finalBalances.entries()].map(([userId, balance]) => [userId, balance]));
-    await ds.query(
-        `INSERT INTO user_coin_balance (user_id, balance)
-         VALUES ${balances.placeholders}
-         ON CONFLICT (user_id) DO UPDATE SET balance = EXCLUDED.balance`,
-        balances.params,
-    );
+        const balances = buildBulkInsert([...finalBalances.entries()].map(([userId, balance]) => [userId, balance]));
+        await manager.query(
+            `INSERT INTO user_coin_balance (user_id, balance)
+             VALUES ${balances.placeholders}
+             ON CONFLICT (user_id) DO UPDATE SET balance = EXCLUDED.balance`,
+            balances.params,
+        );
+    });
 
     await ds.destroy();
     console.log(`seed-coin-transactions: ${targetUsers.length} User bekamen je ${SEED_TX_PER_USER} Transaktionen (${allUsers.length - targetUsers.length} bereits vorhanden).`);

@@ -128,25 +128,29 @@ async function main() {
         }
     }
 
+    // subscriptions + payment_logs muessen atomar zusammen entstehen — sonst
+    // hinterlaesst ein Fehler eine Subscription ohne Payment-Logs, und der
+    // naechste Lauf uebersieht den User (provider_subscription_id existiert ja
+    // schon).
     if (subRows.length > 0) {
-        const subs = buildBulkInsert(subRows);
-        await ds.query(
-            `INSERT INTO subscriptions
-                (id, user_id, plan, status, payment_provider, provider_subscription_id,
-                 started_at, expires_at, cancelled_at)
-             VALUES ${subs.placeholders}`,
-            subs.params,
-        );
-    }
+        await ds.transaction(async manager => {
+            const subs = buildBulkInsert(subRows);
+            await manager.query(
+                `INSERT INTO subscriptions
+                    (id, user_id, plan, status, payment_provider, provider_subscription_id,
+                     started_at, expires_at, cancelled_at)
+                 VALUES ${subs.placeholders}`,
+                subs.params,
+            );
 
-    if (paymentRows.length > 0) {
-        const payments = buildBulkInsert(paymentRows);
-        await ds.query(
-            `INSERT INTO payment_logs
-                (user_id, subscription_id, amount, tax_amount, currency, status, provider_tx_id, created_at)
-             VALUES ${payments.placeholders}`,
-            payments.params,
-        );
+            const payments = buildBulkInsert(paymentRows);
+            await manager.query(
+                `INSERT INTO payment_logs
+                    (user_id, subscription_id, amount, tax_amount, currency, status, provider_tx_id, created_at)
+                 VALUES ${payments.placeholders}`,
+                payments.params,
+            );
+        });
     }
 
     await ds.destroy();

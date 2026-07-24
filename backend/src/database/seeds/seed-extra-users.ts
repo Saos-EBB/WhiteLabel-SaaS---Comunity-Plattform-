@@ -102,10 +102,15 @@ async function main() {
         let publicId = '';
         for (let c = 0; c < 6; c++) publicId += PUBLIC_ID_CHARS[Math.floor(rng() * PUBLIC_ID_CHARS.length)];
 
+        // "heute minus ageYears Jahre" allein reicht nicht: faellt der zufaellige
+        // Monat/Tag spaeter im Jahr als heute, ist die Person de facto noch ein
+        // Jahr juenger und chk_profiles_birthdate_min_age (>=18) schlaegt fehl.
+        // Zusaetzliche randomisierte Tage nach unten schliessen die Luecke sicher.
         const ageYears = randomInt(rng, 18, 65);
+        const extraDays = randomInt(rng, 0, 364);
         const birthdate = new Date();
         birthdate.setFullYear(birthdate.getFullYear() - ageYears);
-        birthdate.setMonth(randomInt(rng, 0, 11), randomInt(rng, 1, 28));
+        birthdate.setDate(birthdate.getDate() - extraDays);
 
         userRows.push([
             userId, encryptField(email), hashEmail(email), passwordHash,
@@ -116,24 +121,31 @@ async function main() {
         ]);
     }
 
-    const users = buildBulkInsert(userRows, 'NOW(), NOW(), NOW()');
-    await ds.query(
-        `INSERT INTO users
-            (id, email, email_search_hash, password_hash, role, is_verified, public_id,
-             email_verified_at, created_at, last_login)
-         VALUES
-            ${users.placeholders}`,
-        users.params,
-    );
+    // users + profiles muessen atomar zusammen entstehen — sonst hinterlaesst
+    // ein Fehler (z.B. eine verletzte CHECK-Constraint) User ohne Profil, die
+    // der naechste Lauf per COUNT(*) FROM profiles nicht sieht und erneut mit
+    // demselben (deterministischen) Nickname/Email anzulegen versucht, was an
+    // uq_users_email_hash scheitert.
+    await ds.transaction(async manager => {
+        const users = buildBulkInsert(userRows, 'NOW(), NOW(), NOW()');
+        await manager.query(
+            `INSERT INTO users
+                (id, email, email_search_hash, password_hash, role, is_verified, public_id,
+                 email_verified_at, created_at, last_login)
+             VALUES
+                ${users.placeholders}`,
+            users.params,
+        );
 
-    const profiles = buildBulkInsert(profileRows, 'NOW()');
-    await ds.query(
-        `INSERT INTO profiles
-            (id, user_id, nickname, birthdate, is_published, onboarding_completed, updated_at)
-         VALUES
-            ${profiles.placeholders}`,
-        profiles.params,
-    );
+        const profiles = buildBulkInsert(profileRows, 'NOW()');
+        await manager.query(
+            `INSERT INTO profiles
+                (id, user_id, nickname, birthdate, is_published, onboarding_completed, updated_at)
+             VALUES
+                ${profiles.placeholders}`,
+            profiles.params,
+        );
+    });
 
     await ds.destroy();
     console.log(`seed-extra-users: ${profileRows.length} seed_user_* angelegt (${existingCount} bereits vorhanden).`);
