@@ -97,9 +97,10 @@ do_upload() {
 
 login() {
   local email="$1" password="$2"
+  # LoginDto erwartet "identifier" (E-Mail oder Nickname), nicht "email".
   curl -s -m 10 -X POST "${BASE_URL}/auth/login" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"${email}\",\"password\":\"${password}\"}" \
+    -d "{\"identifier\":\"${email}\",\"password\":\"${password}\"}" \
     | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
 }
 
