@@ -12,6 +12,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const { parseRow, computeStats } = require('./aggregator');
+const { parseErrorLine, capRecent } = require('./errorTailer');
 
 const LOADTEST_DIR = path.join(__dirname, '..', '..');
 const LOGS_DIR = path.join(LOADTEST_DIR, 'loadtest-logs');
@@ -28,6 +29,7 @@ async function listRuns() {
     ids.map(async (ts) => ({
       ts,
       hasSummary: fs.existsSync(path.join(LOGS_DIR, ts, 'summary.txt')),
+      hasErrors: fs.existsSync(path.join(LOGS_DIR, ts, 'errors.log')),
     })),
   );
 }
@@ -36,9 +38,10 @@ async function getRun(ts) {
   if (!RUN_ID_RE.test(ts)) throw new Error('invalid run id');
   const dir = path.join(LOGS_DIR, ts);
 
-  const [allRowsRaw, summaryText] = await Promise.all([
+  const [allRowsRaw, summaryText, errorsRaw] = await Promise.all([
     fsp.readFile(path.join(dir, '_all_rows.csv'), 'utf8').catch(() => null),
     fsp.readFile(path.join(dir, 'summary.txt'), 'utf8').catch(() => null),
+    fsp.readFile(path.join(dir, 'errors.log'), 'utf8').catch(() => null),
   ]);
 
   if (allRowsRaw === null && summaryText === null) return null;
@@ -46,8 +49,11 @@ async function getRun(ts) {
   const stats = allRowsRaw
     ? computeStats(allRowsRaw.split('\n').slice(1).map(parseRow).filter(Boolean))
     : null;
+  const errors = errorsRaw
+    ? capRecent(errorsRaw.split('\n').map(parseErrorLine).filter(Boolean))
+    : [];
 
-  return { ts, stats, summaryText };
+  return { ts, stats, summaryText, errors };
 }
 
 module.exports = { listRuns, getRun };

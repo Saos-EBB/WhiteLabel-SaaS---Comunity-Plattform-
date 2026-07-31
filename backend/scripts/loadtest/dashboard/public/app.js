@@ -10,6 +10,8 @@ const statusDistEl = el('status-dist');
 const categoriesEl = el('categories');
 const summaryCategoriesEl = el('summary-categories');
 const endpointBody = document.querySelector('#endpoint-table tbody');
+const errorsBody = document.querySelector('#errors-table tbody');
+const summaryErrorsBody = document.querySelector('#summary-errors-table tbody');
 const dockerStatsEl = el('docker-stats');
 const chartThroughput = el('chart-throughput');
 const chartP95 = el('chart-p95');
@@ -81,7 +83,10 @@ fetch('/api/state')
 
 function formatRunLabel(run) {
   const date = new Date(Number(run.ts) * 1000).toLocaleString();
-  return run.hasSummary ? date : `${date} (no summary — interrupted?)`;
+  const suffixes = [];
+  if (!run.hasSummary) suffixes.push('no summary — interrupted?');
+  if (run.hasErrors) suffixes.push('had errors');
+  return suffixes.length ? `${date} (${suffixes.join(', ')})` : date;
 }
 
 async function loadRunList(selectTs) {
@@ -113,6 +118,7 @@ async function loadRun(ts) {
     summaryCategoriesEl.innerHTML = '';
     summaryBody.innerHTML = '';
   }
+  renderErrors(run.errors, summaryErrorsBody);
 }
 
 runSelect.addEventListener('change', () => loadRun(runSelect.value));
@@ -168,6 +174,35 @@ function renderEndpointTable(perPath, tbody) {
   for (const [p, s] of paths) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${p}</td><td>${s.n}</td><td>${s.avg}</td><td>${s.p95}</td><td>${s.max}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// Built with textContent (not innerHTML) — unlike the other cells here,
+// the error body snippet is real backend response text, not one of our
+// own hardcoded strings, so it isn't safe to interpolate as markup.
+function renderErrors(errors, tbody) {
+  tbody.innerHTML = '';
+  if (!errors || errors.length === 0) {
+    const tr = document.createElement('tr');
+    tr.className = 'empty-row';
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    td.textContent = 'No errors — clean run so far.';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+  for (const e of [...errors].reverse()) { // newest first
+    const tr = document.createElement('tr');
+    const cells = [e.timestamp, e.method, e.path, e.status, e.body];
+    cells.forEach((value, i) => {
+      const td = document.createElement('td');
+      if (i === 3) td.className = 'status-cell';
+      if (i === 4) td.className = 'body-cell';
+      td.textContent = value;
+      tr.appendChild(td);
+    });
     tbody.appendChild(tr);
   }
 }
@@ -240,6 +275,7 @@ function applyTick(tick) {
   renderCategories(tick.categories, tick.total, categoriesEl);
   renderStatusDist(tick.statusDist);
   renderEndpointTable(tick.perPath, endpointBody);
+  renderErrors(tick.errors, errorsBody);
   renderDockerStats(tick.docker || []);
 
   pushPoint('throughput', tick.throughput);

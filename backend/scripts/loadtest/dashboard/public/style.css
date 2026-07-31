@@ -80,6 +80,12 @@ th { color: var(--muted); font-weight: 600; }
 
 canvas { border: 1px solid var(--border); border-radius: 0.25rem; max-width: 100%; }
 
+.errors-table { font-family: ui-monospace, monospace; font-size: 0.75rem; }
+.errors-table td { vertical-align: top; }
+.errors-table .status-cell { color: var(--err); font-weight: 600; }
+.errors-table .body-cell { white-space: pre-wrap; word-break: break-word; max-width: 40rem; color: var(--muted); }
+.errors-table .empty-row td { color: var(--muted); font-style: italic; font-family: system-ui, sans-serif; }
+
 #summary-text {
   white-space: pre-wrap;
   font-size: 0.8rem;
