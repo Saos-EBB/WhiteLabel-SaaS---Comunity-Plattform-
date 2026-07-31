@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Loadtest Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Loadtest Dashboard</h1>
+    <span id="run-status" class="status status--idle">idle</span>
+  </header>
+
+  <section id="controls">
+    <label>Users <input id="num-users" type="number" min="1" value="100"></label>
+    <label>Duration (s) <input id="duration-sec" type="number" min="1" value="60"></label>
+    <button id="start-btn" type="button">Start</button>
+    <button id="stop-btn" type="button" disabled>Stop</button>
+    <span id="control-error" class="error"></span>
+  </section>
+
+  <section id="live">
+    <h2>Live</h2>
+    <div id="live-totals" class="totals">
+      <div class="stat"><span class="stat__label">Requests</span><span id="stat-total" class="stat__value">–</span></div>
+      <div class="stat"><span class="stat__label">req/s</span><span id="stat-throughput" class="stat__value">–</span></div>
+    </div>
+
+    <h3>Status codes</h3>
+    <div id="status-dist"></div>
+
+    <h3>Per endpoint</h3>
+    <table id="endpoint-table">
+      <thead>
+        <tr><th>Path</th><th>n</th><th>avg</th><th>p95</th><th>max</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Docker</h3>
+    <div id="docker-stats" class="totals"></div>
+
+    <h3>Throughput / p95 over time</h3>
+    <canvas id="timeseries" width="900" height="220"></canvas>
+  </section>
+
+  <section id="summary">
+    <h2>Runs</h2>
+    <label>Past run <select id="run-select"></select></label>
+    <pre id="summary-text"></pre>
+    <table id="summary-table">
+      <thead>
+        <tr><th>Path</th><th>n</th><th>avg</th><th>p95</th><th>max</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
