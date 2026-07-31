@@ -54,6 +54,7 @@ services:
   XXX_backend_load:
     build:
       context: ./backend
+    image: xxx_backend_load:local
     container_name: XXX_backend_load
     restart: unless-stopped
     environment:
