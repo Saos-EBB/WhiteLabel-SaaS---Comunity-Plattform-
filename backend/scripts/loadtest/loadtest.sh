@@ -46,6 +46,7 @@ declare -A PIPELINE_WEIGHTS=(
   [browse]=50
   [coin_transaction]=30
   [media_upload]=20
+  [connect]=20
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -59,25 +60,31 @@ random_delay() {
 
 # Führt einen Request aus, loggt Status-Code + Dauer in die User-Logdatei.
 # Args: <user_log_file> <token|-> <METHOD> <path> [json_body]
+# Setzt RESPONSE_BODY als Nebeneffekt — fuer Pipelines, die die Antwort
+# auswerten muessen (z.B. pipeline_connect braucht die user_id aus dem
+# Deck), ohne dafuer einen zweiten curl-Call nur zum Parsen zu brauchen.
 do_request() {
   local logfile="$1" token="$2" method="$3" path="$4" body="${5:-}"
   local auth_header=()
   [ "$token" != "-" ] && auth_header=(-H "Authorization: Bearer ${token}")
 
-  local start end dur status
+  local start end dur raw status
   start=$(date +%s%3N)
   if [ -n "$body" ]; then
-    status=$(curl -s -o /dev/null -w "%{http_code}" -m 10 \
-      -X "$method" "${BASE_URL}${path}" \
+    raw=$(curl -s -m 10 -X "$method" "${BASE_URL}${path}" \
       -H "Content-Type: application/json" \
-      "${auth_header[@]}" -d "$body")
+      "${auth_header[@]}" -d "$body" -w $'\n%{http_code}')
   else
-    status=$(curl -s -o /dev/null -w "%{http_code}" -m 10 \
-      -X "$method" "${BASE_URL}${path}" \
-      "${auth_header[@]}")
+    raw=$(curl -s -m 10 -X "$method" "${BASE_URL}${path}" \
+      "${auth_header[@]}" -w $'\n%{http_code}')
   fi
   end=$(date +%s%3N)
   dur=$(( end - start ))
+
+  RESPONSE_BODY="${raw%$'\n'*}"
+  status="${raw##*$'\n'}"
+  [ -z "$status" ] && status="000"   # curl killed/no response at all -> treat like connection failure
+
   echo "$(date -Iseconds),${method},${path},${status},${dur}" >> "$logfile"
 }
 
@@ -159,6 +166,40 @@ pipeline_admin_moderate() {
   do_request "$logfile" "$token" GET "/admin/media/pending"
   # PATCH .../approve braucht eine echte Media-ID aus der Response oben —
   # kein "next"-Convenience-Endpoint vorhanden (siehe Bericht)
+}
+
+# Reine Lastpipeline, keine Korrektheit pro User: Deck lesen -> Kontakt-
+# anfrage an einen (zufaelligen) Kandidaten senden; separat eigene
+# eingehende Pending-Requests lesen -> falls vorhanden, die erste
+# annehmen. Verbindungen entstehen so ueber echten DB-State (verschiedene
+# simulierte User akzeptieren zufaellig fremde Requests), nicht ueber
+# In-Memory-Zuordnung. PATCH .../accept 409t, wenn der Request inzwischen
+# von woanders schon beantwortet wurde — erwartet unter Last, kein Bug.
+pipeline_connect() {
+  local logfile="$1" token="$2"
+
+  do_request "$logfile" "$token" GET "/discover/deck"
+  local ids=()
+  while IFS= read -r id; do
+    [ -n "$id" ] && ids+=("$id")
+  done < <(printf '%s' "$RESPONSE_BODY" | grep -o '"user_id":"[^"]*"' | cut -d'"' -f4)
+
+  if [ "${#ids[@]}" -gt 0 ]; then
+    local target="${ids[$((RANDOM % ${#ids[@]}))]}"
+    random_delay
+    do_request "$logfile" "$token" POST "/chat/requests" \
+      "{\"receiver_id\":\"${target}\"}"
+  fi
+
+  random_delay
+  do_request "$logfile" "$token" GET "/chat/requests/incoming"
+  local first_id
+  first_id=$(printf '%s' "$RESPONSE_BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+  if [ -n "$first_id" ]; then
+    random_delay
+    do_request "$logfile" "$token" PATCH "/chat/requests/${first_id}/accept"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────
