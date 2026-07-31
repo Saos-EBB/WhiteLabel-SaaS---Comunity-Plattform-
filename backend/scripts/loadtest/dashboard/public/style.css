@@ -7,6 +7,8 @@
   --ok: #1a7f37;
   --warn: #b08800;
   --err: #c62828;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,6 +17,8 @@
     --bg: #1a1a1a;
     --muted: #999;
     --border: #3a3a3a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
   }
 }
 
