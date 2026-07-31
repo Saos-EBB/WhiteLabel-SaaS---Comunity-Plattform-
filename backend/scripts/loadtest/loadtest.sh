@@ -40,6 +40,7 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-Demo1234!}"
 TS="$(date +%s)"
 LOG_DIR="./loadtest-logs/${TS}"
 mkdir -p "${LOG_DIR}"
+ERRORS_FILE="${LOG_DIR}/errors.log"
 
 # Pipeline-Gewichte (müssen nicht 100 ergeben, werden normalisiert)
 declare -A PIPELINE_WEIGHTS=(
@@ -57,6 +58,20 @@ declare -A PIPELINE_WEIGHTS=(
 random_delay() {
   local ms=$(( RANDOM % (MAX_DELAY_MS - MIN_DELAY_MS + 1) + MIN_DELAY_MS ))
   sleep "$(awk -v ms="$ms" 'BEGIN{printf "%.3f", ms/1000}')"
+}
+
+# 4xx sind bei diesem Lastansatz erwartet (z.B. "Anfrage bereits gesendet",
+# "insufficient coins") und werden NICHT hier geloggt — nur echte Fehler:
+# 5xx oder eine tote Verbindung (curl liefert dann "000", siehe do_request).
+# Args: <METHOD> <path> <status> <response_body>
+log_error_if_needed() {
+  local method="$1" path="$2" status="$3" body="$4"
+  if [ "$status" = "000" ] || { [[ "$status" =~ ^[0-9]+$ ]] && [ "$status" -ge 500 ]; }; then
+    local snippet="${body:0:500}"
+    snippet="${snippet//$'\n'/ }"
+    snippet="${snippet//$'\t'/ }"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$method" "$path" "$status" "$snippet" >> "$ERRORS_FILE"
+  fi
 }
 
 # Führt einen Request aus, loggt Status-Code + Dauer in die User-Logdatei.
@@ -87,29 +102,44 @@ do_request() {
   [ -z "$status" ] && status="000"   # curl killed/no response at all -> treat like connection failure
 
   echo "$(date -Iseconds),${method},${path},${status},${dur}" >> "$logfile"
+  log_error_if_needed "$method" "$path" "$status" "$RESPONSE_BODY"
 }
 
 # Multipart-Datei-Upload, loggt wie do_request. Args: <logfile> <token> <path> <field> <filepath>
 do_upload() {
   local logfile="$1" token="$2" path="$3" field="$4" filepath="$5"
-  local start end dur status
+  local start end dur raw status body
   start=$(date +%s%3N)
-  status=$(curl -s -o /dev/null -w "%{http_code}" -m 10 \
-    -X POST "${BASE_URL}${path}" \
+  raw=$(curl -s -m 10 -X POST "${BASE_URL}${path}" \
     -H "Authorization: Bearer ${token}" \
-    -F "${field}=@${filepath};type=image/jpeg")
+    -F "${field}=@${filepath};type=image/jpeg" \
+    -w $'\n%{http_code}')
   end=$(date +%s%3N)
   dur=$(( end - start ))
+
+  body="${raw%$'\n'*}"
+  status="${raw##*$'\n'}"
+  [ -z "$status" ] && status="000"
+
   echo "$(date -Iseconds),POST,${path},${status},${dur}" >> "$logfile"
+  log_error_if_needed POST "$path" "$status" "$body"
 }
 
 login() {
   local email="$1" password="$2"
+  local raw status body
   # LoginDto erwartet "identifier" (E-Mail oder Nickname), nicht "email".
-  curl -s -m 10 -X POST "${BASE_URL}/auth/login" \
+  raw=$(curl -s -m 10 -X POST "${BASE_URL}/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"identifier\":\"${email}\",\"password\":\"${password}\"}" \
-    | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
+    -w $'\n%{http_code}')
+
+  body="${raw%$'\n'*}"
+  status="${raw##*$'\n'}"
+  [ -z "$status" ] && status="000"
+  log_error_if_needed POST "/auth/login" "$status" "$body"
+
+  printf '%s' "$body" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
 }
 
 # Gewichtete Zufallsauswahl einer Pipeline
