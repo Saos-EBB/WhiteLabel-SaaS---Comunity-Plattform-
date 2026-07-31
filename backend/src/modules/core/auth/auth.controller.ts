@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Delete, Patch, Body, Query, HttpCode, HttpStatus, UseGuards, Request, Req, Res, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -31,6 +31,10 @@ export class AuthController {
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { ttl: 60000, limit: 5 } })
+    // Nur im Loadtest-Stack (LOADTEST_MODE=true) aufgehoben — Brute-Force-Schutz
+    // bleibt fuer Demo/Prod unveraendert. Loadtest-User teilen sich alle dieselbe
+    // Quell-IP (der Testrunner), gegen die der Login-Throttle sonst sofort greift.
+    @SkipThrottle({ default: process.env.LOADTEST_MODE === 'true' })
     async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
         const { accessToken, rawRefreshToken, needsConsent } = await this.authService.login(dto);
         res.cookie('refreshToken', rawRefreshToken, REFRESH_COOKIE_OPTIONS);
