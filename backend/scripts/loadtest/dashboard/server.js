@@ -14,6 +14,7 @@ const path = require('path');
 
 const liveState = require('./lib/liveState');
 const { pollDockerStats } = require('./lib/dockerStats');
+const runner = require('./lib/runner');
 
 const HOST = '127.0.0.1';
 const PORT = 4300;
@@ -55,6 +56,70 @@ setInterval(async () => {
   broadcast('tick', { ...tick, docker: lastDockerStats });
 }, CSV_POLL_MS);
 
+runner.on('logdir', (logDir) => {
+  liveState.startRun(logDir, runner.numUsers, runner.durationSec);
+  broadcast('started', liveState.getState());
+});
+
+runner.on('exit', async ({ code, hadLogDir }) => {
+  if (!hadLogDir) {
+    broadcast('run-error', { message: `run-loadtest.sh exited (code ${code}) before it started logging — check the dashboard server's own console output` });
+    return;
+  }
+  await liveState.finishRun();
+  broadcast('finished', liveState.getState());
+});
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => {
+      data += chunk;
+      if (data.length > 1e5) req.destroy(); // guard against a runaway body
+    });
+    req.on('end', () => {
+      try {
+        resolve(data ? JSON.parse(data) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function sendJson(res, status, body) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+async function handleStart(req, res) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    sendJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
+  const numUsers = Number(body.numUsers);
+  const durationSec = Number(body.durationSec);
+  try {
+    const pid = runner.start(numUsers, durationSec);
+    sendJson(res, 202, { started: true, pid });
+  } catch (err) {
+    sendJson(res, 409, { error: err.message });
+  }
+}
+
+function handleStop(req, res) {
+  const stopped = runner.stop();
+  sendJson(res, stopped ? 202 : 409, { stopped, error: stopped ? undefined : 'no active run' });
+}
+
+function handleState(req, res) {
+  sendJson(res, 200, { active: runner.isActive(), ...liveState.getState() });
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -87,6 +152,18 @@ function serveStatic(req, res) {
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/api/events') {
     handleEvents(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/state') {
+    handleState(req, res);
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/start') {
+    handleStart(req, res);
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/stop') {
+    handleStop(req, res);
     return;
   }
   serveStatic(req, res);

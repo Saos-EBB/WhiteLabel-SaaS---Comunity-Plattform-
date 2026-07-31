@@ -1,6 +1,6 @@
 'use strict';
-// Live view: SSE consumer + rendering. Start/Stop wiring and past-run
-// selection are added in later commits.
+// Live view + controls over SSE. Past-run selection is added in a
+// later commit.
 
 const el = (id) => document.getElementById(id);
 
@@ -12,6 +12,68 @@ const endpointBody = document.querySelector('#endpoint-table tbody');
 const dockerStatsEl = el('docker-stats');
 const chartThroughput = el('chart-throughput');
 const chartP95 = el('chart-p95');
+const numUsersInput = el('num-users');
+const durationInput = el('duration-sec');
+const startBtn = el('start-btn');
+const stopBtn = el('stop-btn');
+const controlError = el('control-error');
+
+function setRunningUI(active) {
+  startBtn.disabled = active;
+  stopBtn.disabled = !active;
+  numUsersInput.disabled = active;
+  durationInput.disabled = active;
+}
+
+function setStatus(status) {
+  statusBadge.textContent = status;
+  statusBadge.className = `status status--${status}`;
+}
+
+startBtn.addEventListener('click', async () => {
+  controlError.textContent = '';
+  const numUsers = Number(numUsersInput.value);
+  const durationSec = Number(durationInput.value);
+  setRunningUI(true);
+  try {
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ numUsers, durationSec }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      controlError.textContent = body.error || 'failed to start';
+      setRunningUI(false);
+      return;
+    }
+    setStatus('running');
+  } catch (err) {
+    controlError.textContent = String(err);
+    setRunningUI(false);
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  controlError.textContent = '';
+  stopBtn.disabled = true;
+  try {
+    const res = await fetch('/api/stop', { method: 'POST' });
+    const body = await res.json();
+    if (!res.ok) controlError.textContent = body.error || 'failed to stop';
+  } catch (err) {
+    controlError.textContent = String(err);
+  }
+});
+
+// Sync button/badge state on load (e.g. after a page refresh mid-run).
+fetch('/api/state')
+  .then((res) => res.json())
+  .then((state) => {
+    setRunningUI(state.active);
+    setStatus(state.active ? 'running' : state.status);
+  })
+  .catch(() => {});
 
 const STATUS_COLORS = { ok: 'var(--ok)', warn: 'var(--warn)', err: 'var(--err)', other: 'var(--muted)' };
 
@@ -105,8 +167,7 @@ function drawLineChart(canvas, values, color) {
 }
 
 function applyTick(tick) {
-  statusBadge.textContent = tick.status;
-  statusBadge.className = `status status--${tick.status}`;
+  setStatus(tick.status);
 
   statTotal.textContent = tick.total;
   statThroughput.textContent = tick.throughput.toFixed(1);
@@ -123,3 +184,16 @@ function applyTick(tick) {
 
 const source = new EventSource('/api/events');
 source.addEventListener('tick', (ev) => applyTick(JSON.parse(ev.data)));
+source.addEventListener('started', (ev) => {
+  setRunningUI(true);
+  setStatus(JSON.parse(ev.data).status);
+});
+source.addEventListener('finished', (ev) => {
+  applyTick({ ...JSON.parse(ev.data), throughput: 0, docker: [] });
+  setRunningUI(false);
+});
+source.addEventListener('run-error', (ev) => {
+  controlError.textContent = JSON.parse(ev.data).message;
+  setRunningUI(false);
+  setStatus('idle');
+});
