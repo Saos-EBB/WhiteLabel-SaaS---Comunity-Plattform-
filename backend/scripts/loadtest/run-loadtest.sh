@@ -23,9 +23,10 @@ DURATION_SEC="${2:-60}"
 LOADTEST_BASE_URL="http://localhost:3100/api/v1"
 
 echo "=== 1/4: Health-Check auf ${LOADTEST_BASE_URL} ==="
-# Kein dedizierter /health-Endpoint im Backend — GET /api/v1 (Root-Route,
-# main.ts setGlobalPrefix) prueft, dass Nest tatsaechlich durchgebootet ist,
-# nicht nur dass der Port offen ist.
+# Kein dedizierter /health-Endpoint im Backend, und AppController (GET /) ist
+# nirgends registriert (curl liefert hier reproduzierbar 404). Jeder HTTP-
+# Statuscode beweist trotzdem, dass Nest antwortet — nur "000" (curl kommt
+# gar nicht durch: Connection refused/Timeout) zaehlt hier als "nicht da".
 status=$(curl -s -o /dev/null -w "%{http_code}" -m 5 "${LOADTEST_BASE_URL}" 2>/dev/null)
 if [ "$status" = "000" ]; then
   echo "Fehler: Loadtest-Stack unter ${LOADTEST_BASE_URL} nicht erreichbar."
