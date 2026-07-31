@@ -23,6 +23,28 @@ function parseRow(line) {
   return { timestamp, method, path, status, duration_ms };
 }
 
+// This is a pure load test — 4xx that follows from the load approach
+// itself (duplicate contact request, no pending request to accept,
+// insufficient coins, ...) is expected traffic, not a bug. Only 5xx
+// and transport failures ("000" from a dead connection, the "FAIL"
+// literal loadtest.sh's own login() writes) are real errors — bucketed
+// separately so expected 4xx never inflates the error rate.
+function categorizeStatus(status) {
+  if (status === 'FAIL') return 'error';
+  const n = Number(status);
+  if (Number.isFinite(n) && n >= 200 && n < 300) return 'success';
+  if (Number.isFinite(n) && n >= 400 && n < 500) return 'expectedReject';
+  return 'error'; // 5xx, "000", and anything else unexpected
+}
+
+function categorize(statusDist) {
+  const buckets = { success: 0, expectedReject: 0, error: 0 };
+  for (const [status, count] of Object.entries(statusDist)) {
+    buckets[categorizeStatus(status)] += count;
+  }
+  return buckets;
+}
+
 function statsForDurations(durations) {
   const sorted = [...durations].sort((a, b) => a - b);
   const n = sorted.length;
@@ -49,7 +71,13 @@ function computeStats(rows) {
   const perPath = {};
   for (const [p, durations] of byPath) perPath[p] = statsForDurations(durations);
 
-  return { total: rows.length, statusDist, perPath, overall: statsForDurations(allDurations) };
+  return {
+    total: rows.length,
+    statusDist,
+    categories: categorize(statusDist),
+    perPath,
+    overall: statsForDurations(allDurations),
+  };
 }
 
 // Accumulates rows for one active run and produces live snapshots,

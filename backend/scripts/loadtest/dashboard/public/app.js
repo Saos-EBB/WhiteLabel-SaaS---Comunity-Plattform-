@@ -7,6 +7,8 @@ const statusBadge = el('run-status');
 const statTotal = el('stat-total');
 const statThroughput = el('stat-throughput');
 const statusDistEl = el('status-dist');
+const categoriesEl = el('categories');
+const summaryCategoriesEl = el('summary-categories');
 const endpointBody = document.querySelector('#endpoint-table tbody');
 const dockerStatsEl = el('docker-stats');
 const chartThroughput = el('chart-throughput');
@@ -104,8 +106,13 @@ async function loadRun(ts) {
   if (!res.ok) return;
   const run = await res.json();
   summaryText.textContent = run.summaryText || '(no summary.txt for this run)';
-  if (run.stats) renderEndpointTable(run.stats.perPath, summaryBody);
-  else summaryBody.innerHTML = '';
+  if (run.stats) {
+    renderCategories(run.stats.categories, run.stats.total, summaryCategoriesEl);
+    renderEndpointTable(run.stats.perPath, summaryBody);
+  } else {
+    summaryCategoriesEl.innerHTML = '';
+    summaryBody.innerHTML = '';
+  }
 }
 
 runSelect.addEventListener('change', () => loadRun(runSelect.value));
@@ -120,6 +127,28 @@ function statusClass(code) {
   if (n >= 400 && n < 500) return 'warn';
   if (n >= 500) return 'err';
   return 'other';
+}
+
+const CATEGORY_LABELS = [
+  ['success', 'Success (2xx)'],
+  ['expectedReject', 'Expected reject (4xx)'],
+  ['error', 'Error (5xx / transport)'],
+];
+
+// Headline numbers: SUCCESS / EXPECTED-REJECT / ERROR, kept visually
+// separate from the raw per-status-code list below so an expected-4xx
+// -heavy pipeline (e.g. pipeline_connect's 409s) never reads as a high
+// error rate.
+function renderCategories(categories, total, container) {
+  container.innerHTML = '';
+  for (const [key, label] of CATEGORY_LABELS) {
+    const count = (categories && categories[key]) || 0;
+    const rate = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+    const div = document.createElement('div');
+    div.className = `stat stat--${key === 'expectedReject' ? 'expected' : key}`;
+    div.innerHTML = `<span class="stat__label">${label}</span><span class="stat__value">${count} (${rate}%)</span>`;
+    container.appendChild(div);
+  }
 }
 
 function renderStatusDist(statusDist) {
@@ -208,6 +237,7 @@ function applyTick(tick) {
   statTotal.textContent = tick.total;
   statThroughput.textContent = tick.throughput.toFixed(1);
 
+  renderCategories(tick.categories, tick.total, categoriesEl);
   renderStatusDist(tick.statusDist);
   renderEndpointTable(tick.perPath, endpointBody);
   renderDockerStats(tick.docker || []);

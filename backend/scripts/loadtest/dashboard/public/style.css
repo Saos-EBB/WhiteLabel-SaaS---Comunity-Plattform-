@@ -70,6 +70,9 @@ h3 { font-size: 0.95rem; color: var(--muted); margin: 1rem 0 0.4rem; }
 .stat { display: flex; flex-direction: column; }
 .stat__label { font-size: 0.75rem; color: var(--muted); }
 .stat__value { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.stat--success .stat__value { color: var(--ok); }
+.stat--expected .stat__value { color: var(--warn); }
+.stat--error .stat__value { color: var(--err); }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 th, td { text-align: left; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }

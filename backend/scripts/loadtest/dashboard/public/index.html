@@ -26,7 +26,10 @@
       <div class="stat"><span class="stat__label">req/s</span><span id="stat-throughput" class="stat__value">–</span></div>
     </div>
 
-    <h3>Status codes</h3>
+    <h3>Result</h3>
+    <div id="categories" class="totals"></div>
+
+    <h3>Status codes (detail)</h3>
     <div id="status-dist"></div>
 
     <h3>Per endpoint</h3>
@@ -50,6 +53,8 @@
   <section id="summary">
     <h2>Runs</h2>
     <label>Past run <select id="run-select"></select></label>
+    <h3>Result</h3>
+    <div id="summary-categories" class="totals"></div>
     <pre id="summary-text"></pre>
     <table id="summary-table">
       <thead>
