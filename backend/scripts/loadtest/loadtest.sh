@@ -47,6 +47,7 @@ declare -A PIPELINE_WEIGHTS=(
   [coin_transaction]=30
   [media_upload]=20
   [connect]=20
+  [chat]=25
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -199,6 +200,30 @@ pipeline_connect() {
   if [ -n "$first_id" ]; then
     random_delay
     do_request "$logfile" "$token" PATCH "/chat/requests/${first_id}/accept"
+  fi
+}
+
+# Liest eigene Conversations; falls mindestens eine existiert, liest
+# Nachrichten einer zufaelligen davon und schreibt eine neue Nachricht
+# rein. Kein Fallback-Call falls keine Conversation existiert — dann war
+# der GET /chat/conversations oben bereits der einzige Call (gleiches
+# Muster wie pipeline_media_upload ohne GET /media/mine).
+pipeline_chat() {
+  local logfile="$1" token="$2"
+
+  do_request "$logfile" "$token" GET "/chat/conversations"
+  local ids=()
+  while IFS= read -r id; do
+    [ -n "$id" ] && ids+=("$id")
+  done < <(printf '%s' "$RESPONSE_BODY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+
+  if [ "${#ids[@]}" -gt 0 ]; then
+    local conv_id="${ids[$((RANDOM % ${#ids[@]}))]}"
+    random_delay
+    do_request "$logfile" "$token" GET "/chat/conversations/${conv_id}/messages"
+    random_delay
+    do_request "$logfile" "$token" POST "/chat/conversations/${conv_id}/messages" \
+      "{\"content\":\"loadtest message $(date +%s%N)\"}"
   fi
 }
 
