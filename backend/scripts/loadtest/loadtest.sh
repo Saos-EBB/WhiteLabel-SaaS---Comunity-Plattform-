@@ -139,10 +139,11 @@ pipeline_coin_transaction() {
   local logfile="$1" token="$2"
   do_request "$logfile" "$token" GET "/hidden/coin/balance"
   random_delay
-  # Kein direkter Mutations-Endpoint (siehe Bericht) — Coin-Kauf laeuft nur
-  # ueber echten Stripe-Checkout (POST /hidden/coin/purchase -> Redirect ->
-  # POST /hidden/coin/confirm mit echter session_id), fuer den Loadtest-Loop
-  # ungeeignet. Pipeline bleibt read-only.
+  # Nur erreichbar wenn Backend mit LOADTEST_MODE=true laeuft (siehe CoinModule) —
+  # sonst 404. Loest denselben DB-Schreibpfad wie ein echter Stripe-Kauf aus
+  # (CoinService.addCoins), ohne echten Stripe-Call.
+  do_request "$logfile" "$token" POST "/hidden/coin/test-purchase"
+  random_delay
   do_request "$logfile" "$token" GET "/hidden/coin/balance"
 }
 
