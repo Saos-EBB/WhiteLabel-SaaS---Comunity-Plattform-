@@ -1,6 +1,5 @@
 'use strict';
-// Live view + controls over SSE. Past-run selection is added in a
-// later commit.
+// Live view + controls over SSE, plus past-run browsing.
 
 const el = (id) => document.getElementById(id);
 
@@ -17,6 +16,9 @@ const durationInput = el('duration-sec');
 const startBtn = el('start-btn');
 const stopBtn = el('stop-btn');
 const controlError = el('control-error');
+const runSelect = el('run-select');
+const summaryText = el('summary-text');
+const summaryBody = document.querySelector('#summary-table tbody');
 
 function setRunningUI(active) {
   startBtn.disabled = active;
@@ -74,6 +76,40 @@ fetch('/api/state')
     setStatus(state.active ? 'running' : state.status);
   })
   .catch(() => {});
+
+function formatRunLabel(run) {
+  const date = new Date(Number(run.ts) * 1000).toLocaleString();
+  return run.hasSummary ? date : `${date} (no summary — interrupted?)`;
+}
+
+async function loadRunList(selectTs) {
+  const list = await fetch('/api/runs').then((res) => res.json());
+  runSelect.innerHTML = '';
+  for (const run of list) {
+    const opt = document.createElement('option');
+    opt.value = run.ts;
+    opt.textContent = formatRunLabel(run);
+    runSelect.appendChild(opt);
+  }
+  if (selectTs && list.some((r) => r.ts === selectTs)) {
+    runSelect.value = selectTs;
+    await loadRun(selectTs);
+  } else if (list.length) {
+    await loadRun(list[0].ts);
+  }
+}
+
+async function loadRun(ts) {
+  const res = await fetch(`/api/runs/${ts}`);
+  if (!res.ok) return;
+  const run = await res.json();
+  summaryText.textContent = run.summaryText || '(no summary.txt for this run)';
+  if (run.stats) renderEndpointTable(run.stats.perPath, summaryBody);
+  else summaryBody.innerHTML = '';
+}
+
+runSelect.addEventListener('change', () => loadRun(runSelect.value));
+loadRunList();
 
 const STATUS_COLORS = { ok: 'var(--ok)', warn: 'var(--warn)', err: 'var(--err)', other: 'var(--muted)' };
 
@@ -189,8 +225,11 @@ source.addEventListener('started', (ev) => {
   setStatus(JSON.parse(ev.data).status);
 });
 source.addEventListener('finished', (ev) => {
-  applyTick({ ...JSON.parse(ev.data), throughput: 0, docker: [] });
+  const final = JSON.parse(ev.data);
+  applyTick({ ...final, docker: [] });
   setRunningUI(false);
+  const ts = (final.logDir || '').split('/').filter(Boolean).pop();
+  loadRunList(ts);
 });
 source.addEventListener('run-error', (ev) => {
   controlError.textContent = JSON.parse(ev.data).message;

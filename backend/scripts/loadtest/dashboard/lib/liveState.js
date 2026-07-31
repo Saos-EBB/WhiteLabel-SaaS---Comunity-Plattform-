@@ -42,6 +42,7 @@ async function finishRun() {
   }
   state.status = 'finished';
   state.finishedAt = Date.now();
+  return { ...state, ...aggregator.snapshot() };
 }
 
 async function pollTick() {

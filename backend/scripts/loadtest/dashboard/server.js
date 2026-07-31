@@ -15,6 +15,7 @@ const path = require('path');
 const liveState = require('./lib/liveState');
 const { pollDockerStats } = require('./lib/dockerStats');
 const runner = require('./lib/runner');
+const runs = require('./lib/runs');
 
 const HOST = '127.0.0.1';
 const PORT = 4300;
@@ -66,8 +67,8 @@ runner.on('exit', async ({ code, hadLogDir }) => {
     broadcast('run-error', { message: `run-loadtest.sh exited (code ${code}) before it started logging — check the dashboard server's own console output` });
     return;
   }
-  await liveState.finishRun();
-  broadcast('finished', liveState.getState());
+  const final = await liveState.finishRun();
+  broadcast('finished', final);
 });
 
 function readJsonBody(req) {
@@ -120,6 +121,25 @@ function handleState(req, res) {
   sendJson(res, 200, { active: runner.isActive(), ...liveState.getState() });
 }
 
+async function handleRunsList(req, res) {
+  sendJson(res, 200, await runs.listRuns());
+}
+
+async function handleRunDetail(req, res, ts) {
+  let run;
+  try {
+    run = await runs.getRun(decodeURIComponent(ts));
+  } catch (err) {
+    sendJson(res, 400, { error: err.message });
+    return;
+  }
+  if (!run) {
+    sendJson(res, 404, { error: 'run not found' });
+    return;
+  }
+  sendJson(res, 200, run);
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -164,6 +184,14 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'POST' && req.url === '/api/stop') {
     handleStop(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/runs') {
+    handleRunsList(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url.startsWith('/api/runs/')) {
+    handleRunDetail(req, res, req.url.slice('/api/runs/'.length));
     return;
   }
   serveStatic(req, res);
