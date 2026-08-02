@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 #
-# YourBrand Loadtest — gewichtete Pipelines statt reinem Random-Pick.
-# Jeder simulierte User loggt sich ein und durchläuft wiederholt eine
-# zufällig (gewichtet) gewählte Pipeline, mit Delay zwischen den Aktionen.
+# YourBrand Loadtest — flaches Random-Action-Modell. Jeder simulierte User
+# hat bereits einen Token (aus tokens.csv, siehe prefetch-tokens.sh) und
+# waehlt pro Tick EINE zufaellige Aktion aus einer flachen Liste aller
+# bekannten Endpoints, fuehrt sie aus, schlaeft 2-25s, waehlt neu. Kein
+# Login im Loop, kein Per-User-State (auf IDs angewiesene Aktionen holen
+# sich per Quick-GET eine, sonst zaehlt der GET-Call selbst schon als
+# Aktion).
 #
-# Voraussetzung: users.csv in diesem Ordner (email,password), z.B. per
-#   COUNT=10000 ./generate-users-csv.sh > users.csv
-# erzeugt aus den seed_user_*-Fake-Usern (siehe generate-users-csv.sh).
-# Läuft bewusst gegen eine eigene Loadtest-DB, NICHT gegen die Demo-DB.
-# test-photo.jpg (in diesem Ordner) wird fuer pipeline_media_upload gebraucht
+# Voraussetzung: tokens.csv in diesem Ordner (email,token), erzeugt per
+#   ./prefetch-tokens.sh
+# (das wiederum users.csv voraussetzt, siehe generate-users-csv.sh).
+# Laeuft bewusst gegen eine eigene Loadtest-DB, NICHT gegen die Demo-DB.
+# test-photo.jpg (in diesem Ordner) wird fuer action_media_upload gebraucht
 # (echter multipart-Upload, der Server prueft Magic Bytes + dekodiert mit sharp).
+#
+# admin_pending ist Teil der flachen Liste wie jede andere Aktion — hat
+# der Token in tokens.csv keine owner-Rolle (Normalfall, seed_user_* sind
+# alle role=user), liefert das 403 und zaehlt als EXPECTED-REJECT, kein
+# Bug. Um echte 200er auf dieser Aktion zu sehen, den Owner-Account
+# (owner@demo.example.com) mit in users.csv aufnehmen, bevor prefetch
+# laeuft.
 #
 # Usage:
 #   ./loadtest.sh
-#   NUM_USERS=200 DURATION_SEC=300 ./loadtest.sh
+#   NUM_USERS=200 DURATION_SEC=300 RAMP_SEC=60 ./loadtest.sh
 #
 set -uo pipefail   # bewusst KEIN -e: einzelne fehlgeschlagene Requests
                     # sollen geloggt werden, nicht das ganze Script killen
@@ -21,48 +32,37 @@ set -uo pipefail   # bewusst KEIN -e: einzelne fehlgeschlagene Requests
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─────────────────────────────────────────────────────────────
-# KONFIGURATION — das hier sind die Stellschrauben für die Nutzerzahl
+# KONFIGURATION
 # ─────────────────────────────────────────────────────────────
 # Alle Routen laufen unter globalem Prefix /api/v1 (main.ts: app.setGlobalPrefix('api/v1'))
 BASE_URL="${BASE_URL:-http://localhost:3000/api/v1}"
-NUM_USERS="${NUM_USERS:-50}"              # <- Haupt-Variable für Nutzerzahl
-DURATION_SEC="${DURATION_SEC:-60}"        # Testdauer in Sekunden
-MIN_DELAY_MS="${MIN_DELAY_MS:-200}"       # Denkpause zwischen Aktionen (min)
-MAX_DELAY_MS="${MAX_DELAY_MS:-2000}"      # Denkpause zwischen Aktionen (max)
-USERS_FILE="${USERS_FILE:-./users.csv}"   # Format: email,password (ohne Header)
-TEST_PHOTO="${TEST_PHOTO:-${SCRIPT_DIR}/test-photo.jpg}"  # fuer pipeline_media_upload
-RUN_ADMIN_PIPELINE="${RUN_ADMIN_PIPELINE:-true}"  # 1x Owner-Loop parallel laufen lassen
-# owner@demo.example.com / Demo1234! ist der einzige role=owner-Account aus
-# demo-users.yaml — es gibt nur diese eine Owner-Rolle, nicht N.
-ADMIN_EMAIL="${ADMIN_EMAIL:-owner@demo.example.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-Demo1234!}"
+NUM_USERS="${NUM_USERS:-0}"                # 0 = alle Tokens aus TOKENS_FILE nutzen
+DURATION_SEC="${DURATION_SEC:-60}"         # Testdauer in Sekunden
+MIN_DELAY_SEC="${MIN_DELAY_SEC:-2}"        # Denkpause zwischen Aktionen (min)
+MAX_DELAY_SEC="${MAX_DELAY_SEC:-25}"       # Denkpause zwischen Aktionen (max)
+RAMP_SEC="${RAMP_SEC:-30}"                 # alle User werden ueber dieses Fenster verteilt gestartet,
+                                            # unabhaengig von NUM_USERS (ersetzt festes Stagger-Sleep)
+TOKENS_FILE="${TOKENS_FILE:-./tokens.csv}" # Format: email,token (ohne Header), siehe prefetch-tokens.sh
+TEST_PHOTO="${TEST_PHOTO:-${SCRIPT_DIR}/test-photo.jpg}"  # fuer action_media_upload
 
 TS="$(date +%s)"
 LOG_DIR="./loadtest-logs/${TS}"
 mkdir -p "${LOG_DIR}"
 ERRORS_FILE="${LOG_DIR}/errors.log"
 
-# Pipeline-Gewichte (müssen nicht 100 ergeben, werden normalisiert)
-declare -A PIPELINE_WEIGHTS=(
-  [browse]=50
-  [coin_transaction]=30
-  [media_upload]=20
-  [connect]=20
-  [chat]=25
-)
-
 # ─────────────────────────────────────────────────────────────
 # HILFSFUNKTIONEN
 # ─────────────────────────────────────────────────────────────
 
 random_delay() {
-  local ms=$(( RANDOM % (MAX_DELAY_MS - MIN_DELAY_MS + 1) + MIN_DELAY_MS ))
-  sleep "$(awk -v ms="$ms" 'BEGIN{printf "%.3f", ms/1000}')"
+  local sec=$(( RANDOM % (MAX_DELAY_SEC - MIN_DELAY_SEC + 1) + MIN_DELAY_SEC ))
+  sleep "$sec"
 }
 
 # 4xx sind bei diesem Lastansatz erwartet (z.B. "Anfrage bereits gesendet",
-# "insufficient coins") und werden NICHT hier geloggt — nur echte Fehler:
-# 5xx oder eine tote Verbindung (curl liefert dann "000", siehe do_request).
+# "insufficient coins", 403 auf admin_pending fuer Nicht-Owner) und werden
+# NICHT hier geloggt — nur echte Fehler: 5xx oder eine tote Verbindung
+# (curl liefert dann "000", siehe do_request).
 # Args: <METHOD> <path> <status> <response_body>
 log_error_if_needed() {
   local method="$1" path="$2" status="$3" body="$4"
@@ -76,9 +76,9 @@ log_error_if_needed() {
 
 # Führt einen Request aus, loggt Status-Code + Dauer in die User-Logdatei.
 # Args: <user_log_file> <token|-> <METHOD> <path> [json_body]
-# Setzt RESPONSE_BODY als Nebeneffekt — fuer Pipelines, die die Antwort
-# auswerten muessen (z.B. pipeline_connect braucht die user_id aus dem
-# Deck), ohne dafuer einen zweiten curl-Call nur zum Parsen zu brauchen.
+# Setzt RESPONSE_BODY als Nebeneffekt — fuer Aktionen, die die Antwort
+# auswerten muessen (z.B. eine ID fuer den naechsten Call brauchen), ohne
+# dafuer einen zweiten curl-Call nur zum Parsen zu brauchen.
 do_request() {
   local logfile="$1" token="$2" method="$3" path="$4" body="${5:-}"
   local auth_header=()
@@ -125,176 +125,126 @@ do_upload() {
   log_error_if_needed POST "$path" "$status" "$body"
 }
 
-login() {
-  local email="$1" password="$2"
-  local raw status body
-  # LoginDto erwartet "identifier" (E-Mail oder Nickname), nicht "email".
-  raw=$(curl -s -m 10 -X POST "${BASE_URL}/auth/login" \
-    -H "Content-Type: application/json" \
-    -d "{\"identifier\":\"${email}\",\"password\":\"${password}\"}" \
-    -w $'\n%{http_code}')
-
-  body="${raw%$'\n'*}"
-  status="${raw##*$'\n'}"
-  [ -z "$status" ] && status="000"
-  log_error_if_needed POST "/auth/login" "$status" "$body"
-
-  printf '%s' "$body" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
-}
-
-# Gewichtete Zufallsauswahl einer Pipeline
-pick_pipeline() {
-  local total=0 key
-  for key in "${!PIPELINE_WEIGHTS[@]}"; do
-    total=$(( total + PIPELINE_WEIGHTS[$key] ))
-  done
-  local r=$(( RANDOM % total ))
-  local acc=0
-  for key in "${!PIPELINE_WEIGHTS[@]}"; do
-    acc=$(( acc + PIPELINE_WEIGHTS[$key] ))
-    if [ "$r" -lt "$acc" ]; then
-      echo "$key"
-      return
-    fi
-  done
-}
-
 # ─────────────────────────────────────────────────────────────
-# PIPELINES — bilden echte Userflows nach, nicht einzelne Aktionen
-# TODO: Pfade an eure echten Endpoints anpassen (aktuell Annahmen)
+# AKTIONEN — je eine pro bekanntem Endpoint, gleichgewichtet in ACTIONS
 # ─────────────────────────────────────────────────────────────
 
-pipeline_browse() {
-  local logfile="$1" token="$2"
-  do_request "$logfile" "$token" GET "/discover/deck"
-  random_delay
-  # Ersatz fuer /profiles/random (existiert nicht, siehe Bericht)
-  do_request "$logfile" "$token" GET "/discover/matches"
-  random_delay
-  do_request "$logfile" "$token" GET "/hidden/coin/balance"
+action_discover_deck() {
+  do_request "$1" "$2" GET "/discover/deck"
 }
 
-pipeline_coin_transaction() {
-  local logfile="$1" token="$2"
-  do_request "$logfile" "$token" GET "/hidden/coin/balance"
-  random_delay
-  # Nur erreichbar wenn Backend mit LOADTEST_MODE=true laeuft (siehe CoinModule) —
-  # sonst 404. Loest denselben DB-Schreibpfad wie ein echter Stripe-Kauf aus
-  # (CoinService.addCoins), ohne echten Stripe-Call.
-  do_request "$logfile" "$token" POST "/hidden/coin/test-purchase"
-  random_delay
-  do_request "$logfile" "$token" GET "/hidden/coin/balance"
+action_discover_matches() {
+  do_request "$1" "$2" GET "/discover/matches"
 }
 
-pipeline_media_upload() {
-  local logfile="$1" token="$2"
-  do_upload "$logfile" "$token" "/media/upload/profile-photo" "file" "$TEST_PHOTO"
-  # GET /media/mine existiert nicht (siehe Bericht) — kein zweiter Call moeglich
+action_coin_balance() {
+  do_request "$1" "$2" GET "/hidden/coin/balance"
 }
 
-pipeline_admin_moderate() {
-  local logfile="$1" token="$2"
-  do_request "$logfile" "$token" GET "/admin/media/pending"
-  # PATCH .../approve braucht eine echte Media-ID aus der Response oben —
-  # kein "next"-Convenience-Endpoint vorhanden (siehe Bericht)
+# Nur erreichbar wenn Backend mit LOADTEST_MODE=true laeuft (siehe CoinModule) —
+# sonst 404 (zaehlt als EXPECTED-REJECT, nicht als Bug).
+action_coin_test_purchase() {
+  do_request "$1" "$2" POST "/hidden/coin/test-purchase"
 }
 
-# Reine Lastpipeline, keine Korrektheit pro User: Deck lesen -> Kontakt-
-# anfrage an einen (zufaelligen) Kandidaten senden; separat eigene
-# eingehende Pending-Requests lesen -> falls vorhanden, die erste
-# annehmen. Verbindungen entstehen so ueber echten DB-State (verschiedene
-# simulierte User akzeptieren zufaellig fremde Requests), nicht ueber
-# In-Memory-Zuordnung. PATCH .../accept 409t, wenn der Request inzwischen
-# von woanders schon beantwortet wurde — erwartet unter Last, kein Bug.
-pipeline_connect() {
-  local logfile="$1" token="$2"
+action_media_upload() {
+  do_upload "$1" "$2" "/media/upload/profile-photo" "file" "$TEST_PHOTO"
+}
 
+action_chat_conversations_list() {
+  do_request "$1" "$2" GET "/chat/conversations"
+}
+
+# Quick-GET auf /chat/conversations um eine ID zu holen; ohne Conversation
+# bleibt es bei diesem einen GET (kein Fallback-Call moeglich).
+action_chat_messages_list() {
+  local logfile="$1" token="$2"
+  do_request "$logfile" "$token" GET "/chat/conversations"
+  local conv_id
+  conv_id=$(printf '%s' "$RESPONSE_BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  [ -n "$conv_id" ] && do_request "$logfile" "$token" GET "/chat/conversations/${conv_id}/messages"
+}
+
+action_chat_messages_post() {
+  local logfile="$1" token="$2"
+  do_request "$logfile" "$token" GET "/chat/conversations"
+  local conv_id
+  conv_id=$(printf '%s' "$RESPONSE_BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  if [ -n "$conv_id" ]; then
+    do_request "$logfile" "$token" POST "/chat/conversations/${conv_id}/messages" \
+      "{\"content\":\"loadtest message $(date +%s%N)\"}"
+  fi
+}
+
+# Quick-GET aufs Deck um einen Kandidaten zu holen, dann Kontaktanfrage.
+# 409 heisst "gab's schon" — erwartet unter Last, kein Bug.
+action_contact_request_send() {
+  local logfile="$1" token="$2"
   do_request "$logfile" "$token" GET "/discover/deck"
   local ids=()
   while IFS= read -r id; do
     [ -n "$id" ] && ids+=("$id")
   done < <(printf '%s' "$RESPONSE_BODY" | grep -o '"user_id":"[^"]*"' | cut -d'"' -f4)
-
   if [ "${#ids[@]}" -gt 0 ]; then
     local target="${ids[$((RANDOM % ${#ids[@]}))]}"
-    random_delay
-    do_request "$logfile" "$token" POST "/chat/requests" \
-      "{\"receiver_id\":\"${target}\"}"
+    do_request "$logfile" "$token" POST "/chat/requests" "{\"receiver_id\":\"${target}\"}"
   fi
+}
 
-  random_delay
+action_contact_request_incoming() {
+  do_request "$1" "$2" GET "/chat/requests/incoming"
+}
+
+# Quick-GET auf die eigenen Incoming-Requests, erste (falls vorhanden)
+# annehmen. PATCH .../accept 409t, wenn der Request inzwischen von
+# woanders schon beantwortet wurde — erwartet unter Last, kein Bug.
+action_contact_request_accept() {
+  local logfile="$1" token="$2"
   do_request "$logfile" "$token" GET "/chat/requests/incoming"
   local first_id
   first_id=$(printf '%s' "$RESPONSE_BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-  if [ -n "$first_id" ]; then
-    random_delay
-    do_request "$logfile" "$token" PATCH "/chat/requests/${first_id}/accept"
-  fi
+  [ -n "$first_id" ] && do_request "$logfile" "$token" PATCH "/chat/requests/${first_id}/accept"
 }
 
-# Liest eigene Conversations; falls mindestens eine existiert, liest
-# Nachrichten einer zufaelligen davon und schreibt eine neue Nachricht
-# rein. Kein Fallback-Call falls keine Conversation existiert — dann war
-# der GET /chat/conversations oben bereits der einzige Call (gleiches
-# Muster wie pipeline_media_upload ohne GET /media/mine).
-pipeline_chat() {
-  local logfile="$1" token="$2"
-
-  do_request "$logfile" "$token" GET "/chat/conversations"
-  local ids=()
-  while IFS= read -r id; do
-    [ -n "$id" ] && ids+=("$id")
-  done < <(printf '%s' "$RESPONSE_BODY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
-
-  if [ "${#ids[@]}" -gt 0 ]; then
-    local conv_id="${ids[$((RANDOM % ${#ids[@]}))]}"
-    random_delay
-    do_request "$logfile" "$token" GET "/chat/conversations/${conv_id}/messages"
-    random_delay
-    do_request "$logfile" "$token" POST "/chat/conversations/${conv_id}/messages" \
-      "{\"content\":\"loadtest message $(date +%s%N)\"}"
-  fi
+action_admin_pending() {
+  do_request "$1" "$2" GET "/admin/media/pending"
 }
+
+ACTIONS=(
+  action_discover_deck
+  action_discover_matches
+  action_coin_balance
+  action_coin_test_purchase
+  action_media_upload
+  action_chat_conversations_list
+  action_chat_messages_list
+  action_chat_messages_post
+  action_contact_request_send
+  action_contact_request_incoming
+  action_contact_request_accept
+  action_admin_pending
+)
 
 # ─────────────────────────────────────────────────────────────
 # SIMULIERTER USER — läuft als Background-Prozess bis Testende
 # ─────────────────────────────────────────────────────────────
 
 simulate_user() {
-  local idx="$1" email="$2" password="$3" end_ts="$4"
+  local idx="$1" token="$2" end_ts="$3"
   local logfile="${LOG_DIR}/user_${idx}.csv"
   echo "timestamp,method,path,status,duration_ms" > "$logfile"
 
-  local token
-  token=$(login "$email" "$password")
+  # Leerer Token heisst: Prefetch hat fuer diesen Slot keinen Token
+  # geliefert (siehe prefetch-tokens.sh "X of Y tokens acquired") — kein
+  # Login-Fehler im Loop, sondern eine Prefetch-Luecke.
   if [ -z "$token" ]; then
     echo "$(date -Iseconds),LOGIN,-,FAIL,0" >> "$logfile"
     return
   fi
 
   while [ "$(date +%s)" -lt "$end_ts" ]; do
-    local pipeline
-    pipeline=$(pick_pipeline)
-    "pipeline_${pipeline}" "$logfile" "$token"
-    random_delay
-  done
-}
-
-simulate_admin() {
-  local end_ts="$1"
-  local logfile="${LOG_DIR}/admin_owner.csv"
-  echo "timestamp,method,path,status,duration_ms" > "$logfile"
-
-  local token
-  token=$(login "$ADMIN_EMAIL" "$ADMIN_PASSWORD")
-  if [ -z "$token" ]; then
-    echo "$(date -Iseconds),LOGIN,-,FAIL,0" >> "$logfile"
-    return
-  fi
-
-  while [ "$(date +%s)" -lt "$end_ts" ]; do
-    pipeline_admin_moderate "$logfile" "$token"
+    local action="${ACTIONS[$((RANDOM % ${#ACTIONS[@]}))]}"
+    "$action" "$logfile" "$token"
     random_delay
   done
 }
@@ -303,37 +253,37 @@ simulate_admin() {
 # MAIN
 # ─────────────────────────────────────────────────────────────
 
-if [ ! -f "$USERS_FILE" ]; then
-  echo "Fehler: ${USERS_FILE} nicht gefunden (Format: email,password pro Zeile, kein Header)."
-  echo "Erzeugen mit: COUNT=10000 ./generate-users-csv.sh > users.csv"
+if [ ! -f "$TOKENS_FILE" ]; then
+  echo "Fehler: ${TOKENS_FILE} nicht gefunden (Format: email,token pro Zeile, kein Header)."
+  echo "Erzeugen mit: COUNT=1000 ./generate-users-csv.sh > users.csv && ./prefetch-tokens.sh"
   exit 1
 fi
 
-mapfile -t USER_LINES < "$USERS_FILE"
-AVAILABLE_USERS="${#USER_LINES[@]}"
-if [ "$AVAILABLE_USERS" -lt "$NUM_USERS" ]; then
-  echo "Warnung: nur ${AVAILABLE_USERS} User in ${USERS_FILE}, NUM_USERS wird darauf begrenzt."
-  NUM_USERS="$AVAILABLE_USERS"
+mapfile -t TOKEN_LINES < "$TOKENS_FILE"
+AVAILABLE_TOKENS="${#TOKEN_LINES[@]}"
+if [ "$AVAILABLE_TOKENS" -eq 0 ]; then
+  echo "Fehler: ${TOKENS_FILE} ist leer."
+  exit 1
+fi
+
+if [ "$NUM_USERS" -eq 0 ] || [ "$NUM_USERS" -gt "$AVAILABLE_TOKENS" ]; then
+  [ "$NUM_USERS" -gt "$AVAILABLE_TOKENS" ] && echo "Warnung: nur ${AVAILABLE_TOKENS} Tokens in ${TOKENS_FILE}, NUM_USERS wird darauf begrenzt."
+  NUM_USERS="$AVAILABLE_TOKENS"
 fi
 
 END_TS=$(( $(date +%s) + DURATION_SEC ))
+RAMP_INTERVAL=$(awk -v r="$RAMP_SEC" -v n="$NUM_USERS" 'BEGIN{ v = n>0 ? r/n : 0; printf "%.3f", v }')
 
-echo "Start: ${NUM_USERS} User, ${DURATION_SEC}s Dauer, Ziel ${BASE_URL}"
+echo "Start: ${NUM_USERS} User, ${DURATION_SEC}s Dauer, Ramp ueber ${RAMP_SEC}s, Ziel ${BASE_URL}"
 echo "Logs: ${LOG_DIR}"
 
 PIDS=()
 
-if [ "$RUN_ADMIN_PIPELINE" = "true" ]; then
-  simulate_admin "$END_TS" &
+for (( i=0; i<NUM_USERS; i++ )); do
+  IFS=',' read -r email token <<< "${TOKEN_LINES[$i]}"
+  simulate_user "$i" "$token" "$END_TS" &
   PIDS+=($!)
-fi
-
-for i in $(seq 0 $((NUM_USERS - 1))); do
-  IFS=',' read -r email password <<< "${USER_LINES[$i]}"
-  simulate_user "$i" "$email" "$password" "$END_TS" &
-  PIDS+=($!)
-  # kleines Stagger beim Start, damit nicht alle exakt gleichzeitig einloggen
-  sleep 0.02
+  sleep "$RAMP_INTERVAL"
 done
 
 # warten bis alle User-Prozesse fertig sind
