@@ -142,9 +142,10 @@ const CATEGORY_LABELS = [
 ];
 
 // Headline numbers: SUCCESS / EXPECTED-REJECT / ERROR, kept visually
-// separate from the raw per-status-code list below so an expected-4xx
-// -heavy pipeline (e.g. pipeline_connect's 409s) never reads as a high
-// error rate.
+// separate from the raw per-status-code list below so expected 4xx
+// traffic (duplicate contact request, no pending request to accept,
+// admin-only endpoint hit by a non-owner token, ...) never reads as a
+// high error rate.
 function renderCategories(categories, total, container) {
   container.innerHTML = '';
   for (const [key, label] of CATEGORY_LABELS) {
@@ -157,13 +158,20 @@ function renderCategories(categories, total, container) {
   }
 }
 
+// "FAIL" is written by loadtest.sh when a user's slot in tokens.csv had
+// no token — a prefetch gap (see prefetch-tokens.sh), not a login that
+// failed live during this run.
+function statusLabel(code) {
+  return code === 'FAIL' ? 'FAIL (prefetch gap)' : code;
+}
+
 function renderStatusDist(statusDist) {
   statusDistEl.innerHTML = '';
   for (const [code, count] of Object.entries(statusDist).sort((a, b) => b[1] - a[1])) {
     const span = document.createElement('span');
     span.style.color = STATUS_COLORS[statusClass(code)];
     span.style.marginRight = '1rem';
-    span.textContent = `${code}: ${count}`;
+    span.textContent = `${statusLabel(code)}: ${count}`;
     statusDistEl.appendChild(span);
   }
 }

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 //
-// Live view onto scripts/loadtest's log output. Plain Node http, no
-// dependencies, no build step — see scripts/loadtest/README.md for usage.
-// The bash loadtest itself (loadtest.sh / run-loadtest.sh /
-// generate-users-csv.sh) is untouched; this server only reads its logs
-// and, for the control endpoints, spawns run-loadtest.sh as a child.
+// Live view onto scripts/loadtest's log output for Mode 2 (prefetch +
+// endpoint load) only — Mode 1 (login-capacity.sh) is terminal-only and
+// not tracked here. Plain Node http, no dependencies, no build step —
+// see scripts/loadtest/README.md for usage. The bash side (loadtest.sh /
+// run-loadtest.sh / prefetch-tokens.sh / generate-users-csv.sh) is
+// untouched by this server; it only reads their logs and, for the
+// control endpoints, spawns run-loadtest.sh as a child.
 //
 'use strict';
 

@@ -25,10 +25,14 @@ function parseRow(line) {
 
 // This is a pure load test — 4xx that follows from the load approach
 // itself (duplicate contact request, no pending request to accept,
-// insufficient coins, ...) is expected traffic, not a bug. Only 5xx
-// and transport failures ("000" from a dead connection, the "FAIL"
-// literal loadtest.sh's own login() writes) are real errors — bucketed
-// separately so expected 4xx never inflates the error rate.
+// insufficient coins, admin-only endpoint hit by a non-owner token, ...)
+// is expected traffic, not a bug. Only 5xx, transport failures ("000"
+// from a dead connection), and the "FAIL" literal are real errors —
+// bucketed separately so expected 4xx never inflates the error rate.
+// Since Mode 2 dropped in-loop login (tokens now come from
+// prefetch-tokens.sh), "FAIL" no longer means a live login failure — it
+// means this user's slot in tokens.csv was empty, i.e. a prefetch gap
+// (see prefetch-tokens.sh's "X of Y tokens acquired" report).
 function categorizeStatus(status) {
   if (status === 'FAIL') return 'error';
   const n = Number(status);
