@@ -6,8 +6,8 @@
 # latency runs away. Does not touch any other endpoint and does not write
 # anything under loadtest-logs/ — standalone, terminal-only, own summary.
 #
-# Voraussetzung: users.csv in diesem Ordner (email,password), z.B. per
-#   COUNT=1000 ./generate-users-csv.sh > users.csv
+# users.csv wird bei Bedarf selbst erzeugt (email,password), genau wie
+# run-loadtest.sh das fuer Mode 2 tut — keine manuelle Vorbereitung noetig.
 # Login attempts cycle through all available users so the ramp isn't
 # hammering a handful of accounts (bcrypt cost is per-request either way,
 # not per-account, but real traffic wouldn't repeat one identifier either).
@@ -34,10 +34,17 @@ MAX_RATE="${MAX_RATE:-50}"        # Ramp stoppt, sobald target rate das uebersch
 AUTO_STOP="${AUTO_STOP:-false}"           # bei true: Ramp stoppt, sobald success% < SUCCESS_THRESHOLD
 SUCCESS_THRESHOLD="${SUCCESS_THRESHOLD:-95}"
 
-if [ ! -f "$USERS_FILE" ]; then
-  echo "Fehler: ${USERS_FILE} nicht gefunden (Format: email,password pro Zeile, kein Header)."
-  echo "Erzeugen mit: COUNT=1000 ./generate-users-csv.sh > users.csv"
-  exit 1
+# users.csv braucht mindestens so viele Zeilen wie der teuerste Step
+# (MAX_RATE Logins/Sekunde ueber STEP_SEC Sekunden) an Logins ausloest,
+# sonst wiederholt sich derselbe Account mehrfach pro Step. Genau wie
+# run-loadtest.sh: eine vorhandene users.csv mit genug Zeilen bleibt
+# unangetastet, nur bei zu wenigen wird neu erzeugt.
+NEEDED_USERS=$(( MAX_RATE * STEP_SEC ))
+EXISTING_USERS=0
+[ -f "$USERS_FILE" ] && EXISTING_USERS=$(wc -l < "$USERS_FILE")
+if [ "$EXISTING_USERS" -lt "$NEEDED_USERS" ]; then
+  echo "Erzeuge ${USERS_FILE} mit ${NEEDED_USERS} Usern (vorhanden: ${EXISTING_USERS})..."
+  COUNT="$NEEDED_USERS" ./generate-users-csv.sh > "$USERS_FILE"
 fi
 
 mapfile -t USER_LINES < "$USERS_FILE"
