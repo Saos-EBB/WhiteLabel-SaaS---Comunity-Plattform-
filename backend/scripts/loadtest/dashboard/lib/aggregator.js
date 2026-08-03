@@ -62,6 +62,7 @@ function statsForDurations(durations) {
 function computeStats(rows) {
   const statusDist = {};
   const byPath = new Map();
+  const statusDistByPath = new Map();
   const allDurations = [];
 
   for (const row of rows) {
@@ -70,10 +71,16 @@ function computeStats(rows) {
     if (!bucket) { bucket = []; byPath.set(row.path, bucket); }
     bucket.push(row.duration_ms);
     allDurations.push(row.duration_ms);
+
+    let pathStatusDist = statusDistByPath.get(row.path);
+    if (!pathStatusDist) { pathStatusDist = {}; statusDistByPath.set(row.path, pathStatusDist); }
+    pathStatusDist[row.status] = (pathStatusDist[row.status] || 0) + 1;
   }
 
   const perPath = {};
-  for (const [p, durations] of byPath) perPath[p] = statsForDurations(durations);
+  for (const [p, durations] of byPath) {
+    perPath[p] = { ...statsForDurations(durations), categories: categorize(statusDistByPath.get(p)) };
+  }
 
   return {
     total: rows.length,

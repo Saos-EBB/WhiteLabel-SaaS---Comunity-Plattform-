@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 //
-// Live view onto scripts/loadtest's log output for Mode 2 (prefetch +
-// endpoint load) only — Mode 1 (login-capacity.sh) is terminal-only and
-// not tracked here. Plain Node http, no dependencies, no build step —
-// see scripts/loadtest/README.md for usage. The bash side (loadtest.sh /
-// run-loadtest.sh / prefetch-tokens.sh / generate-users-csv.sh) is
-// untouched by this server; it only reads their logs and, for the
-// control endpoints, spawns run-loadtest.sh as a child.
+// Live view onto scripts/loadtest's log output for both modes. Plain Node
+// http, no dependencies, no build step — see scripts/loadtest/README.md for
+// usage. The bash side (login-capacity.sh / loadtest.sh / run-loadtest.sh /
+// prefetch-tokens.sh / generate-users-csv.sh) is untouched by this server;
+// it only reads their logs and, for the control endpoints, spawns them as
+// children. Mode 2 (run-loadtest.sh) tails loadtest-logs/<ts>/*.csv on disk;
+// Mode 1 (login-capacity.sh) has no log directory to tail, just a stdout
+// table, so its live state is parsed straight from the child's stdout (see
+// lib/capacityRunner.js) and persisted to capacity-logs/<ts>.log for the
+// past-runs view.
 //
 'use strict';
 
@@ -18,6 +21,8 @@ const liveState = require('./lib/liveState');
 const { pollDockerStats } = require('./lib/dockerStats');
 const runner = require('./lib/runner');
 const runs = require('./lib/runs');
+const capacityRunner = require('./lib/capacityRunner');
+const capacityRuns = require('./lib/capacityRuns');
 
 const HOST = '127.0.0.1';
 const PORT = 4300;
@@ -72,6 +77,10 @@ runner.on('exit', async ({ code, hadLogDir }) => {
   const final = await liveState.finishRun();
   broadcast('finished', final);
 });
+
+capacityRunner.on('started', (state) => broadcast('capacity-started', state));
+capacityRunner.on('line', ({ line, row }) => broadcast('capacity-line', { line, row }));
+capacityRunner.on('exit', ({ code, ts }) => broadcast('capacity-finished', { code, ts, ...capacityRunner.getState() }));
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -142,6 +151,59 @@ async function handleRunDetail(req, res, ts) {
   sendJson(res, 200, run);
 }
 
+async function handleCapacityStart(req, res) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    sendJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
+  const params = {
+    startRate: Number(body.startRate),
+    rateStep: Number(body.rateStep),
+    stepSec: Number(body.stepSec),
+    maxRate: Number(body.maxRate),
+    autoStop: !!body.autoStop,
+    successThreshold: body.successThreshold !== undefined ? Number(body.successThreshold) : undefined,
+    baseUrl: body.baseUrl || undefined,
+  };
+  try {
+    const result = capacityRunner.start(params);
+    sendJson(res, 202, { started: true, ...result });
+  } catch (err) {
+    sendJson(res, 409, { error: err.message });
+  }
+}
+
+function handleCapacityStop(req, res) {
+  const stopped = capacityRunner.stop();
+  sendJson(res, stopped ? 202 : 409, { stopped, error: stopped ? undefined : 'no active capacity run' });
+}
+
+function handleCapacityState(req, res) {
+  sendJson(res, 200, { active: capacityRunner.isActive(), ...capacityRunner.getState() });
+}
+
+async function handleCapacityRunsList(req, res) {
+  sendJson(res, 200, await capacityRuns.listRuns());
+}
+
+async function handleCapacityRunDetail(req, res, ts) {
+  let run;
+  try {
+    run = await capacityRuns.getRun(decodeURIComponent(ts));
+  } catch (err) {
+    sendJson(res, 400, { error: err.message });
+    return;
+  }
+  if (!run) {
+    sendJson(res, 404, { error: 'run not found' });
+    return;
+  }
+  sendJson(res, 200, run);
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -194,6 +256,26 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'GET' && req.url.startsWith('/api/runs/')) {
     handleRunDetail(req, res, req.url.slice('/api/runs/'.length));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/capacity/start') {
+    handleCapacityStart(req, res);
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/capacity/stop') {
+    handleCapacityStop(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/capacity/state') {
+    handleCapacityState(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/capacity/runs') {
+    handleCapacityRunsList(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url.startsWith('/api/capacity/runs/')) {
+    handleCapacityRunDetail(req, res, req.url.slice('/api/capacity/runs/'.length));
     return;
   }
   serveStatic(req, res);
