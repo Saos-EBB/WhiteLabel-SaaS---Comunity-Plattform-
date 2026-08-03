@@ -4,24 +4,24 @@ Two independent modes (see each script's header comment for usage/env vars):
 
 - **Mode 1 — login capacity:** `login-capacity.sh`. Stepped-ramp test
   against only `POST /auth/login`, to find how many logins/sec the backend
-  (bcrypt) sustains. Terminal-only, its own summary table — not tracked by
-  the dashboard.
+  (bcrypt) sustains. Has its own summary table and is also start/stop-able
+  and browsable from the dashboard's "Mode 1" tab.
 - **Mode 2 — prefetch + endpoint load:** `generate-users-csv.sh` ->
   `prefetch-tokens.sh` (logs every user in once, writes `tokens.csv`) ->
   `loadtest.sh` (flat random-action loop over all known endpoints, reads
   tokens from `tokens.csv`, no login in the loop). `run-loadtest.sh`
-  orchestrates all three end to end. This README's dashboard section covers
-  Mode 2 only.
+  orchestrates all three end to end — this is the dashboard's "Mode 2" tab.
 
 Run Mode 1 first to find a safe login rate, then pass it to Mode 2's
 prefetch step, e.g. `BATCH_SIZE=30 BATCH_PAUSE=1 ./run-loadtest.sh 1000 300`.
 
 ## Dashboard
 
-A live view onto Mode 2's logs — plain Node, no dependencies, no build
-step. It does not run the loadtest itself; it tails
-`loadtest-logs/<ts>/*.csv` while `run-loadtest.sh` runs, and can start/stop
-that script for you.
+A live view onto both modes' output — plain Node, no dependencies, no
+build step. It does not run the loadtest logic itself; for Mode 2 it tails
+`loadtest-logs/<ts>/*.csv` while `run-loadtest.sh` runs, for Mode 1 it
+parses `login-capacity.sh`'s stdout table live (persisted to
+`capacity-logs/<ts>.log`) — and can start/stop either script for you.
 
 **Start:**
 
