@@ -11,74 +11,167 @@
     <span id="run-status" class="status status--idle">idle</span>
   </header>
 
-  <section id="controls">
-    <label>Users <input id="num-users" type="number" min="1" value="100"></label>
-    <label>Duration (s) <input id="duration-sec" type="number" min="1" value="60"></label>
-    <button id="start-btn" type="button">Start</button>
-    <button id="stop-btn" type="button" disabled>Stop</button>
-    <span id="control-error" class="error"></span>
+  <nav class="tabs" role="tablist" aria-label="Loadtest mode">
+    <button class="tab tab--active" id="tab-mode1" type="button" role="tab" aria-selected="true" aria-controls="mode1" data-mode="1">Mode 1 · Login Capacity</button>
+    <button class="tab" id="tab-mode2" type="button" role="tab" aria-selected="false" aria-controls="mode2" data-mode="2">Mode 2 · Endpoint Load</button>
+  </nav>
+
+  <!-- ══════════════════════════════ MODE 1 ══════════════════════════════ -->
+  <section id="mode1" class="mode-panel" role="tabpanel" aria-labelledby="tab-mode1">
+
+    <section class="card">
+      <h2>Controls
+        <span class="hint" tabindex="0" data-tooltip="Stepped ramp against POST /auth/login only — finds how many logins/sec bcrypt sustains before success rate drops or latency runs away. Nothing else is hit.">ⓘ</span>
+      </h2>
+      <div class="controls-grid">
+        <label>Start rate/s <input id="cap-start-rate" type="number" min="1" value="5"></label>
+        <label>Rate step <input id="cap-rate-step" type="number" min="1" value="5"></label>
+        <label>Step (s) <input id="cap-step-sec" type="number" min="1" value="10"></label>
+        <label>Max rate/s <input id="cap-max-rate" type="number" min="1" value="50"></label>
+        <label class="checkbox">
+          <input id="cap-auto-stop" type="checkbox">
+          Auto-stop
+          <span class="hint" tabindex="0" data-tooltip="Stop the ramp early once a step's success% falls below the threshold, instead of running every step up to Max rate/s.">ⓘ</span>
+        </label>
+        <label>Threshold % <input id="cap-threshold" type="number" min="1" max="100" value="95"></label>
+        <label>Base URL <input id="cap-base-url" type="text" value="http://localhost:3100/api/v1"></label>
+      </div>
+      <div class="actions">
+        <button id="cap-start-btn" type="button">Start</button>
+        <button id="cap-stop-btn" type="button" disabled>Stop</button>
+        <span id="cap-control-error" class="error"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Live <span id="cap-status" class="status status--idle">idle</span></h2>
+      <div id="cap-live-meta" class="meta-row"></div>
+      <table id="cap-table">
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th data-tooltip="Logins/sec this step fired at.">Target/s</th>
+            <th data-tooltip="Login requests fired during this step.">Attempts</th>
+            <th data-tooltip="Requests that returned a token.">Success</th>
+            <th data-tooltip="Successful logins ÷ attempts. This is the number that collapses when you hit the ceiling.">Success %</th>
+            <th data-tooltip="Mean latency across successful logins in this step.">avg ms</th>
+            <th data-tooltip="95th-percentile latency — 95% of this step's logins were faster than this.">p95 ms</th>
+            <th data-tooltip="Slowest login in this step.">max ms</th>
+          </tr>
+        </thead>
+        <tbody id="cap-table-body"></tbody>
+      </table>
+      <div id="cap-verdict" class="verdict verdict--empty"></div>
+
+      <h3>Console</h3>
+      <pre id="cap-console" class="console"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Past runs</h2>
+      <label>Run <select id="cap-run-select"></select></label>
+      <table id="cap-summary-table">
+        <thead>
+          <tr>
+            <th>Step</th><th>Target/s</th><th>Attempts</th><th>Success</th>
+            <th>Success %</th><th>avg ms</th><th>p95 ms</th><th>max ms</th>
+          </tr>
+        </thead>
+        <tbody id="cap-summary-body"></tbody>
+      </table>
+    </section>
   </section>
 
-  <section id="live">
-    <h2>Live</h2>
-    <div id="live-totals" class="totals">
-      <div class="stat"><span class="stat__label">Requests</span><span id="stat-total" class="stat__value">–</span></div>
-      <div class="stat"><span class="stat__label">req/s</span><span id="stat-throughput" class="stat__value">–</span></div>
-    </div>
+  <!-- ══════════════════════════════ MODE 2 ══════════════════════════════ -->
+  <section id="mode2" class="mode-panel" role="tabpanel" aria-labelledby="tab-mode2" hidden>
 
-    <h3>Result</h3>
-    <div id="categories" class="totals"></div>
+    <section class="card">
+      <h2>Controls
+        <span class="hint" tabindex="0" data-tooltip="Runs run-loadtest.sh: health-check → generate users.csv → prefetch tokens → flat random-action loop → summary.">ⓘ</span>
+      </h2>
+      <div class="controls-grid">
+        <label>Users <input id="num-users" type="number" min="1" value="100"></label>
+        <label>Duration (s) <input id="duration-sec" type="number" min="1" value="60"></label>
+      </div>
+      <div class="actions">
+        <button id="start-btn" type="button">Start</button>
+        <button id="stop-btn" type="button" disabled>Stop</button>
+        <span id="control-error" class="error"></span>
+      </div>
+    </section>
 
-    <h3>Status codes (detail)</h3>
-    <div id="status-dist"></div>
+    <section class="card">
+      <h2>Live</h2>
+      <div id="live-totals" class="totals">
+        <div class="stat"><span class="stat__label">Requests</span><span id="stat-total" class="stat__value">–</span></div>
+        <div class="stat"><span class="stat__label">req/s</span><span id="stat-throughput" class="stat__value">–</span></div>
+        <div class="stat"><span class="stat__label" data-tooltip="Time since this run's first request.">Elapsed</span><span id="stat-elapsed" class="stat__value">–</span></div>
+      </div>
 
-    <h3>Per endpoint</h3>
-    <table id="endpoint-table">
-      <thead>
-        <tr><th>Path</th><th>n</th><th>avg</th><th>p95</th><th>max</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+      <h3>Result</h3>
+      <div id="categories" class="totals"></div>
 
-    <h3>Errors (5xx / transport failures)</h3>
-    <table id="errors-table" class="errors-table">
-      <thead>
-        <tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Body</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+      <h3>Status codes (detail)</h3>
+      <div id="status-dist"></div>
 
-    <h3>Docker</h3>
-    <div id="docker-stats" class="totals"></div>
+      <h3>Per endpoint</h3>
+      <table id="endpoint-table">
+        <thead>
+          <tr>
+            <th>Path</th><th>n</th><th>avg</th><th>p95</th><th>max</th>
+            <th data-tooltip="2xx responses for this path.">ok</th>
+            <th data-tooltip="4xx responses for this path — expected traffic (duplicate request, insufficient coins, admin route hit by a non-owner token, ...), not a bug.">4xx</th>
+            <th data-tooltip="5xx or transport failures for this path — real errors, also in the errors table below.">err</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
 
-    <h3>Throughput (req/s)</h3>
-    <canvas id="chart-throughput" width="900" height="140"></canvas>
+      <h3>Errors <span class="hint" tabindex="0" data-tooltip="Sourced from this run's errors.log — only 5xx and transport failures land there, never expected 4xx.">ⓘ</span></h3>
+      <table id="errors-table" class="errors-table">
+        <thead>
+          <tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Body</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
 
-    <h3>p95 latency (ms, all endpoints combined)</h3>
-    <canvas id="chart-p95" width="900" height="140"></canvas>
+      <h3>Docker</h3>
+      <div id="docker-stats" class="totals"></div>
+
+      <h3>Throughput (req/s)</h3>
+      <div class="chart-wrap"><canvas id="chart-throughput" width="900" height="140"></canvas></div>
+
+      <h3>p95 latency (ms, all endpoints combined)</h3>
+      <div class="chart-wrap"><canvas id="chart-p95" width="900" height="140"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>Runs</h2>
+      <label>Past run <select id="run-select"></select></label>
+      <h3>Result</h3>
+      <div id="summary-categories" class="totals"></div>
+      <pre id="summary-text"></pre>
+      <table id="summary-table">
+        <thead>
+          <tr>
+            <th>Path</th><th>n</th><th>avg</th><th>p95</th><th>max</th>
+            <th>ok</th><th>4xx</th><th>err</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Errors (5xx / transport failures)</h3>
+      <table id="summary-errors-table" class="errors-table">
+        <thead>
+          <tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Body</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
   </section>
 
-  <section id="summary">
-    <h2>Runs</h2>
-    <label>Past run <select id="run-select"></select></label>
-    <h3>Result</h3>
-    <div id="summary-categories" class="totals"></div>
-    <pre id="summary-text"></pre>
-    <table id="summary-table">
-      <thead>
-        <tr><th>Path</th><th>n</th><th>avg</th><th>p95</th><th>max</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <h3>Errors (5xx / transport failures)</h3>
-    <table id="summary-errors-table" class="errors-table">
-      <thead>
-        <tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Body</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </section>
+  <div id="chart-tooltip"></div>
 
   <script src="app.js"></script>
 </body>
