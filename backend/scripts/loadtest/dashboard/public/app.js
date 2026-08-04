@@ -140,15 +140,15 @@ function renderEndpointTable2(perPath) {
   for (const [p, s] of paths) {
     const c = s.categories || { success: 0, expectedReject: 0, error: 0 };
     const width = maxP95 > 0 ? (s.p95 / maxP95) * 100 : 0;
-    const cell = (value, cls) => `<td class="${value === 0 ? 'zero' : cls}" data-label="${cls}">${value}</td>`;
+    const cell = (value, cls, label) => `<td class="${value === 0 ? 'zero' : cls}" data-label="${label}">${value}</td>`;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="path" data-label="Path">${p}</td>`
       + `<td data-label="n">${s.n}</td>`
       + `<td data-label="p95">${s.p95}</td>`
       + `<td class="bar-cell" data-label="Latenz"><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div></td>`
-      + cell(c.success, 'cell-ok')
-      + cell(c.expectedReject, 'cell-warn')
-      + cell(c.error, 'cell-err');
+      + cell(c.success, 'cell-ok', 'ok')
+      + cell(c.expectedReject, 'cell-warn', '4xx')
+      + cell(c.error, 'cell-err', 'err');
     endpointBody.appendChild(tr);
   }
 }
@@ -477,7 +477,7 @@ function renderCapSummary(rows) {
   const { best, knee } = computeCapVerdict(rows, threshold);
   const hasError = rows.length > 0 && best === null;
 
-  capStatLimit.textContent = best ? `${best.targetRate}/s` : (rows.length ? '–' : '–');
+  capStatLimit.textContent = best ? `${best.targetRate}/s` : '–';
   capStatLimit.className = 'num ' + (rows.length ? (best ? 'ok' : 'err') : '');
 
   capStatBcrypt.textContent = best ? String(best.avgMs) : '–';
@@ -590,6 +590,145 @@ source.addEventListener('capacity-finished', (ev) => {
 
 // ═══════════════════════════════ HISTORY ═══════════════════════════════════
 
-function loadHistoryList() {
-  // Built out once the backend delta lands — see HANDOFF/task plan.
+const historyList = el('history-list');
+
+// Loads a past Mode 2 run's full detail into the SAME elements the live
+// SSE ticks drive (status bar, health bar, endpoint table, errors panel)
+// — this is the "past-run rendering that already exists" the History tab
+// reuses, not a separate view. Does not touch start/stop button state:
+// if a live run is actually active, its own next tick simply overwrites
+// this static snapshot, which is the expected/harmless behavior.
+async function loadPastRunIntoMode2(ts) {
+  const res = await fetch(`/api/runs/${ts}`);
+  if (!res.ok) return;
+  const run = await res.json();
+
+  if (run.params) {
+    numUsersInput.value = run.params.numUsers;
+    durationInput.value = run.params.durationSec;
+  }
+
+  resetSeries();
+  drawLineChart(chartThroughput, [], cssVar('--pink-bright'));
+  drawLineChart(chartP95, [], cssVar('--on-variant'));
+  chartHistoricalNote.classList.remove('hidden');
+
+  const total = run.stats ? run.stats.total : 0;
+  const categories = run.stats ? run.stats.categories : null;
+  const durationSec = run.params ? run.params.durationSec : null;
+  const hasError = updateHealthAndNumbers(categories, total, null, durationSec);
+  setState2('finished', 0, hasError);
+
+  renderEndpointTable2(run.stats ? run.stats.perPath : {});
+  renderErrorsPanel(run.errors || []);
+  renderDockerStats([]);
+}
+
+// Same idea for Mode 1 — feeds the same stepped-ramp table + status bar
+// the live capacity-line SSE events drive.
+async function loadPastRunIntoMode1(ts) {
+  const res = await fetch(`/api/capacity/runs/${ts}`);
+  if (!res.ok) return;
+  const run = await res.json();
+  const rows = run.rows || [];
+
+  if (run.params) {
+    capStartRate.value = run.params.startRate;
+    capRateStep.value = run.params.rateStep;
+    capStepSec.value = run.params.stepSec;
+    capMaxRate.value = run.params.maxRate;
+    capAutoStop.checked = !!run.params.autoStop;
+    if (run.params.successThreshold !== undefined) capThreshold.value = run.params.successThreshold;
+    if (run.params.baseUrl) capBaseUrl.value = run.params.baseUrl;
+  }
+
+  capRowsByStep = new Map(rows.map((r) => [r.step, r]));
+  renderCapTable(rows, capTableBody);
+  const hasError = renderCapSummary(rows);
+  setCapState('finished', hasError);
+  capConsole.textContent = (run.lines || []).join('\n');
+  capConsole.scrollTop = capConsole.scrollHeight;
+}
+
+// The best rate that still cleared the threshold, and the first rate (in
+// ramp order) that fell below it — same logic renderCapSummary() uses
+// live, reused here so a History row's numbers agree with what its own
+// detail view (loadPastRunIntoMode1) will show for the same run.
+function historyCapVerdict(rows, threshold) {
+  return computeCapVerdict(rows, threshold ?? 95);
+}
+
+function renderHistRow(run) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'hist-row';
+
+  let healthy;
+  let metaText;
+  let stats3;
+  let miniBarHtml;
+
+  if (run.mode === 2) {
+    const stats = run.stats;
+    const total = stats ? stats.total : 0;
+    const cats = stats ? stats.categories : { success: 0, expectedReject: 0, error: 0 };
+    healthy = !!stats && cats.error === 0;
+    metaText = run.params ? `Mode 2 · ${run.params.numUsers} Users · ${run.params.durationSec}s` : 'Mode 2 · Lauf';
+    const reqS = stats && run.params ? (total / run.params.durationSec).toFixed(1) : '–';
+    const successPct = stats && total > 0 ? `${((cats.success / total) * 100).toFixed(1)}%` : '–';
+    stats3 = [
+      ['req/s', reqS],
+      ['Erfolg', successPct],
+      ['Fehler', stats ? String(cats.error) : '–'],
+    ];
+    miniBarHtml = `<div style="background:var(--ok);flex:${cats.success}"></div>`
+      + `<div style="background:var(--warn);flex:${cats.expectedReject}"></div>`
+      + `<div style="background:var(--err);flex:${cats.error}"></div>`;
+  } else {
+    const rows = run.rows || [];
+    const { best, knee } = historyCapVerdict(rows, run.params && run.params.successThreshold);
+    healthy = rows.length > 0 && !!best;
+    metaText = run.params
+      ? `Mode 1 · Login Capacity · ${run.params.startRate}→${run.params.maxRate}/s`
+      : 'Mode 1 · Login Capacity';
+    stats3 = [
+      ['Grenze', best ? `${best.targetRate}/s` : '–'],
+      ['bcrypt', best ? `${best.avgMs}ms` : '–'],
+      ['Knick', knee ? `${knee.targetRate}/s` : '–'],
+    ];
+    const totalSuccesses = rows.reduce((s, r) => s + r.successes, 0);
+    const totalAttempts = rows.reduce((s, r) => s + r.attempts, 0);
+    miniBarHtml = `<div style="background:var(--ok);flex:${totalSuccesses}"></div>`
+      + `<div style="background:var(--err);flex:${Math.max(0, totalAttempts - totalSuccesses)}"></div>`;
+  }
+
+  const statsHtml = stats3.map(([k, v]) => `<div class="hist-stat"><span class="k">${k}</span>${v}</div>`).join('');
+  btn.innerHTML = `<span class="hist-badge ${healthy ? 'ok' : 'err'}"></span>`
+    + `<div><div class="hist-when">${formatHistDate(run.ts)}</div><div class="hist-meta">${metaText}</div></div>`
+    + statsHtml
+    + `<div class="hist-mini">${miniBarHtml}</div>`;
+
+  btn.addEventListener('click', () => {
+    if (run.mode === 2) { setTab('2'); loadPastRunIntoMode2(run.ts); }
+    else { setTab('1'); loadPastRunIntoMode1(run.ts); }
+  });
+  return btn;
+}
+
+async function loadHistoryList() {
+  const [runs2, runs1] = await Promise.all([
+    fetch('/api/runs').then((r) => r.json()).catch(() => []),
+    fetch('/api/capacity/runs').then((r) => r.json()).catch(() => []),
+  ]);
+  const combined = [
+    ...runs2.map((r) => ({ mode: 2, ...r })),
+    ...runs1.map((r) => ({ mode: 1, ...r })),
+  ].sort((a, b) => Number(b.ts) - Number(a.ts));
+
+  historyList.innerHTML = '';
+  if (!combined.length) {
+    historyList.innerHTML = '<div class="hist-empty">Noch keine Läufe.</div>';
+    return;
+  }
+  for (const run of combined) historyList.appendChild(renderHistRow(run));
 }
