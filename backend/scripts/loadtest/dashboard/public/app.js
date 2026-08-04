@@ -1,34 +1,35 @@
 'use strict';
-// Live view + controls over SSE, plus past-run browsing. Two independent
-// modes share one page and one SSE connection (/api/events): Mode 1
-// (login-capacity.sh) and Mode 2 (run-loadtest.sh) each own their own
-// section, run status, and past-runs list — nothing here assumes only one
-// runs at a time, but running both against the same backend at once will
-// obviously contend for the same capacity.
+// Live view + controls over SSE, plus past-run browsing via the History
+// tab. Three tabs share one page and one SSE connection (/api/events):
+// Mode 2 (run-loadtest.sh), Mode 1 (login-capacity.sh), and History. Each
+// mode has exactly ONE view — clicking a History row loads that run's
+// full detail into the SAME elements the live SSE ticks update, via the
+// same render functions (see loadPastRunIntoMode2/loadPastRunIntoMode1
+// further down), rather than a separate past-runs section.
 
 const el = (id) => document.getElementById(id);
 
-// ── Mode tabs ─────────────────────────────────────────────────────────────
+// ── Tabs ──────────────────────────────────────────────────────────────────
 
-const MODE_STORAGE_KEY = 'loadtest-dashboard-mode';
+const MODE_STORAGE_KEY = 'loadtest-dashboard-tab';
 const tabButtons = document.querySelectorAll('.tab');
-const modePanels = { 1: el('mode1'), 2: el('mode2') };
+const panels = { 2: el('mode2'), 1: el('mode1'), history: el('history') };
 
-function setMode(mode) {
+function setTab(tab) {
   for (const btn of tabButtons) {
-    const active = btn.dataset.mode === String(mode);
+    const active = btn.dataset.mode === String(tab);
     btn.classList.toggle('tab--active', active);
     btn.setAttribute('aria-selected', String(active));
   }
-  modePanels[1].hidden = mode !== 1;
-  modePanels[2].hidden = mode !== 2;
-  localStorage.setItem(MODE_STORAGE_KEY, String(mode));
+  for (const key of Object.keys(panels)) panels[key].hidden = key !== String(tab);
+  localStorage.setItem(MODE_STORAGE_KEY, String(tab));
+  if (tab === 'history') loadHistoryList();
 }
 
 for (const btn of tabButtons) {
-  btn.addEventListener('click', () => setMode(Number(btn.dataset.mode)));
+  btn.addEventListener('click', () => setTab(btn.dataset.mode));
 }
-setMode(Number(localStorage.getItem(MODE_STORAGE_KEY)) || 1);
+setTab(localStorage.getItem(MODE_STORAGE_KEY) || '2');
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -39,29 +40,51 @@ function formatElapsed(ms) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// "03.08. 13:54:35" — short German date, used by History rows.
+function formatHistDate(ts) {
+  const d = new Date(Number(ts) * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}. ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 // ═══════════════════════════════ MODE 2 ════════════════════════════════════
 
-const statusBadge = el('run-status');
-const statTotal = el('stat-total');
-const statThroughput = el('stat-throughput');
-const statElapsed = el('stat-elapsed');
-const statusDistEl = el('status-dist');
-const categoriesEl = el('categories');
-const summaryCategoriesEl = el('summary-categories');
-const endpointBody = document.querySelector('#endpoint-table tbody');
-const errorsBody = document.querySelector('#errors-table tbody');
-const summaryErrorsBody = document.querySelector('#summary-errors-table tbody');
-const dockerStatsEl = el('docker-stats');
-const chartThroughput = el('chart-throughput');
-const chartP95 = el('chart-p95');
 const numUsersInput = el('num-users');
 const durationInput = el('duration-sec');
 const startBtn = el('start-btn');
 const stopBtn = el('stop-btn');
 const controlError = el('control-error');
-const runSelect = el('run-select');
-const summaryText = el('summary-text');
-const summaryBody = document.querySelector('#summary-table tbody');
+
+const statusbarEl = el('statusbar');
+const stateDot = el('state-dot');
+const stateText = el('state-text');
+const statThroughput = el('stat-throughput');
+const statSuccessRate = el('stat-success-rate');
+const statRealErrors = el('stat-real-errors');
+
+const healthOk = el('health-ok');
+const healthWarn = el('health-warn');
+const healthErr = el('health-err');
+const healthOkLabel = el('health-ok-label');
+const healthWarnLabel = el('health-warn-label');
+const healthErrLabel = el('health-err-label');
+
+const chartHistoricalNote = el('chart-historical-note');
+const chartThroughput = el('chart-throughput');
+const chartP95 = el('chart-p95');
+const endpointBody = document.querySelector('#endpoint-table tbody');
+
+const errorsBlock = el('errors-block');
+const errorsAnchorTop = el('errors-anchor-top');
+const errorsAnchorBottom = el('errors-anchor-bottom');
+const errorsClean = el('errors-clean');
+const errorsTable = el('errors-table');
+const errorsBody = document.querySelector('#errors-table tbody');
+const dockerStatsEl = el('docker-stats');
 
 function setRunningUI(active) {
   startBtn.disabled = active;
@@ -70,9 +93,106 @@ function setRunningUI(active) {
   durationInput.disabled = active;
 }
 
-function setStatus(status) {
-  statusBadge.textContent = status;
-  statusBadge.className = `status status--${status}`;
+// status: 'idle' | 'running' | 'finished'. hasError drives the red left
+// border + dot tint independently of run status — a finished run with a
+// real error still reads red, not grey.
+function setState2(status, elapsedMs, hasError) {
+  stateDot.className = 'dot' + (status === 'running' ? ' running' : status === 'finished' ? ' finished' : '') + (hasError ? ' errored' : '');
+  stateText.textContent = status === 'running' ? `LÄUFT · ${formatElapsed(elapsedMs)}` : status === 'finished' ? 'FERTIG' : 'IDLE';
+  statusbarEl.classList.toggle('errored', !!hasError);
+  statusbarEl.classList.toggle('idle', status === 'idle');
+}
+
+// Big glance numbers + the stacked health bar. throughput is the live
+// rolling req/s from the aggregator; for a loaded past run there is no
+// rolling window, so pass null and a durationSec to fall back to
+// total/durationSec (or null durationSec to show "–").
+function updateHealthAndNumbers(categories, total, throughput, durationSecFallback) {
+  const c = categories || { success: 0, expectedReject: 0, error: 0 };
+  const hasError = (c.error || 0) > 0;
+  const successPct = total > 0 ? (c.success / total) * 100 : 0;
+
+  statThroughput.textContent = throughput != null
+    ? throughput.toFixed(1)
+    : (durationSecFallback ? (total / durationSecFallback).toFixed(1) : '–');
+  statThroughput.className = 'num';
+
+  statSuccessRate.textContent = total > 0 ? `${successPct.toFixed(1)}%` : '–';
+  statSuccessRate.className = 'num ' + (hasError ? 'err' : 'ok');
+
+  statRealErrors.textContent = String(c.error || 0);
+  statRealErrors.className = 'num ' + (hasError ? 'err' : 'ok');
+
+  healthOk.style.flex = String(c.success || 0);
+  healthWarn.style.flex = String(c.expectedReject || 0);
+  healthErr.style.flex = String(c.error || 0);
+  healthOkLabel.textContent = `Success 2xx · ${c.success || 0}`;
+  healthWarnLabel.textContent = `Expected reject 4xx · ${c.expectedReject || 0}`;
+  healthErrLabel.textContent = `Error 5xx / transport · ${c.error || 0}`;
+
+  return hasError;
+}
+
+function renderEndpointTable2(perPath) {
+  endpointBody.innerHTML = '';
+  const paths = Object.entries(perPath || {}).sort((a, b) => b[1].p95 - a[1].p95);
+  const maxP95 = paths.length ? paths[0][1].p95 : 0;
+  for (const [p, s] of paths) {
+    const c = s.categories || { success: 0, expectedReject: 0, error: 0 };
+    const width = maxP95 > 0 ? (s.p95 / maxP95) * 100 : 0;
+    const cell = (value, cls) => `<td class="${value === 0 ? 'zero' : cls}" data-label="${cls}">${value}</td>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="path" data-label="Path">${p}</td>`
+      + `<td data-label="n">${s.n}</td>`
+      + `<td data-label="p95">${s.p95}</td>`
+      + `<td class="bar-cell" data-label="Latenz"><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div></td>`
+      + cell(c.success, 'cell-ok')
+      + cell(c.expectedReject, 'cell-warn')
+      + cell(c.error, 'cell-err');
+    endpointBody.appendChild(tr);
+  }
+}
+
+// Built with textContent (not innerHTML) — unlike the other cells here,
+// the error body snippet is real backend response text, not one of our
+// own hardcoded strings, so it isn't safe to interpolate as markup.
+function renderErrorRows(errors, tbody) {
+  tbody.innerHTML = '';
+  for (const e of [...errors].reverse()) { // newest first
+    const tr = document.createElement('tr');
+    const cells = [e.timestamp, e.method, e.path, e.status, e.body];
+    cells.forEach((value, i) => {
+      const td = document.createElement('td');
+      if (i === 3) td.className = 'status-cell';
+      if (i === 4) td.className = 'body-cell';
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+// Clean runs show a quiet dashed placeholder; the moment a real error
+// shows up the panel turns into a red-bordered table AND physically
+// moves up to just under the health bar (errors-anchor-top) instead of
+// sitting below the endpoint table (errors-anchor-bottom) — re-parenting
+// every render is cheap at the 1s tick rate and keeps this idempotent.
+function renderErrorsPanel(errors) {
+  const hasErrors = errors && errors.length > 0;
+  errorsClean.classList.toggle('hidden', hasErrors);
+  errorsTable.classList.toggle('hidden', !hasErrors);
+  if (hasErrors) renderErrorRows(errors, errorsBody);
+  (hasErrors ? errorsAnchorTop : errorsAnchorBottom).insertAdjacentElement('afterend', errorsBlock);
+}
+
+function renderDockerStats(docker) {
+  dockerStatsEl.innerHTML = '';
+  for (const d of docker || []) {
+    const div = document.createElement('div');
+    div.className = 'stat';
+    div.innerHTML = `<span class="stat__label">${d.name}</span><span class="stat__value">${d.cpu} / ${d.mem}</span>`;
+    dockerStatsEl.appendChild(div);
+  }
 }
 
 startBtn.addEventListener('click', async () => {
@@ -92,7 +212,7 @@ startBtn.addEventListener('click', async () => {
       setRunningUI(false);
       return;
     }
-    setStatus('running');
+    setState2('running', 0, false);
   } catch (err) {
     controlError.textContent = String(err);
     setRunningUI(false);
@@ -116,160 +236,15 @@ fetch('/api/state')
   .then((res) => res.json())
   .then((state) => {
     setRunningUI(state.active);
-    setStatus(state.active ? 'running' : state.status);
+    setState2(state.active ? 'running' : (state.status || 'idle'), state.startedAt ? Date.now() - state.startedAt : 0, false);
   })
   .catch(() => {});
 
-function formatRunLabel(run) {
-  const date = new Date(Number(run.ts) * 1000).toLocaleString();
-  const suffixes = [];
-  if (!run.hasSummary) suffixes.push('no summary — interrupted?');
-  if (run.hasErrors) suffixes.push('had errors');
-  return suffixes.length ? `${date} (${suffixes.join(', ')})` : date;
-}
-
-async function loadRunList(selectTs) {
-  const list = await fetch('/api/runs').then((res) => res.json());
-  runSelect.innerHTML = '';
-  for (const run of list) {
-    const opt = document.createElement('option');
-    opt.value = run.ts;
-    opt.textContent = formatRunLabel(run);
-    runSelect.appendChild(opt);
-  }
-  if (selectTs && list.some((r) => r.ts === selectTs)) {
-    runSelect.value = selectTs;
-    await loadRun(selectTs);
-  } else if (list.length) {
-    await loadRun(list[0].ts);
-  }
-}
-
-async function loadRun(ts) {
-  const res = await fetch(`/api/runs/${ts}`);
-  if (!res.ok) return;
-  const run = await res.json();
-  summaryText.textContent = run.summaryText || '(no summary.txt for this run)';
-  if (run.stats) {
-    renderCategories(run.stats.categories, run.stats.total, summaryCategoriesEl);
-    renderEndpointTable(run.stats.perPath, summaryBody);
-  } else {
-    summaryCategoriesEl.innerHTML = '';
-    summaryBody.innerHTML = '';
-  }
-  renderErrors(run.errors, summaryErrorsBody);
-}
-
-runSelect.addEventListener('change', () => loadRun(runSelect.value));
-loadRunList();
-
-function statusClass(code) {
-  if (code === 'FAIL') return 'error';
-  const n = Number(code);
-  if (n >= 200 && n < 300) return 'success';
-  if (n >= 400 && n < 500) return 'expected';
-  return 'error';
-}
-
-const CATEGORY_LABELS = [
-  ['success', 'Success (2xx)'],
-  ['expectedReject', 'Expected reject (4xx)'],
-  ['error', 'Error (5xx / transport)'],
-];
-
-// Headline numbers: SUCCESS / EXPECTED-REJECT / ERROR, kept visually
-// separate from the raw per-status-code list below so expected 4xx
-// traffic (duplicate contact request, no pending request to accept,
-// admin-only endpoint hit by a non-owner token, ...) never reads as a
-// high error rate.
-function renderCategories(categories, total, container) {
-  container.innerHTML = '';
-  for (const [key, label] of CATEGORY_LABELS) {
-    const count = (categories && categories[key]) || 0;
-    const rate = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
-    const div = document.createElement('div');
-    div.className = `stat stat--${key === 'expectedReject' ? 'expected' : key}`;
-    div.innerHTML = `<span class="stat__label">${label}</span><span class="stat__value">${count} (${rate}%)</span>`;
-    container.appendChild(div);
-  }
-}
-
-// "FAIL" is written by loadtest.sh when a user's slot in tokens.csv had
-// no token — a prefetch gap (see prefetch-tokens.sh), not a login that
-// failed live during this run.
-function statusLabel(code) {
-  return code === 'FAIL' ? 'FAIL (prefetch gap)' : code;
-}
-
-function renderStatusDist(statusDist) {
-  statusDistEl.innerHTML = '';
-  for (const [code, count] of Object.entries(statusDist).sort((a, b) => b[1] - a[1])) {
-    const span = document.createElement('span');
-    span.style.color = `var(--${{ success: 'good', expected: 'warning', error: 'critical' }[statusClass(code)]})`;
-    span.style.marginRight = '1rem';
-    span.textContent = `${statusLabel(code)}: ${count}`;
-    statusDistEl.appendChild(span);
-  }
-}
-
-function renderEndpointTable(perPath, tbody) {
-  tbody.innerHTML = '';
-  const paths = Object.entries(perPath).sort((a, b) => b[1].n - a[1].n);
-  for (const [p, s] of paths) {
-    const c = s.categories || { success: 0, expectedReject: 0, error: 0 };
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${p}</td><td>${s.n}</td><td>${s.avg}</td><td>${s.p95}</td><td>${s.max}</td>`
-      + `<td class="count--success">${c.success}</td>`
-      + `<td class="count--expected">${c.expectedReject}</td>`
-      + `<td class="count--error">${c.error}</td>`;
-    tbody.appendChild(tr);
-  }
-}
-
-// Built with textContent (not innerHTML) — unlike the other cells here,
-// the error body snippet is real backend response text, not one of our
-// own hardcoded strings, so it isn't safe to interpolate as markup.
-function renderErrors(errors, tbody) {
-  tbody.innerHTML = '';
-  if (!errors || errors.length === 0) {
-    const tr = document.createElement('tr');
-    tr.className = 'empty-row';
-    const td = document.createElement('td');
-    td.colSpan = 5;
-    td.textContent = 'No errors — clean run so far.';
-    tr.appendChild(td);
-    tbody.appendChild(tr);
-    return;
-  }
-  for (const e of [...errors].reverse()) { // newest first
-    const tr = document.createElement('tr');
-    const cells = [e.timestamp, e.method, e.path, e.status, e.body];
-    cells.forEach((value, i) => {
-      const td = document.createElement('td');
-      if (i === 3) td.className = 'status-cell';
-      if (i === 4) td.className = 'body-cell';
-      td.textContent = value;
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  }
-}
-
-function renderDockerStats(docker) {
-  dockerStatsEl.innerHTML = '';
-  for (const d of docker) {
-    const div = document.createElement('div');
-    div.className = 'stat';
-    div.innerHTML = `<span class="stat__label">${d.name}</span><span class="stat__value">${d.cpu} / ${d.mem}</span>`;
-    dockerStatsEl.appendChild(div);
-  }
-}
-
 // ── Charts — small-multiple line charts (throughput, p95) with a hover
-// crosshair + tooltip, since a static canvas render with no hover layer
-// is the one thing this skill treats as a straight-up miss. Kept as two
-// single-axis charts rather than one dual-axis chart since the two
-// metrics have unrelated scales. ──────────────────────────────────────────
+// crosshair + tooltip. Kept as two single-axis charts rather than one
+// dual-axis chart since the two metrics have unrelated scales. A loaded
+// past run has no time series (see loadPastRunIntoMode2), so the charts
+// clear and a note explains why. ─────────────────────────────────────────
 
 const MAX_POINTS = 120;
 const series = { throughput: [], p95: [] };
@@ -281,8 +256,9 @@ function pushPoint(name, value) {
   if (arr.length > MAX_POINTS) arr.shift();
 }
 
-function cssVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function resetSeries() {
+  series.throughput = [];
+  series.p95 = [];
 }
 
 function drawLineChart(canvas, points, color) {
@@ -301,7 +277,7 @@ function drawLineChart(canvas, points, color) {
   const stepX = w / (MAX_POINTS - 1);
   const startIdx = MAX_POINTS - points.length;
 
-  ctx.strokeStyle = cssVar('--baseline');
+  ctx.strokeStyle = cssVar('--outline');
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, h - 0.5);
@@ -343,7 +319,7 @@ function attachCrosshair(canvas) {
 
     drawLineChart(canvas, canvas._points, canvas._color);
     const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = cssVar('--text-muted');
+    ctx.strokeStyle = cssVar('--on-variant');
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(nearest.x, 0);
@@ -377,42 +353,40 @@ function attachCrosshair(canvas) {
 attachCrosshair(chartThroughput);
 attachCrosshair(chartP95);
 
-function applyTick(tick) {
-  setStatus(tick.status);
+function applyTick2(tick) {
+  chartHistoricalNote.classList.add('hidden');
+  const elapsedMs = tick.startedAt ? (tick.finishedAt || Date.now()) - tick.startedAt : 0;
+  const hasError = updateHealthAndNumbers(tick.categories, tick.total, tick.throughput, tick.durationSec);
+  setState2(tick.status, elapsedMs, hasError);
 
-  statTotal.textContent = tick.total;
-  statThroughput.textContent = tick.throughput.toFixed(1);
-  statElapsed.textContent = tick.startedAt ? formatElapsed((tick.finishedAt || Date.now()) - tick.startedAt) : '–';
-
-  renderCategories(tick.categories, tick.total, categoriesEl);
-  renderStatusDist(tick.statusDist);
-  renderEndpointTable(tick.perPath, endpointBody);
-  renderErrors(tick.errors, errorsBody);
+  renderEndpointTable2(tick.perPath);
+  renderErrorsPanel(tick.errors);
   renderDockerStats(tick.docker || []);
 
   pushPoint('throughput', tick.throughput);
   pushPoint('p95', tick.overall ? tick.overall.p95 : 0);
-  drawLineChart(chartThroughput, series.throughput, cssVar('--series-1'));
-  drawLineChart(chartP95, series.p95, cssVar('--series-2'));
+  drawLineChart(chartThroughput, series.throughput, cssVar('--pink-bright'));
+  drawLineChart(chartP95, series.p95, cssVar('--on-variant'));
 }
 
 const source = new EventSource('/api/events');
-source.addEventListener('tick', (ev) => applyTick(JSON.parse(ev.data)));
+source.addEventListener('tick', (ev) => applyTick2(JSON.parse(ev.data)));
 source.addEventListener('started', (ev) => {
   setRunningUI(true);
-  setStatus(JSON.parse(ev.data).status);
+  resetSeries();
+  chartHistoricalNote.classList.add('hidden');
+  setState2(JSON.parse(ev.data).status, 0, false);
 });
 source.addEventListener('finished', (ev) => {
   const final = JSON.parse(ev.data);
-  applyTick({ ...final, docker: [] });
+  applyTick2({ ...final, docker: [] });
   setRunningUI(false);
-  const ts = (final.logDir || '').split('/').filter(Boolean).pop();
-  loadRunList(ts);
+  if (!panels.history.hidden) loadHistoryList();
 });
 source.addEventListener('run-error', (ev) => {
   controlError.textContent = JSON.parse(ev.data).message;
   setRunningUI(false);
-  setStatus('idle');
+  setState2('idle', 0, false);
 });
 
 // ═══════════════════════════════ MODE 1 ════════════════════════════════════
@@ -427,18 +401,15 @@ const capBaseUrl = el('cap-base-url');
 const capStartBtn = el('cap-start-btn');
 const capStopBtn = el('cap-stop-btn');
 const capControlError = el('cap-control-error');
-const capStatusBadge = el('cap-status');
-const capLiveMeta = el('cap-live-meta');
-const capTableBody = el('cap-table-body');
-const capVerdict = el('cap-verdict');
-const capConsole = el('cap-console');
-const capRunSelect = el('cap-run-select');
-const capSummaryBody = el('cap-summary-body');
 
-function setCapStatus(status) {
-  capStatusBadge.textContent = status;
-  capStatusBadge.className = `status status--${status}`;
-}
+const capStateDot = el('cap-state-dot');
+const capStateText = el('cap-state-text');
+const capStatLimit = el('cap-stat-limit');
+const capStatBcrypt = el('cap-stat-bcrypt');
+const capStatKnee = el('cap-stat-knee');
+
+const capTableBody = el('cap-table-body');
+const capConsole = el('cap-console');
 
 function setCapRunningUI(active) {
   capStartBtn.disabled = active;
@@ -448,13 +419,22 @@ function setCapRunningUI(active) {
   }
 }
 
+function setCapState(status) {
+  capStateDot.className = 'dot' + (status === 'running' ? ' running' : status === 'finished' ? ' finished' : '');
+  capStateText.textContent = status === 'running' ? 'LÄUFT' : status === 'finished' ? 'FERTIG' : 'IDLE';
+}
+
 function renderCapRow(row) {
+  const threshold = Number(capThreshold.value || 95);
+  const belowThreshold = row.successPct < threshold;
   const tr = document.createElement('tr');
   tr.dataset.step = row.step;
-  const belowThreshold = row.successPct < Number(capThreshold.value || 95);
-  tr.innerHTML = `<td>${row.step}</td><td>${row.targetRate}/s</td><td>${row.attempts}</td><td>${row.successes}</td>`
-    + `<td class="${belowThreshold ? 'count--error' : 'count--success'}">${row.successPct.toFixed(1)}%</td>`
-    + `<td>${row.avgMs}</td><td>${row.p95Ms}</td><td>${row.maxMs}</td>`;
+  tr.innerHTML = `<td data-label="Target/s">${row.targetRate}/s</td>`
+    + `<td data-label="Attempts">${row.attempts}</td>`
+    + `<td data-label="Success">${row.successes}</td>`
+    + `<td class="${belowThreshold ? 'cell-err' : 'cell-ok'}" data-label="Success %">${row.successPct.toFixed(1)}%</td>`
+    + `<td class="bar-cell" data-label="Rate"><div class="bar-track"><div class="bar-fill" style="width:0%"></div></div></td>`
+    + `<td data-label="p95 ms">${row.p95Ms}</td>`;
   return tr;
 }
 
@@ -463,44 +443,9 @@ function renderCapTable(rows, tbody) {
   for (const row of rows) tbody.appendChild(renderCapRow(row));
 }
 
-// Best rate seen so far that still cleared the success threshold — the
-// practical answer to "how many logins/sec can this backend take".
-function renderCapVerdict(rows) {
-  const threshold = Number(capThreshold.value || 95);
-  const safe = rows.filter((r) => r.successPct >= threshold);
-  capVerdict.classList.remove('verdict--empty');
-  if (safe.length === 0) {
-    capVerdict.textContent = rows.length
-      ? `No step cleared ${threshold}% success yet — even the first step (${rows[0].targetRate}/s) is already over the line.`
-      : '';
-    if (!rows.length) capVerdict.classList.add('verdict--empty');
-    return;
-  }
-  const best = safe[safe.length - 1];
-  capVerdict.textContent = `Highest rate at ≥${threshold}% success so far: ${best.targetRate}/s (p95 ${best.p95Ms}ms).`;
-}
-
 function appendCapConsoleLine(line) {
   capConsole.textContent += (capConsole.textContent ? '\n' : '') + line;
   capConsole.scrollTop = capConsole.scrollHeight;
-}
-
-function renderCapMeta(state) {
-  capLiveMeta.innerHTML = '';
-  if (!state.params) return;
-  const p = state.params;
-  const parts = [
-    `${p.startRate}→${p.maxRate}/s in steps of ${p.rateStep}`,
-    `${p.stepSec}s/step`,
-    p.autoStop ? `auto-stop < ${p.successThreshold ?? 95}%` : 'no auto-stop',
-  ];
-  if (p.baseUrl) parts.push(p.baseUrl); // user-typed — always inserted via textContent below
-  parts.forEach((part, i) => {
-    if (i > 0) capLiveMeta.appendChild(document.createTextNode(' · '));
-    const strong = document.createElement('strong');
-    strong.textContent = part;
-    capLiveMeta.appendChild(strong);
-  });
 }
 
 capStartBtn.addEventListener('click', async () => {
@@ -529,8 +474,7 @@ capStartBtn.addEventListener('click', async () => {
     }
     capTableBody.innerHTML = '';
     capConsole.textContent = '';
-    capVerdict.className = 'verdict verdict--empty';
-    setCapStatus('running');
+    setCapState('running');
   } catch (err) {
     capControlError.textContent = String(err);
     setCapRunningUI(false);
@@ -556,52 +500,17 @@ fetch('/api/capacity/state')
   .then((state) => {
     capRowsByStep = new Map((state.rows || []).map((r) => [r.step, r]));
     setCapRunningUI(state.active);
-    setCapStatus(state.active ? 'running' : state.status);
-    renderCapMeta(state);
+    setCapState(state.active ? 'running' : (state.status || 'idle'));
     renderCapTable(state.rows || [], capTableBody);
-    renderCapVerdict(state.rows || []);
     capConsole.textContent = (state.lines || []).join('\n');
     capConsole.scrollTop = capConsole.scrollHeight;
   })
   .catch(() => {});
 
-function formatCapRunLabel(ts) {
-  return new Date(Number(ts) * 1000).toLocaleString();
-}
-
-async function loadCapRunList(selectTs) {
-  const list = await fetch('/api/capacity/runs').then((res) => res.json());
-  capRunSelect.innerHTML = '';
-  for (const ts of list) {
-    const opt = document.createElement('option');
-    opt.value = ts;
-    opt.textContent = formatCapRunLabel(ts);
-    capRunSelect.appendChild(opt);
-  }
-  if (selectTs && list.includes(selectTs)) {
-    capRunSelect.value = selectTs;
-    await loadCapRun(selectTs);
-  } else if (list.length) {
-    await loadCapRun(list[0]);
-  }
-}
-
-async function loadCapRun(ts) {
-  const res = await fetch(`/api/capacity/runs/${ts}`);
-  if (!res.ok) return;
-  const run = await res.json();
-  renderCapTable(run.rows || [], capSummaryBody);
-}
-
-capRunSelect.addEventListener('change', () => loadCapRun(capRunSelect.value));
-loadCapRunList();
-
-source.addEventListener('capacity-started', (ev) => {
-  const state = JSON.parse(ev.data);
+source.addEventListener('capacity-started', () => {
   capRowsByStep = new Map();
   setCapRunningUI(true);
-  setCapStatus('running');
-  renderCapMeta(state);
+  setCapState('running');
 });
 source.addEventListener('capacity-line', (ev) => {
   const { line, row } = JSON.parse(ev.data);
@@ -613,15 +522,19 @@ source.addEventListener('capacity-line', (ev) => {
     capRowsByStep.set(row.step, row);
     const rows = [...capRowsByStep.values()].sort((a, b) => a.step - b.step);
     renderCapTable(rows, capTableBody);
-    renderCapVerdict(rows);
   }
 });
 source.addEventListener('capacity-finished', (ev) => {
   const state = JSON.parse(ev.data);
   capRowsByStep = new Map((state.rows || []).map((r) => [r.step, r]));
   setCapRunningUI(false);
-  setCapStatus('finished');
+  setCapState('finished');
   renderCapTable(state.rows || [], capTableBody);
-  renderCapVerdict(state.rows || []);
-  loadCapRunList(String(state.ts));
+  if (!panels.history.hidden) loadHistoryList();
 });
+
+// ═══════════════════════════════ HISTORY ═══════════════════════════════════
+
+function loadHistoryList() {
+  // Built out once the backend delta lands — see HANDOFF/task plan.
+}
