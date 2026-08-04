@@ -72,6 +72,11 @@ class CapacityRunner extends EventEmitter {
     this.startedAt = Date.now();
     this.finishedAt = null;
     this.logStream = fs.createWriteStream(path.join(LOGS_DIR, `${this.ts}.log`));
+    // login-capacity.sh's stdout never reprints its own invocation
+    // params, so unlike Mode 2 (which gets them from summary.txt) there
+    // is nothing on disk to recover them from later — persist them
+    // ourselves so History rows for this run can show "5→50/s" etc.
+    fs.writeFileSync(path.join(LOGS_DIR, `${this.ts}.json`), JSON.stringify({ params, startedAt: this.startedAt }));
 
     const env = {
       ...process.env,
