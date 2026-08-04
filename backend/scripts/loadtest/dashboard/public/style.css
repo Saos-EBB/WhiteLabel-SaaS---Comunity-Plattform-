@@ -126,9 +126,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-vis
 
 .error { color: var(--err); font-size: 0.85rem; display: block; margin: 6px 2px 0; min-height: 1.1em; }
 
-/* ── Tooltips — hover + keyboard focus, native title never used ─────────── */
+/* ── Tooltips — one shared floating bubble, driven by tooltips.js.
+   [data-tip="key"] marks a trigger (an input, or a .hint glyph next to
+   a label/header that isn't otherwise interactive); tooltips.js looks
+   the key up in TOOLTIPS and shows/positions #tip-bubble on hover,
+   keyboard focus, or — for .hint glyphs, since touch has no hover — a
+   tap. Native title/[data-tooltip]::after is never used. ────────────── */
 
-[data-tooltip] { position: relative; cursor: help; }
 .hint {
   display: inline-flex;
   align-items: center;
@@ -141,24 +145,21 @@ a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-vis
   font-size: 0.68rem;
   font-weight: 600;
   line-height: 1;
+  cursor: help;
+  flex: none;
 }
-th[data-tooltip] { border-bottom: 1px dotted var(--on-variant); }
-[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+
+.tip-bubble {
+  position: fixed;
+  z-index: 50;
+  max-width: 20rem;
   width: max-content;
-  max-width: 17rem;
   background: var(--surface-top);
   color: var(--on-surface);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 400;
   line-height: 1.4;
-  text-transform: none;
-  letter-spacing: normal;
-  padding: 0.45rem 0.65rem;
+  padding: 0.5rem 0.7rem;
   border-radius: 0.4rem;
   border: 1px solid var(--outline);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
@@ -166,26 +167,10 @@ th[data-tooltip] { border-bottom: 1px dotted var(--on-variant); }
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.12s ease;
-  z-index: 30;
 }
-[data-tooltip]::before {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--surface-top);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-  z-index: 30;
-}
-[data-tooltip]:hover::after, [data-tooltip]:hover::before,
-[data-tooltip]:focus-visible::after, [data-tooltip]:focus-visible::before {
-  opacity: 1;
-  visibility: visible;
+.tip-bubble.tip-bubble--visible { opacity: 1; visibility: visible; }
+@media (prefers-reduced-motion: reduce) {
+  .tip-bubble { transition: none; }
 }
 
 /* ── Status bar — the glance line ─────────────────────────────────────── */

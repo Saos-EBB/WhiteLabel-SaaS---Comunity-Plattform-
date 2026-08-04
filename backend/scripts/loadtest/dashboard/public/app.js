@@ -677,9 +677,9 @@ function renderHistRow(run) {
     const reqS = stats && run.params ? (total / run.params.durationSec).toFixed(1) : '–';
     const successPct = stats && total > 0 ? `${((cats.success / total) * 100).toFixed(1)}%` : '–';
     stats3 = [
-      ['req/s', reqS],
-      ['Erfolg', successPct],
-      ['Fehler', stats ? String(cats.error) : '–'],
+      ['req/s', reqS, 'history.reqs'],
+      ['Erfolg', successPct, 'history.successRate'],
+      ['Fehler', stats ? String(cats.error) : '–', 'history.errors'],
     ];
     miniBarHtml = `<div style="background:var(--ok);flex:${cats.success}"></div>`
       + `<div style="background:var(--warn);flex:${cats.expectedReject}"></div>`
@@ -692,9 +692,9 @@ function renderHistRow(run) {
       ? `Mode 1 · Login Capacity · ${run.params.startRate}→${run.params.maxRate}/s`
       : 'Mode 1 · Login Capacity';
     stats3 = [
-      ['Grenze', best ? `${best.targetRate}/s` : '–'],
-      ['bcrypt', best ? `${best.avgMs}ms` : '–'],
-      ['Knick', knee ? `${knee.targetRate}/s` : '–'],
+      ['Grenze', best ? `${best.targetRate}/s` : '–', 'mode1.limit'],
+      ['bcrypt', best ? `${best.avgMs}ms` : '–', 'mode1.bcrypt'],
+      ['Knick', knee ? `${knee.targetRate}/s` : '–', 'mode1.knee'],
     ];
     const totalSuccesses = rows.reduce((s, r) => s + r.successes, 0);
     const totalAttempts = rows.reduce((s, r) => s + r.attempts, 0);
@@ -702,11 +702,15 @@ function renderHistRow(run) {
       + `<div style="background:var(--err);flex:${Math.max(0, totalAttempts - totalSuccesses)}"></div>`;
   }
 
-  const statsHtml = stats3.map(([k, v]) => `<div class="hist-stat"><span class="k">${k}</span>${v}</div>`).join('');
-  btn.innerHTML = `<span class="hist-badge ${healthy ? 'ok' : 'err'}"></span>`
+  // These inner elements deliberately get no tabindex — they sit inside
+  // the row <button>, and a nested focusable control would be invalid;
+  // hover still shows their tip for mouse users, keyboard users get the
+  // row's own Enter-to-open behavior instead.
+  const statsHtml = stats3.map(([k, v, tip]) => `<div class="hist-stat"><span class="k" data-tip="${tip}">${k}</span>${v}</div>`).join('');
+  btn.innerHTML = `<span class="hist-badge ${healthy ? 'ok' : 'err'}" data-tip="history.dot"></span>`
     + `<div><div class="hist-when">${formatHistDate(run.ts)}</div><div class="hist-meta">${metaText}</div></div>`
     + statsHtml
-    + `<div class="hist-mini">${miniBarHtml}</div>`;
+    + `<div class="hist-mini" data-tip="history.miniBar">${miniBarHtml}</div>`;
 
   btn.addEventListener('click', () => {
     if (run.mode === 2) { setTab('2'); loadPastRunIntoMode2(run.ts); }

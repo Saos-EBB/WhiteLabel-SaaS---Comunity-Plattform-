@@ -17,9 +17,9 @@
   <section id="mode2" class="mode-panel" role="tabpanel" aria-labelledby="tab-mode2">
 
     <div class="controls">
-      <div class="field"><label for="num-users">Users</label><input id="num-users" class="mono" type="number" min="1" value="100"></div>
-      <div class="field"><label for="duration-sec">Dauer (s)</label><input id="duration-sec" class="mono" type="number" min="1" value="60"></div>
-      <span class="hint" tabindex="0" data-tooltip="Runs run-loadtest.sh: health-check → generate users.csv → prefetch tokens → flat random-action loop → summary.">ⓘ</span>
+      <div class="field"><label for="num-users">Users</label><input id="num-users" class="mono" type="number" min="1" value="100" data-tip="mode2.users"></div>
+      <div class="field"><label for="duration-sec">Dauer (s)</label><input id="duration-sec" class="mono" type="number" min="1" value="60" data-tip="mode2.duration"></div>
+      <span class="hint" tabindex="0" data-tip="mode2.controlsInfo">ⓘ</span>
       <div class="controls-spacer"></div>
       <button id="start-btn" class="btn btn-start" type="button">▶ Start</button>
       <button id="stop-btn" class="btn btn-stop" type="button" disabled>■ Stop</button>
@@ -27,19 +27,19 @@
     <span id="control-error" class="error"></span>
 
     <div id="statusbar" class="statusbar">
-      <div class="state"><span id="state-dot" class="dot"></span><span id="state-text">IDLE</span></div>
-      <div class="metric"><span id="stat-throughput" class="num">–</span><span class="lbl">Requests / s</span></div>
-      <div class="metric"><span id="stat-success-rate" class="num">–</span><span class="lbl">Erfolgsrate</span></div>
-      <div class="metric"><span id="stat-real-errors" class="num">–</span><span class="lbl">Echte Fehler</span></div>
+      <div class="state"><span id="state-dot" class="dot"></span><span id="state-text">IDLE</span> <span class="hint" tabindex="0" data-tip="mode2.state">ⓘ</span></div>
+      <div class="metric"><span id="stat-throughput" class="num">–</span><span class="lbl">Requests / s <span class="hint" tabindex="0" data-tip="mode2.reqs">ⓘ</span></span></div>
+      <div class="metric"><span id="stat-success-rate" class="num">–</span><span class="lbl">Erfolgsrate <span class="hint" tabindex="0" data-tip="mode2.successRate">ⓘ</span></span></div>
+      <div class="metric"><span id="stat-real-errors" class="num">–</span><span class="lbl">Echte Fehler <span class="hint" tabindex="0" data-tip="mode2.realErrors">ⓘ</span></span></div>
     </div>
 
-    <div id="health-bar" class="health">
+    <div id="health-bar" class="health" tabindex="0" data-tip="mode2.healthBar">
       <div id="health-ok" class="s-ok"></div><div id="health-warn" class="s-warn"></div><div id="health-err" class="s-err"></div>
     </div>
     <div id="health-legend" class="health-legend">
-      <span><i class="chip ok"></i><span id="health-ok-label">Success 2xx · 0</span></span>
-      <span><i class="chip warn"></i><span id="health-warn-label">Expected reject 4xx · 0</span></span>
-      <span><i class="chip err"></i><span id="health-err-label">Error 5xx / transport · 0</span></span>
+      <span tabindex="0" data-tip="mode2.healthOk"><i class="chip ok"></i><span id="health-ok-label">Success 2xx · 0</span></span>
+      <span tabindex="0" data-tip="mode2.healthWarn"><i class="chip warn"></i><span id="health-warn-label">Expected reject 4xx · 0</span></span>
+      <span tabindex="0" data-tip="mode2.healthErr"><i class="chip err"></i><span id="health-err-label">Error 5xx / transport · 0</span></span>
     </div>
 
     <div id="errors-anchor-top"></div>
@@ -61,12 +61,12 @@
       <thead>
         <tr>
           <th>Path</th>
-          <th>n</th>
-          <th data-tooltip="95th-percentile latency — 95% of this path's requests were faster than this.">p95 (ms)</th>
-          <th class="bar-cell">Latenz</th>
-          <th data-tooltip="2xx responses for this path.">ok</th>
-          <th data-tooltip="4xx responses for this path — expected traffic (duplicate request, insufficient coins, admin route hit by a non-owner token, ...), not a bug.">4xx</th>
-          <th data-tooltip="5xx or transport failures for this path — real errors.">err</th>
+          <th>n <span class="hint" tabindex="0" data-tip="mode2.colN">ⓘ</span></th>
+          <th>p95 (ms) <span class="hint" tabindex="0" data-tip="mode2.colP95">ⓘ</span></th>
+          <th class="bar-cell">Latenz <span class="hint" tabindex="0" data-tip="mode2.colLatencyBar">ⓘ</span></th>
+          <th>ok <span class="hint" tabindex="0" data-tip="mode2.colOk">ⓘ</span></th>
+          <th>4xx <span class="hint" tabindex="0" data-tip="mode2.col4xx">ⓘ</span></th>
+          <th>err <span class="hint" tabindex="0" data-tip="mode2.colErr">ⓘ</span></th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -74,7 +74,7 @@
 
     <div id="errors-anchor-bottom"></div>
     <div id="errors-block">
-      <h2>Fehler <span class="hint" tabindex="0" data-tooltip="Sourced from this run's errors.log — only 5xx and transport failures land there, never expected 4xx.">ⓘ</span></h2>
+      <h2>Fehler <span class="hint" tabindex="0" data-tip="mode2.errorsInfo">ⓘ</span></h2>
       <div id="errors-section">
         <div id="errors-clean" class="errors-clean">Keine echten Fehler — sauberer Lauf. Sobald ein 5xx auftritt, wird dieser Bereich rot und rückt nach oben.</div>
         <table id="errors-table" class="errors-table hidden">
@@ -94,14 +94,14 @@
   <section id="mode1" class="mode-panel" role="tabpanel" aria-labelledby="tab-mode1" hidden>
 
     <div class="controls">
-      <div class="field"><label for="cap-start-rate">Start rate/s</label><input id="cap-start-rate" class="mono" type="number" min="1" value="5"></div>
-      <div class="field"><label for="cap-rate-step">Rate step</label><input id="cap-rate-step" class="mono" type="number" min="1" value="5"></div>
-      <div class="field"><label for="cap-step-sec">Step (s)</label><input id="cap-step-sec" class="mono" type="number" min="1" value="10"></div>
-      <div class="field"><label for="cap-max-rate">Max rate/s</label><input id="cap-max-rate" class="mono" type="number" min="1" value="50"></div>
-      <div class="field checkbox"><label for="cap-auto-stop"><input id="cap-auto-stop" type="checkbox"> Auto-stop</label></div>
-      <div class="field"><label for="cap-threshold">Threshold %</label><input id="cap-threshold" class="mono" type="number" min="1" max="100" value="95"></div>
-      <div class="field"><label for="cap-base-url">Base URL</label><input id="cap-base-url" class="mono" type="text" value="http://localhost:3100/api/v1"></div>
-      <span class="hint" tabindex="0" data-tooltip="Stepped ramp against POST /auth/login only — finds how many logins/sec bcrypt sustains before success rate drops or latency runs away. Nothing else is hit.">ⓘ</span>
+      <div class="field"><label for="cap-start-rate">Start rate/s</label><input id="cap-start-rate" class="mono" type="number" min="1" value="5" data-tip="mode1.startRate"></div>
+      <div class="field"><label for="cap-rate-step">Rate step</label><input id="cap-rate-step" class="mono" type="number" min="1" value="5" data-tip="mode1.rateStep"></div>
+      <div class="field"><label for="cap-step-sec">Step (s)</label><input id="cap-step-sec" class="mono" type="number" min="1" value="10" data-tip="mode1.stepSec"></div>
+      <div class="field"><label for="cap-max-rate">Max rate/s</label><input id="cap-max-rate" class="mono" type="number" min="1" value="50" data-tip="mode1.maxRate"></div>
+      <div class="field checkbox"><label for="cap-auto-stop"><input id="cap-auto-stop" type="checkbox" data-tip="mode1.autoStop"> Auto-stop</label></div>
+      <div class="field"><label for="cap-threshold">Threshold %</label><input id="cap-threshold" class="mono" type="number" min="1" max="100" value="95" data-tip="mode1.threshold"></div>
+      <div class="field"><label for="cap-base-url">Base URL</label><input id="cap-base-url" class="mono" type="text" value="http://localhost:3100/api/v1" data-tip="mode1.baseUrl"></div>
+      <span class="hint" tabindex="0" data-tip="mode1.controlsInfo">ⓘ</span>
       <div class="controls-spacer"></div>
       <button id="cap-start-btn" class="btn btn-start" type="button">▶ Start</button>
       <button id="cap-stop-btn" class="btn btn-stop" type="button" disabled>■ Stop</button>
@@ -109,22 +109,22 @@
     <span id="cap-control-error" class="error"></span>
 
     <div id="cap-statusbar" class="statusbar">
-      <div class="state"><span id="cap-state-dot" class="dot"></span><span id="cap-state-text">IDLE</span></div>
-      <div class="metric"><span id="cap-stat-limit" class="num">–</span><span class="lbl">Login-Grenze</span></div>
-      <div class="metric"><span id="cap-stat-bcrypt" class="num">–</span><span class="lbl">Ø bcrypt ms</span></div>
-      <div class="metric"><span id="cap-stat-knee" class="num">–</span><span class="lbl">Knick bei</span></div>
+      <div class="state"><span id="cap-state-dot" class="dot"></span><span id="cap-state-text">IDLE</span> <span class="hint" tabindex="0" data-tip="mode1.state">ⓘ</span></div>
+      <div class="metric"><span id="cap-stat-limit" class="num">–</span><span class="lbl">Login-Grenze <span class="hint" tabindex="0" data-tip="mode1.limit">ⓘ</span></span></div>
+      <div class="metric"><span id="cap-stat-bcrypt" class="num">–</span><span class="lbl">Ø bcrypt ms <span class="hint" tabindex="0" data-tip="mode1.bcrypt">ⓘ</span></span></div>
+      <div class="metric"><span id="cap-stat-knee" class="num">–</span><span class="lbl">Knick bei <span class="hint" tabindex="0" data-tip="mode1.knee">ⓘ</span></span></div>
     </div>
 
     <h2>Stufen</h2>
     <table id="cap-table">
       <thead>
         <tr>
-          <th>Target/s</th>
-          <th data-tooltip="Login requests fired during this step.">Attempts</th>
-          <th data-tooltip="Requests that returned a token.">Success</th>
-          <th data-tooltip="Successful logins ÷ attempts. This is the number that collapses when you hit the ceiling.">Success %</th>
-          <th class="bar-cell">Rate</th>
-          <th data-tooltip="95th-percentile latency this step.">p95 ms</th>
+          <th>Target/s <span class="hint" tabindex="0" data-tip="mode1.colTargetRate">ⓘ</span></th>
+          <th>Attempts <span class="hint" tabindex="0" data-tip="mode1.colAttempts">ⓘ</span></th>
+          <th>Success <span class="hint" tabindex="0" data-tip="mode1.colSuccess">ⓘ</span></th>
+          <th>Success % <span class="hint" tabindex="0" data-tip="mode1.colSuccessPct">ⓘ</span></th>
+          <th class="bar-cell">Rate <span class="hint" tabindex="0" data-tip="mode1.colRateBar">ⓘ</span></th>
+          <th>p95 ms <span class="hint" tabindex="0" data-tip="mode1.colP95">ⓘ</span></th>
         </tr>
       </thead>
       <tbody id="cap-table-body"></tbody>
@@ -142,6 +142,7 @@
 
   <div id="chart-tooltip"></div>
 
+  <script src="tooltips.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
