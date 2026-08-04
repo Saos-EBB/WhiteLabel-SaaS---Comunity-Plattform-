@@ -52,6 +52,17 @@ export function weightedChoice<T>(rng: () => number, entries: ReadonlyArray<read
 }
 
 /**
+ * Splits an array into fixed-size batches (last batch may be smaller).
+ * Used to keep buildBulkInsert() batches under Postgres's 65535-bound-
+ * parameter-per-statement limit for large SEED_*-driven inserts.
+ */
+export function chunk<T>(arr: readonly T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+    return chunks;
+}
+
+/**
  * Baut "($1,$2,<suffix>),($3,$4,<suffix>)"-Platzhalter + flache Parameterliste
  * fuer Bulk-Inserts. `staticSuffix` haengt pro Zeile feste SQL-Ausdruecke an
  * (z.B. "NOW(), NOW()"), die nicht ueber Parameter laufen muessen.

@@ -18,7 +18,7 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { encryptField, hashEmail } from '../../common/crypto/crypto.helper';
-import { createRng, randomInt, seedFromString, buildBulkInsert } from './seed-shared';
+import { createRng, randomInt, seedFromString, buildBulkInsert, chunk } from './seed-shared';
 
 const ds = new DataSource({
     type: 'postgres',
@@ -37,6 +37,13 @@ const SEED_RESET = (process.env.SEED_RESET ?? 'false').toLowerCase() === 'true';
 
 const NICK_PREFIX = 'seed_user_';
 const PUBLIC_ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+
+// Postgres caps a single statement at 65535 bound parameters. A user row
+// uses 7 of those, a profile row 6 — 1000/batch (7000 / 6000 params) keeps
+// a wide margin below that ceiling regardless of which table's insert is
+// running, while still moving 100k users in ~100 round trips, not one per
+// row.
+const INSERT_BATCH_SIZE = 1000;
 
 function pad(n: number): string {
     return String(n).padStart(4, '0');
@@ -125,26 +132,35 @@ async function main() {
     // ein Fehler (z.B. eine verletzte CHECK-Constraint) User ohne Profil, die
     // der naechste Lauf per COUNT(*) FROM profiles nicht sieht und erneut mit
     // demselben (deterministischen) Nickname/Email anzulegen versucht, was an
-    // uq_users_email_hash scheitert.
+    // uq_users_email_hash scheitert. Deshalb bleibt das EINE Transaktion ueber
+    // alle Batches hinweg (ein Fehler mittendrin rollt komplett zurueck, statt
+    // einen halb geseedeten Batch stehen zu lassen) — nur die einzelnen INSERTs
+    // sind jetzt in INSERT_BATCH_SIZE-Haeppchen aufgeteilt, damit ein grosses
+    // SEED_USERS nicht an Postgres' Parameter-Limit pro Statement scheitert.
+    // Users komplett vor Profiles (FK-Reihenfolge), genau wie vorher.
     await ds.transaction(async manager => {
-        const users = buildBulkInsert(userRows, 'NOW(), NOW(), NOW()');
-        await manager.query(
-            `INSERT INTO users
-                (id, email, email_search_hash, password_hash, role, is_verified, public_id,
-                 email_verified_at, created_at, last_login)
-             VALUES
-                ${users.placeholders}`,
-            users.params,
-        );
+        for (const batch of chunk(userRows, INSERT_BATCH_SIZE)) {
+            const users = buildBulkInsert(batch, 'NOW(), NOW(), NOW()');
+            await manager.query(
+                `INSERT INTO users
+                    (id, email, email_search_hash, password_hash, role, is_verified, public_id,
+                     email_verified_at, created_at, last_login)
+                 VALUES
+                    ${users.placeholders}`,
+                users.params,
+            );
+        }
 
-        const profiles = buildBulkInsert(profileRows, 'NOW()');
-        await manager.query(
-            `INSERT INTO profiles
-                (id, user_id, nickname, birthdate, is_published, onboarding_completed, updated_at)
-             VALUES
-                ${profiles.placeholders}`,
-            profiles.params,
-        );
+        for (const batch of chunk(profileRows, INSERT_BATCH_SIZE)) {
+            const profiles = buildBulkInsert(batch, 'NOW()');
+            await manager.query(
+                `INSERT INTO profiles
+                    (id, user_id, nickname, birthdate, is_published, onboarding_completed, updated_at)
+                 VALUES
+                    ${profiles.placeholders}`,
+                profiles.params,
+            );
+        }
     });
 
     await ds.destroy();
