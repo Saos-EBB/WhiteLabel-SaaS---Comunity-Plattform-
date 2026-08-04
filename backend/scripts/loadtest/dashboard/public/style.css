@@ -291,6 +291,10 @@ thead th {
   font-weight: 500;
 }
 thead th:first-child, tbody td:first-child { text-align: left; }
+thead th[data-sort] { cursor: pointer; user-select: none; }
+thead th[data-sort]:hover { color: var(--on-surface); }
+thead th[aria-sort="ascending"]::after { content: " \25B2"; color: var(--pink-bright); }
+thead th[aria-sort="descending"]::after { content: " \25BC"; color: var(--pink-bright); }
 tbody td { padding: 9px 10px; border-bottom: 1px solid var(--surface-high); font-family: var(--mono); text-align: right; }
 tbody tr:hover { background: var(--surface-low); }
 .path { color: var(--on-surface); }

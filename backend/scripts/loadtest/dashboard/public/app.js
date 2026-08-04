@@ -181,10 +181,33 @@ function updateHealthAndNumbers(categories, total, throughput, durationSecFallba
   return hasError;
 }
 
+// Column sort — persists across live ticks (re-render keeps whatever the
+// user last clicked) rather than resetting to the p95-desc default every
+// second. "Latenz" shares the p95 key since the bar just visualizes p95.
+let lastPerPath = {};
+let endpointSort = { key: 'p95', dir: 'desc' };
+const ENDPOINT_SORT_ACCESSORS = {
+  path: (p) => p.toLowerCase(),
+  n: (p, s) => s.n,
+  p95: (p, s) => s.p95,
+  ok: (p, s) => (s.categories ? s.categories.success : 0),
+  '4xx': (p, s) => (s.categories ? s.categories.expectedReject : 0),
+  err: (p, s) => (s.categories ? s.categories.error : 0),
+};
+
 function renderEndpointTable2(perPath) {
+  lastPerPath = perPath || {};
   endpointBody.innerHTML = '';
-  const paths = Object.entries(perPath || {}).sort((a, b) => b[1].p95 - a[1].p95);
-  const maxP95 = paths.length ? paths[0][1].p95 : 0;
+  const accessor = ENDPOINT_SORT_ACCESSORS[endpointSort.key] || ENDPOINT_SORT_ACCESSORS.p95;
+  const dirMul = endpointSort.dir === 'asc' ? 1 : -1;
+  const paths = Object.entries(lastPerPath).sort((a, b) => {
+    const av = accessor(a[0], a[1]);
+    const bv = accessor(b[0], b[1]);
+    if (av < bv) return -1 * dirMul;
+    if (av > bv) return 1 * dirMul;
+    return 0;
+  });
+  const maxP95 = paths.length ? Math.max(...paths.map(([, s]) => s.p95)) : 0;
   for (const [p, s] of paths) {
     const c = s.categories || { success: 0, expectedReject: 0, error: 0 };
     const width = maxP95 > 0 ? (s.p95 / maxP95) * 100 : 0;
@@ -200,6 +223,35 @@ function renderEndpointTable2(perPath) {
     endpointBody.appendChild(tr);
   }
 }
+
+const endpointHeaders = document.querySelectorAll('#endpoint-table thead th[data-sort]');
+
+function updateEndpointSortIndicators() {
+  for (const th of endpointHeaders) {
+    th.setAttribute('aria-sort', th.dataset.sort === endpointSort.key
+      ? (endpointSort.dir === 'asc' ? 'ascending' : 'descending')
+      : 'none');
+  }
+}
+
+function setEndpointSort(key) {
+  endpointSort = key === endpointSort.key
+    ? { key, dir: endpointSort.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: key === 'path' ? 'asc' : 'desc' };
+  updateEndpointSortIndicators();
+  renderEndpointTable2(lastPerPath);
+}
+
+for (const th of endpointHeaders) {
+  th.addEventListener('click', () => setEndpointSort(th.dataset.sort));
+  th.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      setEndpointSort(th.dataset.sort);
+    }
+  });
+}
+updateEndpointSortIndicators();
 
 // Built with textContent (not innerHTML) — unlike the other cells here,
 // the error body snippet is real backend response text, not one of our
