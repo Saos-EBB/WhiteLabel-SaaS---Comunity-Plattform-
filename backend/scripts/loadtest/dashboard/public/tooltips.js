@@ -23,6 +23,7 @@ const TOOLTIPS = {
 
   // Mode 2 — prefetch phase
   'mode2.prefetch': "Before the test itself starts, every virtual user has to log in once so it has something to send with each request. This shows how many of those logins are done. It only happens here at the start — once every token is loaded, the actual test begins.",
+  'mode2.shortfall': "Fewer virtual users actually logged in than you asked for — usually because the test database doesn't have that many fake accounts set up yet. The test still ran, just with fewer users than requested, so treat its numbers as smaller-scale than intended.",
 
   // Mode 2 — status bar
   'mode2.state': "Whether a test is running (LÄUFT), has finished (FERTIG), or hasn't started (IDLE). Turns red if this run has had a real server error.",

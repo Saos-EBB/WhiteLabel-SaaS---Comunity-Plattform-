@@ -266,6 +266,12 @@ if [ "$AVAILABLE_TOKENS" -eq 0 ]; then
   exit 1
 fi
 
+# Remembered BEFORE the auto-correct below can shrink NUM_USERS, so the
+# summary can report an honest "ran with fewer than asked for" instead of
+# just quietly printing the (already-corrected) smaller number as if it
+# had been the plan all along — see the WARNUNG line near SUMMARY_FILE.
+REQUESTED_USERS="$NUM_USERS"
+
 if [ "$NUM_USERS" -eq 0 ] || [ "$NUM_USERS" -gt "$AVAILABLE_TOKENS" ]; then
   [ "$NUM_USERS" -gt "$AVAILABLE_TOKENS" ] && echo "Warnung: nur ${AVAILABLE_TOKENS} Tokens in ${TOKENS_FILE}, NUM_USERS wird darauf begrenzt."
   NUM_USERS="$AVAILABLE_TOKENS"
@@ -302,6 +308,9 @@ SUMMARY_FILE="${LOG_DIR}/summary.txt"
   echo "=== YourBrand Loadtest Summary ==="
   echo "Zeitpunkt: $(date -Iseconds)"
   echo "NUM_USERS=${NUM_USERS} DURATION_SEC=${DURATION_SEC} BASE_URL=${BASE_URL}"
+  if [ "$NUM_USERS" -lt "$REQUESTED_USERS" ]; then
+    echo "WARNUNG: nur ${NUM_USERS} von ${REQUESTED_USERS} angeforderten Usern liefen mit — ${TOKENS_FILE} hatte nicht genug Tokens (siehe prefetch-tokens.sh-Ausgabe fuer uebersprungene Logins)."
+  fi
   echo ""
 
   ALL_ROWS="${LOG_DIR}/_all_rows.csv"

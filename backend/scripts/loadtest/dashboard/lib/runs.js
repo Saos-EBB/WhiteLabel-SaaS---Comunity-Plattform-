@@ -39,6 +39,18 @@ function parseParamsFromSummary(summaryText) {
   return { numUsers: Number(numUsers[1]), durationSec: Number(durationSec[1]) };
 }
 
+// loadtest.sh writes this line when it had to auto-correct NUM_USERS down
+// because tokens.csv (built by prefetch-tokens.sh) had fewer rows than
+// requested — e.g. the loadtest DB wasn't seeded with enough fake users.
+// null means no shortfall (or an older/malformed summary — same
+// graceful-fallback shape as parseParamsFromSummary above).
+function parseShortfallFromSummary(summaryText) {
+  if (!summaryText) return null;
+  const m = /WARNUNG: nur (\d+) von (\d+) angeforderten Usern/.exec(summaryText);
+  if (!m) return null;
+  return { actual: Number(m[1]), requested: Number(m[2]) };
+}
+
 async function readRunFiles(ts) {
   const dir = path.join(LOGS_DIR, ts);
   const [allRowsRaw, summaryText, errorsRaw] = await Promise.all([
@@ -68,6 +80,7 @@ async function listRuns() {
         hasSummary: summaryText !== null,
         hasErrors: errorCount > 0,
         params: parseParamsFromSummary(summaryText),
+        shortfall: parseShortfallFromSummary(summaryText),
         // Only total + categories — everything a History row needs
         // (req/s via total/params.durationSec, success%, error count,
         // health-bar proportions). perPath/overall are still computed
@@ -91,7 +104,14 @@ async function getRun(ts) {
     ? capRecent(errorsRaw.split('\n').map(parseErrorLine).filter(Boolean))
     : [];
 
-  return { ts, stats, summaryText, params: parseParamsFromSummary(summaryText), errors };
+  return {
+    ts,
+    stats,
+    summaryText,
+    params: parseParamsFromSummary(summaryText),
+    shortfall: parseShortfallFromSummary(summaryText),
+    errors,
+  };
 }
 
 module.exports = { listRuns, getRun };
