@@ -402,6 +402,7 @@ const capStartBtn = el('cap-start-btn');
 const capStopBtn = el('cap-stop-btn');
 const capControlError = el('cap-control-error');
 
+const capStatusbarEl = el('cap-statusbar');
 const capStateDot = el('cap-state-dot');
 const capStateText = el('cap-state-text');
 const capStatLimit = el('cap-stat-limit');
@@ -419,28 +420,73 @@ function setCapRunningUI(active) {
   }
 }
 
-function setCapState(status) {
-  capStateDot.className = 'dot' + (status === 'running' ? ' running' : status === 'finished' ? ' finished' : '');
+function setCapState(status, hasError) {
+  capStateDot.className = 'dot' + (status === 'running' ? ' running' : status === 'finished' ? ' finished' : '') + (hasError ? ' errored' : '');
   capStateText.textContent = status === 'running' ? 'LÄUFT' : status === 'finished' ? 'FERTIG' : 'IDLE';
+  capStatusbarEl.classList.toggle('errored', !!hasError);
+  capStatusbarEl.classList.toggle('idle', status === 'idle');
 }
 
-function renderCapRow(row) {
-  const threshold = Number(capThreshold.value || 95);
-  const belowThreshold = row.successPct < threshold;
+// successPct here is a per-step number, not a traffic-light bucket like
+// Mode 2's 2xx/4xx/5xx — amber only applies right at the threshold edge,
+// otherwise it's a clean ok/err split (cleared the bar or didn't).
+function successClass(successPct, threshold) {
+  if (successPct >= threshold) return 'cell-ok';
+  if (successPct >= threshold - 10) return 'cell-warn';
+  return 'cell-err';
+}
+
+function renderCapRow(row, threshold, maxRate) {
   const tr = document.createElement('tr');
   tr.dataset.step = row.step;
+  const width = maxRate > 0 ? (row.targetRate / maxRate) * 100 : 0;
   tr.innerHTML = `<td data-label="Target/s">${row.targetRate}/s</td>`
     + `<td data-label="Attempts">${row.attempts}</td>`
     + `<td data-label="Success">${row.successes}</td>`
-    + `<td class="${belowThreshold ? 'cell-err' : 'cell-ok'}" data-label="Success %">${row.successPct.toFixed(1)}%</td>`
-    + `<td class="bar-cell" data-label="Rate"><div class="bar-track"><div class="bar-fill" style="width:0%"></div></div></td>`
+    + `<td class="${successClass(row.successPct, threshold)}" data-label="Success %">${row.successPct.toFixed(1)}%</td>`
+    + `<td class="bar-cell" data-label="Rate"><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div></td>`
     + `<td data-label="p95 ms">${row.p95Ms}</td>`;
   return tr;
 }
 
 function renderCapTable(rows, tbody) {
   tbody.innerHTML = '';
-  for (const row of rows) tbody.appendChild(renderCapRow(row));
+  const threshold = Number(capThreshold.value || 95);
+  const maxRate = rows.reduce((m, r) => Math.max(m, r.targetRate), 0);
+  for (const row of rows) tbody.appendChild(renderCapRow(row, threshold, maxRate));
+}
+
+// The practical answer to "how many logins/sec can this backend take":
+// the highest rate that still cleared the success threshold (limit), and
+// the first rate — in ramp order — that fell below it (the knee where
+// capacity runs out). A run that never clears the threshold, even at its
+// first step, reads as a real error (red statusbar/dot), same as Mode 2.
+function computeCapVerdict(rows, threshold) {
+  const ordered = [...rows].sort((a, b) => a.step - b.step);
+  let best = null;
+  let knee = null;
+  for (const row of ordered) {
+    if (row.successPct >= threshold) best = row;
+    else if (knee === null) knee = row;
+  }
+  return { best, knee };
+}
+
+function renderCapSummary(rows) {
+  const threshold = Number(capThreshold.value || 95);
+  const { best, knee } = computeCapVerdict(rows, threshold);
+  const hasError = rows.length > 0 && best === null;
+
+  capStatLimit.textContent = best ? `${best.targetRate}/s` : (rows.length ? '–' : '–');
+  capStatLimit.className = 'num ' + (rows.length ? (best ? 'ok' : 'err') : '');
+
+  capStatBcrypt.textContent = best ? String(best.avgMs) : '–';
+  capStatBcrypt.className = 'num';
+
+  capStatKnee.textContent = knee ? `${knee.targetRate}/s` : '–';
+  capStatKnee.className = 'num ' + (knee ? 'err' : '');
+
+  return hasError;
 }
 
 function appendCapConsoleLine(line) {
@@ -474,7 +520,10 @@ capStartBtn.addEventListener('click', async () => {
     }
     capTableBody.innerHTML = '';
     capConsole.textContent = '';
-    setCapState('running');
+    capStatLimit.textContent = '–';
+    capStatBcrypt.textContent = '–';
+    capStatKnee.textContent = '–';
+    setCapState('running', false);
   } catch (err) {
     capControlError.textContent = String(err);
     setCapRunningUI(false);
@@ -500,8 +549,10 @@ fetch('/api/capacity/state')
   .then((state) => {
     capRowsByStep = new Map((state.rows || []).map((r) => [r.step, r]));
     setCapRunningUI(state.active);
-    setCapState(state.active ? 'running' : (state.status || 'idle'));
-    renderCapTable(state.rows || [], capTableBody);
+    const rows = state.rows || [];
+    const hasError = renderCapSummary(rows);
+    setCapState(state.active ? 'running' : (state.status || 'idle'), hasError);
+    renderCapTable(rows, capTableBody);
     capConsole.textContent = (state.lines || []).join('\n');
     capConsole.scrollTop = capConsole.scrollHeight;
   })
@@ -510,7 +561,7 @@ fetch('/api/capacity/state')
 source.addEventListener('capacity-started', () => {
   capRowsByStep = new Map();
   setCapRunningUI(true);
-  setCapState('running');
+  setCapState('running', false);
 });
 source.addEventListener('capacity-line', (ev) => {
   const { line, row } = JSON.parse(ev.data);
@@ -522,14 +573,18 @@ source.addEventListener('capacity-line', (ev) => {
     capRowsByStep.set(row.step, row);
     const rows = [...capRowsByStep.values()].sort((a, b) => a.step - b.step);
     renderCapTable(rows, capTableBody);
+    const hasError = renderCapSummary(rows);
+    setCapState('running', hasError);
   }
 });
 source.addEventListener('capacity-finished', (ev) => {
   const state = JSON.parse(ev.data);
-  capRowsByStep = new Map((state.rows || []).map((r) => [r.step, r]));
+  const rows = state.rows || [];
+  capRowsByStep = new Map(rows.map((r) => [r.step, r]));
   setCapRunningUI(false);
-  setCapState('finished');
-  renderCapTable(state.rows || [], capTableBody);
+  const hasError = renderCapSummary(rows);
+  setCapState('finished', hasError);
+  renderCapTable(rows, capTableBody);
   if (!panels.history.hidden) loadHistoryList();
 });
 
