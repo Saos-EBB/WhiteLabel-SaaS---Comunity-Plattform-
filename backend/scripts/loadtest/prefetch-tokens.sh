@@ -6,6 +6,12 @@
 # BATCH_PAUSE), damit dieser Schritt selbst nicht schon die in
 # login-capacity.sh gefundene Kapazitaetsgrenze reisst.
 #
+# users.csv ist hier der TOKEN-POOL, nicht mehr zwingend ein Eintrag pro
+# spaeter simuliertem User — loadtest.sh weist Tokens per Round-Robin an
+# seine Worker zu (siehe dort), von run-loadtest.sh typischerweise auf
+# ~NUM_USERS/10 dimensioniert. Fuer dieses Skript selbst aendert sich
+# dadurch nichts: es loggt einfach jede Zeile in users.csv genau einmal ein.
+#
 # Defaults (BATCH_SIZE=20, BATCH_PAUSE=0) sind so aggressiv wie gegen
 # diesen Stack noch verlustfrei moeglich — mit login-capacity.sh
 # nachgemessen (2026-08-05, aktuelle Hardware/UV_THREADPOOL_SIZE):

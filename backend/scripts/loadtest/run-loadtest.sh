@@ -5,13 +5,23 @@
 # erzeugen -> Tokens prefetchen -> loadtest.sh (flaches Random-Action-Modell)
 # starten -> Summary ausgeben.
 #
-# NUM_USERS ist nach diesem Script immer selbst-konsistent: zu wenige
-# geseedete Fake-User stoppen den Lauf VOR dem Prefetch (statt ihn mit
-# weniger Usern durchlaufen zu lassen), users.csv wird bei jedem Lauf frisch
-# mit exakt NUM_USERS Zeilen erzeugt und das auch verifiziert, und ein
-# Tokens-Shortfall nach dem Prefetch (z.B. durch einzelne fehlgeschlagene
-# Logins trotz Retries) landet laut+lesbar in summary.txt statt zu
-# verschwinden — siehe loadtest.sh fuer den WARNUNG-Eintrag dort.
+# NUM_USERS ist die Anzahl gleichzeitiger Worker-Prozesse (= Last), NICHT
+# mehr die Anzahl eindeutiger DB-Accounts — ein Token wird von mehreren
+# Workern gleichzeitig benutzt (siehe loadtest.sh: Token-Zuweisung per
+# index % AVAILABLE_TOKENS). Das ist fuer reine Lasttests (keine Per-User-
+# Korrektheit als Ziel, siehe loadtest.sh's eigener Header-Kommentar)
+# voellig ausreichend: ein JWT authentifiziert beliebig viele Requests,
+# unabhaengig davon, ob "sein" Worker gerade der einzige ist, der es
+# benutzt. Der tatsaechlich benoetigte Account-Pool ist daher viel kleiner
+# als NUM_USERS: TOKEN_POOL_SIZE = NUM_USERS/10 (mindestens NUM_USERS
+# selbst, wenn das schon unter 10 liegt) — bei NUM_USERS=100000 also nur
+# 10000 Accounts statt 100000. users.csv wird bei jedem Lauf frisch mit
+# exakt TOKEN_POOL_SIZE Zeilen erzeugt und das auch verifiziert; kommt der
+# Prefetch trotzdem mit weniger Tokens als TOKEN_POOL_SIZE zurueck (z.B.
+# einzelne fehlgeschlagene Logins trotz Retries), landet das laut+lesbar
+# in summary.txt statt zu verschwinden — siehe loadtest.sh fuer den
+# WARNUNG-Eintrag dort. NUM_USERS selbst wird dadurch NICHT mehr
+# runterkorrigiert — es laufen immer genau so viele Worker wie angefordert.
 #
 # Usage:
 #   ./run-loadtest.sh [NUM_USERS] [DURATION_SEC]
@@ -35,6 +45,15 @@ NUM_USERS="${1:-100}"
 DURATION_SEC="${2:-60}"
 LOADTEST_BASE_URL="http://localhost:3100/api/v1"
 
+# Accounts/Tokens werden wiederverwendet (siehe Header oben) — der Pool
+# muss nur ~1/10 von NUM_USERS gross sein. Fuer kleine Laeufe (<10 Worker)
+# lohnt sich Wiederverwendung nicht, da faellt der Pool auf NUM_USERS
+# zurueck (jeder Worker bekommt seinen eigenen Token, wie frueher).
+TOKEN_POOL_SIZE=$(( NUM_USERS / 10 ))
+if [ "$TOKEN_POOL_SIZE" -lt 1 ]; then
+  TOKEN_POOL_SIZE="$NUM_USERS"
+fi
+
 echo "=== 1/6: Health-Check auf ${LOADTEST_BASE_URL} ==="
 # Kein dedizierter /health-Endpoint im Backend, und AppController (GET /) ist
 # nirgends registriert (curl liefert hier reproduzierbar 404). Jeder HTTP-
@@ -55,26 +74,26 @@ echo "OK (HTTP ${status})"
 # login attempt here is a lot cheaper than discovering the shortfall via a
 # 10000-row prefetch that silently comes back with a fraction of that.
 echo ""
-echo "=== 2/6: Pruefe ob ${NUM_USERS} Fake-User in der Loadtest-DB geseedet sind ==="
-probe_email=$(printf 'seed_user_%04d@seed.local' "$NUM_USERS")
+echo "=== 2/6: Pruefe ob ${TOKEN_POOL_SIZE} Fake-User (Token-Pool fuer ${NUM_USERS} Worker) in der Loadtest-DB geseedet sind ==="
+probe_email=$(printf 'seed_user_%04d@seed.local' "$TOKEN_POOL_SIZE")
 probe_status=$(curl -s -o /dev/null -w "%{http_code}" -m 10 -X POST "${LOADTEST_BASE_URL}/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"identifier\":\"${probe_email}\",\"password\":\"SeedUser1234!\"}" 2>/dev/null)
 if [ "$probe_status" != "200" ]; then
-  echo "Fehler: ${probe_email} existiert nicht (HTTP ${probe_status}) — es sind weniger als ${NUM_USERS} Fake-User in der Loadtest-DB geseedet."
+  echo "Fehler: ${probe_email} existiert nicht (HTTP ${probe_status}) — es sind weniger als ${TOKEN_POOL_SIZE} Fake-User in der Loadtest-DB geseedet."
   echo "Stack mit ausreichend Usern neu hochfahren (vorhandene Fake-User bleiben erhalten, es werden nur die fehlenden ergaenzt):"
-  echo "  SEED_USERS=${NUM_USERS} docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d XXX_db_load XXX_backend_load"
+  echo "  SEED_USERS=${TOKEN_POOL_SIZE} docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d XXX_db_load XXX_backend_load"
   exit 1
 fi
-echo "OK (seed_user_${NUM_USERS} existiert)"
+echo "OK (seed_user_${TOKEN_POOL_SIZE} existiert)"
 
 echo ""
-echo "=== 3/6: users.csv fuer ${NUM_USERS} User erzeugen ==="
-COUNT="$NUM_USERS" ./generate-users-csv.sh > users.csv
+echo "=== 3/6: users.csv fuer Token-Pool (${TOKEN_POOL_SIZE} Accounts, von ${NUM_USERS} Workern geteilt) erzeugen ==="
+COUNT="$TOKEN_POOL_SIZE" ./generate-users-csv.sh > users.csv
 users_csv_rows=$(wc -l < users.csv)
 echo "-> ${SCRIPT_DIR}/users.csv (${users_csv_rows} Zeilen)"
-if [ "$users_csv_rows" -ne "$NUM_USERS" ]; then
-  echo "Fehler: users.csv hat ${users_csv_rows} Zeilen, erwartet ${NUM_USERS} — generate-users-csv.sh hat COUNT nicht eingehalten. Abbruch."
+if [ "$users_csv_rows" -ne "$TOKEN_POOL_SIZE" ]; then
+  echo "Fehler: users.csv hat ${users_csv_rows} Zeilen, erwartet ${TOKEN_POOL_SIZE} — generate-users-csv.sh hat COUNT nicht eingehalten. Abbruch."
   exit 1
 fi
 
@@ -88,8 +107,9 @@ if [ "$prefetch_exit" -ne 0 ]; then
 fi
 
 echo ""
-echo "=== 5/6: loadtest.sh (NUM_USERS=${NUM_USERS} DURATION_SEC=${DURATION_SEC}) ==="
-BASE_URL="$LOADTEST_BASE_URL" NUM_USERS="$NUM_USERS" DURATION_SEC="$DURATION_SEC" ./loadtest.sh
+echo "=== 5/6: loadtest.sh (NUM_USERS=${NUM_USERS} DURATION_SEC=${DURATION_SEC}, Token-Pool-Ziel ${TOKEN_POOL_SIZE}) ==="
+BASE_URL="$LOADTEST_BASE_URL" NUM_USERS="$NUM_USERS" DURATION_SEC="$DURATION_SEC" \
+  TOKEN_POOL_TARGET="$TOKEN_POOL_SIZE" ./loadtest.sh
 loadtest_exit=$?
 
 echo ""

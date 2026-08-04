@@ -39,16 +39,19 @@ function parseParamsFromSummary(summaryText) {
   return { numUsers: Number(numUsers[1]), durationSec: Number(durationSec[1]) };
 }
 
-// loadtest.sh writes this line when it had to auto-correct NUM_USERS down
-// because tokens.csv (built by prefetch-tokens.sh) had fewer rows than
-// requested — e.g. the loadtest DB wasn't seeded with enough fake users.
-// null means no shortfall (or an older/malformed summary — same
-// graceful-fallback shape as parseParamsFromSummary above).
+// Tokens are reused across workers now (token_idx = i % AVAILABLE_TOKENS
+// in loadtest.sh) — NUM_USERS itself always runs in full, it's never
+// downgraded. loadtest.sh writes this line only when the token POOL came
+// up smaller than run-loadtest.sh's own TOKEN_POOL_TARGET (~NUM_USERS/10,
+// e.g. a few individual prefetch logins failing despite retries) — fewer
+// distinct accounts get reused, not fewer workers. null means no
+// shortfall (or an older/malformed summary — same graceful-fallback
+// shape as parseParamsFromSummary above).
 function parseShortfallFromSummary(summaryText) {
   if (!summaryText) return null;
-  const m = /WARNUNG: nur (\d+) von (\d+) angeforderten Usern/.exec(summaryText);
+  const m = /WARNUNG: Token-Pool kleiner als geplant — nur (\d+) von (\d+) vorgesehenen Accounts/.exec(summaryText);
   if (!m) return null;
-  return { actual: Number(m[1]), requested: Number(m[2]) };
+  return { actualTokens: Number(m[1]), poolTarget: Number(m[2]) };
 }
 
 async function readRunFiles(ts) {

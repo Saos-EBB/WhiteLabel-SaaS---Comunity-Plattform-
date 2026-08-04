@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 #
 # YourBrand Loadtest — flaches Random-Action-Modell. Jeder simulierte User
-# hat bereits einen Token (aus tokens.csv, siehe prefetch-tokens.sh) und
 # waehlt pro Tick EINE zufaellige Aktion aus einer flachen Liste aller
 # bekannten Endpoints, fuehrt sie aus, schlaeft 2-25s, waehlt neu. Kein
 # Login im Loop, kein Per-User-State (auf IDs angewiesene Aktionen holen
 # sich per Quick-GET eine, sonst zaehlt der GET-Call selbst schon als
 # Aktion).
+#
+# Tokens werden WIEDERVERWENDET, nicht 1:1 an NUM_USERS gebunden: Worker i
+# bekommt Token (i % Anzahl verfuegbarer Tokens) aus tokens.csv — mehrere
+# gleichzeitige Worker koennen also denselben Account/JWT benutzen. Fuer
+# reine Lasttests ohne Per-User-Korrektheitsziel (kein Dedup, kein State-
+# Tracking, siehe oben) ist das unproblematisch: ein JWT authentifiziert
+# beliebig viele parallele Requests. Das entkoppelt NUM_USERS (= Anzahl
+# gleichzeitiger Worker, also die eigentliche Last) von der Anzahl
+# tatsaechlich in der DB angelegter/prefetchter Accounts — siehe
+# run-loadtest.sh fuer den Token-Pool-Size-Kalkul (~NUM_USERS/10).
 #
 # Voraussetzung: tokens.csv in diesem Ordner (email,token), erzeugt per
 #   ./prefetch-tokens.sh
@@ -44,6 +53,11 @@ RAMP_SEC="${RAMP_SEC:-30}"                 # alle User werden ueber dieses Fenst
                                             # unabhaengig von NUM_USERS (ersetzt festes Stagger-Sleep)
 TOKENS_FILE="${TOKENS_FILE:-./tokens.csv}" # Format: email,token (ohne Header), siehe prefetch-tokens.sh
 TEST_PHOTO="${TEST_PHOTO:-${SCRIPT_DIR}/test-photo.jpg}"  # fuer action_media_upload
+# Vom Aufrufer (run-loadtest.sh) durchgereichter Hinweis, wie gross der
+# Token-Pool eigentlich sein sollte — nur fuer die WARNUNG-Zeile unten,
+# wenn der Prefetch weniger geliefert hat. 0 = nicht gesetzt (z.B. bei
+# direktem, manuellem Aufruf ohne run-loadtest.sh) -> keine Pruefung.
+TOKEN_POOL_TARGET="${TOKEN_POOL_TARGET:-0}"
 
 TS="$(date +%s)"
 LOG_DIR="./loadtest-logs/${TS}"
@@ -266,27 +280,29 @@ if [ "$AVAILABLE_TOKENS" -eq 0 ]; then
   exit 1
 fi
 
-# Remembered BEFORE the auto-correct below can shrink NUM_USERS, so the
-# summary can report an honest "ran with fewer than asked for" instead of
-# just quietly printing the (already-corrected) smaller number as if it
-# had been the plan all along — see the WARNUNG line near SUMMARY_FILE.
-REQUESTED_USERS="$NUM_USERS"
-
-if [ "$NUM_USERS" -eq 0 ] || [ "$NUM_USERS" -gt "$AVAILABLE_TOKENS" ]; then
-  [ "$NUM_USERS" -gt "$AVAILABLE_TOKENS" ] && echo "Warnung: nur ${AVAILABLE_TOKENS} Tokens in ${TOKENS_FILE}, NUM_USERS wird darauf begrenzt."
+# NUM_USERS=0 (Standalone-Aufruf ohne run-loadtest.sh, kein expliziter
+# Wunsch) heisst weiterhin "ein Worker pro verfuegbarem Token" — sonst
+# laeuft NUM_USERS UNVERAENDERT, auch wenn es AVAILABLE_TOKENS uebersteigt:
+# Worker teilen sich dann Tokens (siehe Token-Zuweisung unten), es wird
+# nicht mehr stillschweigend heruntergerechnet.
+if [ "$NUM_USERS" -eq 0 ]; then
   NUM_USERS="$AVAILABLE_TOKENS"
 fi
 
 END_TS=$(( $(date +%s) + DURATION_SEC ))
 RAMP_INTERVAL=$(awk -v r="$RAMP_SEC" -v n="$NUM_USERS" 'BEGIN{ v = n>0 ? r/n : 0; printf "%.3f", v }')
 
-echo "Start: ${NUM_USERS} User, ${DURATION_SEC}s Dauer, Ramp ueber ${RAMP_SEC}s, Ziel ${BASE_URL}"
+echo "Start: ${NUM_USERS} User (${AVAILABLE_TOKENS} Tokens im Pool, wiederverwendet), ${DURATION_SEC}s Dauer, Ramp ueber ${RAMP_SEC}s, Ziel ${BASE_URL}"
 echo "Logs: ${LOG_DIR}"
 
 PIDS=()
 
 for (( i=0; i<NUM_USERS; i++ )); do
-  IFS=',' read -r email token <<< "${TOKEN_LINES[$i]}"
+  # Token-Pool wiederverwendet, sobald NUM_USERS > AVAILABLE_TOKENS —
+  # mehrere Worker benutzen dann denselben Account/JWT gleichzeitig, siehe
+  # Header-Kommentar oben.
+  token_idx=$(( i % AVAILABLE_TOKENS ))
+  IFS=',' read -r email token <<< "${TOKEN_LINES[$token_idx]}"
   simulate_user "$i" "$token" "$END_TS" &
   PIDS+=($!)
   sleep "$RAMP_INTERVAL"
@@ -308,8 +324,13 @@ SUMMARY_FILE="${LOG_DIR}/summary.txt"
   echo "=== YourBrand Loadtest Summary ==="
   echo "Zeitpunkt: $(date -Iseconds)"
   echo "NUM_USERS=${NUM_USERS} DURATION_SEC=${DURATION_SEC} BASE_URL=${BASE_URL}"
-  if [ "$NUM_USERS" -lt "$REQUESTED_USERS" ]; then
-    echo "WARNUNG: nur ${NUM_USERS} von ${REQUESTED_USERS} angeforderten Usern liefen mit — ${TOKENS_FILE} hatte nicht genug Tokens (siehe prefetch-tokens.sh-Ausgabe fuer uebersprungene Logins)."
+  # NUM_USERS selbst lief immer vollstaendig (siehe oben) — das hier ist
+  # KEIN "lief mit weniger Usern"-Fehler mehr, sondern nur ein Hinweis,
+  # dass der Account-Pool kleiner als geplant ist (weniger Account-
+  # Vielfalt unter den wiederverwendeten Tokens), z.B. durch einzelne
+  # fehlgeschlagene Logins trotz Retries beim Prefetch.
+  if [ "$TOKEN_POOL_TARGET" -gt 0 ] && [ "$AVAILABLE_TOKENS" -lt "$TOKEN_POOL_TARGET" ]; then
+    echo "WARNUNG: Token-Pool kleiner als geplant — nur ${AVAILABLE_TOKENS} von ${TOKEN_POOL_TARGET} vorgesehenen Accounts hatten einen Token (siehe prefetch-tokens.sh-Ausgabe fuer uebersprungene Logins). Alle ${NUM_USERS} Worker liefen trotzdem, teilen sich aber einen kleineren Pool."
   fi
   echo ""
 

@@ -65,18 +65,20 @@ const prefetchStatusEl = el('prefetch-status');
 const prefetchCount = el('prefetch-count');
 const prefetchBarFill = el('prefetch-bar-fill');
 
-// loadtest.sh auto-corrects NUM_USERS down when tokens.csv came up short
-// (see run-loadtest.sh's seeded-user check for the main defense — this is
-// the loud fallback for the rarer case of a few individual logins failing
-// despite that check passing) and records it in summary.txt. Without this,
-// a run that silently used fewer users than requested looked identical to
-// a full one — this makes it impossible to miss.
+// Tokens are reused across workers (token_idx = i % AVAILABLE_TOKENS in
+// loadtest.sh) — NUM_USERS itself always runs in full now, never silently
+// downgraded. This only fires when the token POOL itself came up smaller
+// than run-loadtest.sh's own target (~NUM_USERS/10, e.g. a few individual
+// prefetch logins failing despite retries — see run-loadtest.sh's seeded-
+// user check for the main defense against that). Informational, not an
+// error: every requested worker still ran, just reusing a smaller pool of
+// accounts than planned.
 function showShortfall(shortfall) {
   if (!shortfall) {
     shortfallBanner.classList.add('hidden');
     return false;
   }
-  shortfallBanner.textContent = `⚠ Nur ${shortfall.actual} von ${shortfall.requested} angeforderten Usern liefen mit — zu wenige Tokens beim Prefetch.`;
+  shortfallBanner.textContent = `ⓘ Token-Pool kleiner als geplant: nur ${shortfall.actualTokens} von ${shortfall.poolTarget} vorgesehenen Accounts hatten einen Token. Alle Worker liefen trotzdem — sie teilen sich einen kleineren Pool.`;
   shortfallBanner.classList.remove('hidden');
   return true;
 }
@@ -440,18 +442,14 @@ source.addEventListener('finished', (ev) => {
   hidePrefetch();
   applyTick2({ ...final, docker: [] });
   setRunningUI(false);
-  // Whether NUM_USERS got auto-corrected down is only knowable from
+  // Whether the token pool came up short is only knowable from
   // summary.txt, which loadtest.sh only finishes writing right at the very
   // end — re-fetch this run's own detail (already-parsed by runs.js) rather
-  // than re-deriving it here.
+  // than re-deriving it here. Informational only — NUM_USERS itself always
+  // ran in full, so this doesn't flip the run into an errored state.
   const ts = (final.logDir || '').split('/').filter(Boolean).pop();
   if (ts) {
-    fetch(`/api/runs/${ts}`).then((res) => res.json()).then((run) => {
-      if (showShortfall(run.shortfall)) {
-        statusbarEl.classList.add('errored');
-        stateDot.classList.add('errored');
-      }
-    }).catch(() => {});
+    fetch(`/api/runs/${ts}`).then((res) => res.json()).then((run) => showShortfall(run.shortfall)).catch(() => {});
   }
   if (!panels.history.hidden) loadHistoryList();
 });
@@ -692,8 +690,8 @@ async function loadPastRunIntoMode2(ts) {
   const categories = run.stats ? run.stats.categories : null;
   const durationSec = run.params ? run.params.durationSec : null;
   const hasError = updateHealthAndNumbers(categories, total, null, durationSec);
-  const hadShortfall = showShortfall(run.shortfall);
-  setState2('finished', 0, hasError || hadShortfall);
+  showShortfall(run.shortfall); // informational — doesn't affect hasError
+  setState2('finished', 0, hasError);
 
   renderEndpointTable2(run.stats ? run.stats.perPath : {});
   renderErrorsPanel(run.errors || []);
@@ -748,13 +746,13 @@ function renderHistRow(run) {
     const stats = run.stats;
     const total = stats ? stats.total : 0;
     const cats = stats ? stats.categories : { success: 0, expectedReject: 0, error: 0 };
-    // A shortfall means fewer users than requested actually ran — every
-    // individual request may have gone fine (cats.error === 0), but the
-    // run itself under-delivered, so it must never read as a clean green
-    // row just because nothing broke in flight.
-    healthy = !!stats && cats.error === 0 && !run.shortfall;
+    // A token-pool shortfall doesn't affect health — every requested
+    // worker still ran (tokens are reused across workers), it just means
+    // fewer distinct accounts got shared. Still worth a quiet note on the
+    // row, just not a red one.
+    healthy = !!stats && cats.error === 0;
     metaText = run.params ? `Mode 2 · ${run.params.numUsers} Users · ${run.params.durationSec}s` : 'Mode 2 · Lauf';
-    if (run.shortfall) metaText += ` <span class="hist-shortfall">(⚠ ${run.shortfall.requested} angefordert)</span>`;
+    if (run.shortfall) metaText += ` <span class="hist-shortfall">(ⓘ Pool ${run.shortfall.actualTokens}/${run.shortfall.poolTarget})</span>`;
     const reqS = stats && run.params ? (total / run.params.durationSec).toFixed(1) : '–';
     const successPct = stats && total > 0 ? `${((cats.success / total) * 100).toFixed(1)}%` : '–';
     stats3 = [
