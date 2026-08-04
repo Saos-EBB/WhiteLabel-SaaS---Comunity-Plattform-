@@ -64,9 +64,13 @@ setInterval(async () => {
   broadcast('tick', { ...tick, docker: lastDockerStats });
 }, CSV_POLL_MS);
 
+runner.on('prefetch', ({ loaded, total }) => {
+  broadcast('prefetch', { phase: 'prefetch', loaded, total });
+});
+
 runner.on('logdir', (logDir) => {
   liveState.startRun(logDir, runner.numUsers, runner.durationSec);
-  broadcast('started', liveState.getState());
+  broadcast('started', { phase: 'running', ...liveState.getState() });
 });
 
 runner.on('exit', async ({ code, hadLogDir }) => {

@@ -44,15 +44,29 @@ class Runner extends EventEmitter {
     });
     this.child = child;
 
-    let buf = '';
+    // Line-buffered so the one-shot "Logs: <dir>" match and the repeated
+    // "PREFETCH x/y" progress lines (see prefetch-tokens.sh) both parse
+    // cleanly even if a chunk splits a line mid-way. Stops parsing once
+    // logDir is found — nothing after that (the load loop's own output)
+    // needs to be read here.
+    let lineBuf = '';
     child.stdout.on('data', (chunk) => {
       process.stdout.write(chunk);
       if (this.logDir) return;
-      buf += chunk.toString('utf8');
-      const m = buf.match(/Logs:\s+(\S+)/);
-      if (m) {
-        this.logDir = path.resolve(LOADTEST_DIR, m[1]);
-        this.emit('logdir', this.logDir);
+      lineBuf += chunk.toString('utf8');
+      const lines = lineBuf.split('\n');
+      lineBuf = lines.pop();
+      for (const line of lines) {
+        const logMatch = line.match(/Logs:\s+(\S+)/);
+        if (logMatch) {
+          this.logDir = path.resolve(LOADTEST_DIR, logMatch[1]);
+          this.emit('logdir', this.logDir);
+          return;
+        }
+        const prefetchMatch = line.match(/^PREFETCH (\d+)\/(\d+)$/);
+        if (prefetchMatch) {
+          this.emit('prefetch', { loaded: Number(prefetchMatch[1]), total: Number(prefetchMatch[2]) });
+        }
       }
     });
     child.stderr.on('data', (chunk) => process.stderr.write(chunk));

@@ -205,6 +205,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-vis
   .dot.running { animation: none; }
 }
 
+.prefetch-progress { grid-column: 2 / -1; display: flex; flex-direction: column; gap: 8px; }
+.prefetch-bar-track { height: 8px; }
+
 .metric { display: flex; flex-direction: column; }
 .metric .num { font-family: var(--mono); font-size: 30px; font-weight: 600; line-height: 1.1; color: var(--on-surface); }
 .metric .num.ok { color: var(--ok); }

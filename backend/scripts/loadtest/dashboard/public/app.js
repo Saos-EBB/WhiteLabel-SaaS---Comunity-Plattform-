@@ -59,6 +59,10 @@ const startBtn = el('start-btn');
 const stopBtn = el('stop-btn');
 const controlError = el('control-error');
 
+const prefetchStatusEl = el('prefetch-status');
+const prefetchCount = el('prefetch-count');
+const prefetchBarFill = el('prefetch-bar-fill');
+
 const statusbarEl = el('statusbar');
 const stateDot = el('state-dot');
 const stateText = el('state-text');
@@ -66,12 +70,36 @@ const statThroughput = el('stat-throughput');
 const statSuccessRate = el('stat-success-rate');
 const statRealErrors = el('stat-real-errors');
 
+const healthBarEl = el('health-bar');
+const healthLegendEl = el('health-legend');
 const healthOk = el('health-ok');
 const healthWarn = el('health-warn');
 const healthErr = el('health-err');
 const healthOkLabel = el('health-ok-label');
 const healthWarnLabel = el('health-warn-label');
 const healthErrLabel = el('health-err-label');
+
+// Prefetch (logging every virtual user in once, before the load loop
+// starts) can take a while for large user counts — without this, the
+// dashboard shows nothing moving and looks hung. Shown in the SAME grid
+// slot the normal statusbar occupies, swapped in/out rather than shown
+// alongside it, so there's no stale "0 req/s" flashing underneath it.
+function showPrefetch(loaded, total) {
+  prefetchStatusEl.classList.remove('hidden');
+  statusbarEl.classList.add('hidden');
+  healthBarEl.classList.add('hidden');
+  healthLegendEl.classList.add('hidden');
+  if (loaded == null || total == null) return;
+  prefetchCount.textContent = `${loaded} / ${total}`;
+  prefetchBarFill.style.width = total > 0 ? `${Math.min(100, (loaded / total) * 100)}%` : '0%';
+}
+
+function hidePrefetch() {
+  prefetchStatusEl.classList.add('hidden');
+  statusbarEl.classList.remove('hidden');
+  healthBarEl.classList.remove('hidden');
+  healthLegendEl.classList.remove('hidden');
+}
 
 const chartHistoricalNote = el('chart-historical-note');
 const chartThroughput = el('chart-throughput');
@@ -212,7 +240,12 @@ startBtn.addEventListener('click', async () => {
       setRunningUI(false);
       return;
     }
-    setState2('running', 0, false);
+    // Not "running" yet — run-loadtest.sh still has to health-check,
+    // build users.csv, and prefetch tokens before the load loop (and
+    // LÄUFT) actually starts. showPrefetch(null, null) gets the "Vorbereitung
+    // läuft" state on screen immediately; real numbers land once the
+    // first PREFETCH line arrives over SSE.
+    showPrefetch(null, null);
   } catch (err) {
     controlError.textContent = String(err);
     setRunningUI(false);
@@ -371,14 +404,20 @@ function applyTick2(tick) {
 
 const source = new EventSource('/api/events');
 source.addEventListener('tick', (ev) => applyTick2(JSON.parse(ev.data)));
+source.addEventListener('prefetch', (ev) => {
+  const { loaded, total } = JSON.parse(ev.data);
+  showPrefetch(loaded, total);
+});
 source.addEventListener('started', (ev) => {
   setRunningUI(true);
   resetSeries();
   chartHistoricalNote.classList.add('hidden');
+  hidePrefetch(); // load loop actually started — phase:"running"
   setState2(JSON.parse(ev.data).status, 0, false);
 });
 source.addEventListener('finished', (ev) => {
   const final = JSON.parse(ev.data);
+  hidePrefetch();
   applyTick2({ ...final, docker: [] });
   setRunningUI(false);
   if (!panels.history.hidden) loadHistoryList();
@@ -386,6 +425,7 @@ source.addEventListener('finished', (ev) => {
 source.addEventListener('run-error', (ev) => {
   controlError.textContent = JSON.parse(ev.data).message;
   setRunningUI(false);
+  hidePrefetch(); // e.g. the health-check or users.csv step failed before prefetch even began
   setState2('idle', 0, false);
 });
 
@@ -602,6 +642,8 @@ async function loadPastRunIntoMode2(ts) {
   const res = await fetch(`/api/runs/${ts}`);
   if (!res.ok) return;
   const run = await res.json();
+
+  hidePrefetch(); // a past run has no live prefetch phase to show
 
   if (run.params) {
     numUsersInput.value = run.params.numUsers;

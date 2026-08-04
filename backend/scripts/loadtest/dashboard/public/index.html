@@ -26,6 +26,14 @@
     </div>
     <span id="control-error" class="error"></span>
 
+    <div id="prefetch-status" class="statusbar hidden">
+      <div class="state"><span class="dot running"></span><span>Vorbereitung läuft — logge User ein</span> <span class="hint" tabindex="0" data-tip="mode2.prefetch">ⓘ</span></div>
+      <div class="prefetch-progress">
+        <div class="metric"><span id="prefetch-count" class="num">– / –</span><span class="lbl">Tokens geladen</span></div>
+        <div class="bar-track prefetch-bar-track"><div id="prefetch-bar-fill" class="bar-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
     <div id="statusbar" class="statusbar">
       <div class="state"><span id="state-dot" class="dot"></span><span id="state-text">IDLE</span> <span class="hint" tabindex="0" data-tip="mode2.state">ⓘ</span></div>
       <div class="metric"><span id="stat-throughput" class="num">–</span><span class="lbl">Requests / s <span class="hint" tabindex="0" data-tip="mode2.reqs">ⓘ</span></span></div>

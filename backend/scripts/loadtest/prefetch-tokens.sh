@@ -49,6 +49,11 @@ SKIPPED_FILE="$(mktemp "${TMPDIR:-/tmp}/prefetch-skipped.XXXXXX")"
 : > "$TOKENS_FILE"
 
 echo "Prefetch: ${TOTAL} User aus ${USERS_FILE}, Batches von ${BATCH_SIZE} (Pause ${BATCH_PAUSE}s)"
+# Machine-readable progress line, one per batch (see dashboard/lib/runner.js,
+# which tails this script's stdout the same way it already tails for the
+# "Logs: <dir>" line). Deliberately just IDX/TOTAL — processed, not
+# acquired, so a run with a few skipped logins still reaches 100%.
+echo "PREFETCH 0/${TOTAL}"
 
 # Login mit Retries. Args: <email> <password> <out_file>
 # Schreibt "email,token" nach out_file bei Erfolg, sonst nichts (leer).
@@ -96,6 +101,8 @@ while [ "$IDX" -lt "$TOTAL" ]; do
       rm -f "${BATCH_DIR}/${j}.csv"
     fi
   done
+
+  echo "PREFETCH ${IDX}/${TOTAL}"
 
   if [ "$IDX" -lt "$TOTAL" ]; then
     sleep "$BATCH_PAUSE"

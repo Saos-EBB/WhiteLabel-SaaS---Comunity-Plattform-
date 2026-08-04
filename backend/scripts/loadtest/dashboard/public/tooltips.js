@@ -21,6 +21,9 @@ const TOOLTIPS = {
   'mode2.users': "How many virtual users hit the app at the same time. Each one repeatedly performs random actions (browsing, chatting, etc.) for the whole test.",
   'mode2.duration': "How long the test runs, in seconds. All virtual users work at the same time for this long, then stop.",
 
+  // Mode 2 — prefetch phase
+  'mode2.prefetch': "Before the test itself starts, every virtual user has to log in once so it has something to send with each request. This shows how many of those logins are done. It only happens here at the start — once every token is loaded, the actual test begins.",
+
   // Mode 2 — status bar
   'mode2.state': "Whether a test is running (LÄUFT), has finished (FERTIG), or hasn't started (IDLE). Turns red if this run has had a real server error.",
   'mode2.reqs': "How many requests per second the virtual users are generating right now — the actual load being placed on the server.",
