@@ -6,17 +6,20 @@
 # BATCH_PAUSE), damit dieser Schritt selbst nicht schon die in
 # login-capacity.sh gefundene Kapazitaetsgrenze reisst.
 #
-# Defaults (BATCH_SIZE=10, BATCH_PAUSE=0) sind so aggressiv wie gegen
+# Defaults (BATCH_SIZE=20, BATCH_PAUSE=0) sind so aggressiv wie gegen
 # diesen Stack noch verlustfrei moeglich — mit login-capacity.sh
-# nachgemessen: 20 parallele Logins lassen die Erfolgsrate schon auf
-# ~12% einbrechen (bcrypt verstopft den libuv-Threadpool, Requests
-# laufen in den curl-Timeout), 10 parallele liefen bei 100%. Bei
-# anderer Hardware/anderem UV_THREADPOOL_SIZE neu gegenmessen, nicht
-# blind hochdrehen.
+# nachgemessen (2026-08-05, aktuelle Hardware/UV_THREADPOOL_SIZE):
+# 5..25 parallele Logins liefen bei 100% Erfolgsrate (p95 bei 25/s aber
+# schon 5.6s — nah am 10s-curl-Timeout unten), 30/s brach auf 98%, 35/s
+# auf 88.6% ein. 20 gewaehlt als Default mit klarem Sicherheitsabstand
+# (p95 bei 20/s: 2.8s). Die fruehere Messung hier (20 parallel ~12%
+# Erfolgsrate) war fuer eine andere Hardware/einen anderen
+# UV_THREADPOOL_SIZE gueltig — bei erneuter Aenderung von Hardware/
+# Threadpool-Groesse neu gegenmessen, nicht blind hochdrehen.
 #
 # Usage:
 #   ./prefetch-tokens.sh
-#   BATCH_SIZE=20 BATCH_PAUSE=1 ./prefetch-tokens.sh   # gedrosselt
+#   BATCH_SIZE=30 BATCH_PAUSE=1 ./prefetch-tokens.sh   # nur mit frischer Messung, siehe oben
 #
 set -uo pipefail   # bewusst KEIN -e: einzelne fehlgeschlagene Logins sollen
                     # geloggt und uebersprungen werden, nicht das Script killen
@@ -27,7 +30,7 @@ cd "$SCRIPT_DIR"
 BASE_URL="${BASE_URL:-http://localhost:3000/api/v1}"
 USERS_FILE="${USERS_FILE:-./users.csv}"
 TOKENS_FILE="${TOKENS_FILE:-./tokens.csv}"
-BATCH_SIZE="${BATCH_SIZE:-10}"    # parallele Logins pro Batch
+BATCH_SIZE="${BATCH_SIZE:-20}"    # parallele Logins pro Batch
 BATCH_PAUSE="${BATCH_PAUSE:-0}"   # Sekunden Pause zwischen Batches
 RETRIES="${RETRIES:-2}"          # zusaetzliche Versuche nach dem ersten fehlgeschlagenen
 
