@@ -1,4 +1,4 @@
-# White-Label Community Platform
+# YourBrand — White-Label Community Platform
 
 > A modular, white-label SaaS community platform — full-stack, real-time, GDPR-compliant, and payment-ready.
 
@@ -87,6 +87,12 @@ The database starts empty. Load `backend/schema_v4.sql` for a quick baseline, or
 
 ---
 
+## Load Testing & Dashboard
+
+A second, fully isolated stack (`docker-compose.loadtest.yml`, own DB/network/port) exists purely to stress-test the API — three modes (login-capacity ramp, mixed endpoint load, single-endpoint rate ramp for isolating a specific bottleneck), driven from a small live web dashboard with no dependencies of its own. Built to answer "how much can this actually take" with real numbers rather than guesses — see [`backend/README.md`'s Load Testing section](backend/README.md#load-testing) for how to run it.
+
+---
+
 ## Status
 
 Active development. Core feature set is functional; currently in final integration and QA phase.
@@ -99,41 +105,6 @@ Active development. Core feature set is functional; currently in final integrati
   - Quelle: https://www.geonames.org/
   - Änderungen: auf Europa erweitert, Spalten angepasst
   - Datei im Projekt: [`backend/src/database/seeds/cities.csv`](backend/src/database/seeds/cities.csv)
-
----
-
-## Changelog
-
-### 2026-07-22
-- Theme: Zwei neue Farbschemata "lavender" und "darkPink" im Color Panel (Dev-Tool) verfügbar — übernommen aus dem b2b-cv/Whitelabel-Showcase (helles Purple-Theme + dunkles Pink-Theme)
-- Docker: Seed-Reihenfolge im Entrypoint ergänzt — `seed-cities` läuft jetzt vor `backfill-profile-locations`, da Letzteres Lat/Lng aus der Cities-Tabelle nachschlägt
-
-### 2026-06-14
-- Fix: Chat-Kopfzeile in der Web-Ansicht klebt jetzt ganz oben (war vorher 64px zu tief, weil die mobile TopNav auf Desktop versteckt ist)
-- Fix: Interessen-Namen mit Umlauten (ü, ö, ä, ß) waren durch falsche Encoding beim Seed korrumpiert — Migration 041 korrigiert alle 11 betroffenen Einträge direkt in der DB
-
-### 2026-06-13
-- Hidden Zone: Master-Passwort auf "YourBrand" geändert
-- Docker: `DEMO_MEDIA_PATH=/app` im nestjs-Service eingetragen — Demo-Medien (Profilbilder, Audio) werden vom Seed-Script gefunden
-
-### 2026-06-10
-- Discover: Radius-Filter auf max. 5000 km erhöht (vorher 500 km) — Frontend-Slider und Backend-Validierung
-- Docs: Alle 40 Migrations-Dateien haben jetzt einen Kommentar-Header der kurz erklärt was die Migration macht
-- Migration 040: fehlende Interessen (~80 neue Einträge) nachträglich in die DB eingefügt — kompletter Katalog jetzt verfügbar
-- Fix: PostGIS-Location-Filter im Matching-Deck repariert — Profile ohne gesetzten Standort wurden fälschlicherweise komplett ausgeblendet (45 von 49 Profilen betroffen); Deck zeigt jetzt alle published Profile, Distanz wird nur angezeigt wenn vorhanden
-- Fix: Reset-Button löscht jetzt alle Swipes (Likes + Skips), nicht nur Skips; Endpoint umbenannt zu `DELETE /discover/swipes`
-- Backfill: `npm run backfill:locations` ausgeführt — 39/45 Profile mit PostGIS-Koordinaten befüllt; Discover-Radius-Filter funktioniert jetzt korrekt
-- Matching: "Ablehnungen zurücksetzen"-Button im leeren Deck-State (löscht eigene Skips, nicht Likes) + Backend-Endpoint `DELETE /discover/swipes/skips`
-- Bug fix: Request-Notification-Badge zeigte falsche Zahl — ID-Mismatch zwischen Socket-Event und Page behoben, Notifications werden beim Öffnen der Anfragen-Seite korrekt geleert
-- Öffentliche Profilseite zeigt jetzt 💚/🚩 Flags bei Interessen (Green-/Red-Flag-System)
-- Migration 039: setzt alle User mit abgeschlossenem Onboarding auf `is_published = true`
-
-### 2026-06-09
-- Custom-Theme wird jetzt sofort beim Seitenstart wiederhergestellt, nicht erst wenn das Color-Panel geöffnet wird
-- Selbst gespeicherte Custom-Themes im Color-Panel bleiben nach F5 und Re-Login aktiv (aktives Theme wird in localStorage gemerkt und beim Start wiederhergestellt)
-- Beim Löschen oder Zurücksetzen wird das aktive Theme sauber aufgeräumt
-- Hidden Zone Theme und "einmal besucht"-Flag werden jetzt dauerhaft in localStorage gespeichert (überleben F5 und Re-Login)
-- Colors-Tab in der Sidebar bleibt sichtbar, sobald man die Hidden Zone mindestens einmal betreten hat
 
 ---
 

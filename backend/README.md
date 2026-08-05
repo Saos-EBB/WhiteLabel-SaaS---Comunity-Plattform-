@@ -39,6 +39,7 @@ NestJS REST API + WebSocket gateway for the XXX platform.
 - [Frontend](#frontend)
 - [Environment](#environment)
 - [Running Locally](#running-locally)
+- [Load Testing](#load-testing)
 - [Changelog](#changelog)
 
 ---
@@ -648,7 +649,51 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 
 ---
 
+## Load Testing
+
+`backend/scripts/loadtest/` — a self-contained load-testing suite plus a live web dashboard, running against its **own** isolated stack (`docker-compose.loadtest.yml`: `XXX_db_load` + `XXX_backend_load`, own Postgres volume and Docker network, port `3100`) — never the demo stack or demo DB.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d XXX_db_load XXX_backend_load
+cd backend/scripts/loadtest/dashboard && node server.js   # http://127.0.0.1:4300
+```
+
+Three modes, all controllable from the dashboard or directly as bash scripts:
+
+| Mode | Script | What it measures |
+|---|---|---|
+| **1 — Login Capacity** | `login-capacity.sh` | Stepped rate ramp against `POST /auth/login` only — the highest sustainable logins/sec before bcrypt saturates the libuv threadpool |
+| **2 — Endpoint Load** | `run-loadtest.sh` → `loadtest.sh` | `NUM_USERS` concurrent workers, each repeatedly firing a random action from the full endpoint list (`actions.sh`) for `DURATION_SEC` — realistic mixed traffic |
+| **3 — Endpoint Rate** | `endpoint-rate.sh` | Same stepped rate ramp as Mode 1, generalized to any chosen subset of Mode 2's endpoints (one, several, or all) instead of one fixed endpoint — isolates exactly which endpoint breaks first and at what req/s |
+
+Shared building blocks:
+- `generate-users-csv.sh` / `prefetch-tokens.sh` — deterministic `seed_user_NNNN@seed.local` accounts, logged in once and cached to `tokens.csv`. Modes 2 and 3 **reuse** a small token pool round-robin across many workers/requests (Mode 2: pool sized at `NUM_USERS/10` by `run-loadtest.sh`; Mode 3: fixed `TOKEN_POOL_SIZE`, default 50) rather than needing one seeded account per worker — a 100k-user Mode 2 run needs 10k seeded accounts, not 100k.
+- `actions.sh` — the 12 endpoint actions (discover, chat, coin, media upload, contact requests, admin), sourced by both `loadtest.sh` and `endpoint-rate.sh` so they can never drift apart.
+- `src/database/seeds/seed-extra-users.ts` (`SEED_USERS=<n>`) — seeds the fake accounts these scripts log in as; idempotent top-up, batched inserts (1000 rows/statement, under Postgres's parameter limit) so it scales to `SEED_USERS=100000` in one `docker compose up`.
+
+The dashboard (`dashboard/`, plain Node `http`, zero dependencies, no build step) gives all three modes a live SSE view (status bar, health bar, per-endpoint breakdown table, sortable by any column), a History tab merging every past run across all three modes, and start/stop control — see [`scripts/loadtest/README.md`](scripts/loadtest/README.md) for the full breakdown.
+
+---
+
 ## Changelog
+
+### 2026-08-05 — Load Test: Seed Batching, Token Reuse, Mode 3
+- fix(seeds): `seed-extra-users.ts` built one unbatched bulk INSERT for the whole `SEED_USERS` delta — Postgres caps bound parameters at 65535/statement (≈9360 users at 7 params/row), so a large `SEED_USERS` value threw and, since seeding runs under `set -e` in `docker-entrypoint.sh` before `npm run start:dev`, could take the whole backend container down. Now batched (1000 rows/insert) inside one transaction; verified `SEED_USERS=100000` end-to-end against the real stack.
+- perf(loadtest): `prefetch-tokens.sh`'s `BATCH_SIZE` default raised 10 → 20, re-measured fresh against the current stack with `login-capacity.sh` (old figure was stale for this hardware/`UV_THREADPOOL_SIZE`)
+- feat(loadtest): Mode 2 tokens are no longer 1:1 with `NUM_USERS` — `loadtest.sh` assigns worker `i` token `i % AVAILABLE_TOKENS`, so `NUM_USERS` concurrent workers can share a small reused account pool (`run-loadtest.sh` sizes it at `NUM_USERS/10`). A 100k-user run now needs 10k seeded accounts, not 100k, and `NUM_USERS` is never silently downgraded — see the `fix(loadtest)` entry below for the shortfall path this replaced
+- feat(loadtest): **Mode 3 — endpoint rate test** (`endpoint-rate.sh`). Same stepped rate-ramp engine as Mode 1, generalized to fire at any chosen subset of endpoints (`ENDPOINTS=discover_deck,media_upload ...`, unset = all) instead of one fixed endpoint or `NUM_USERS`-driven random traffic — isolates exactly which endpoint breaks first and at what req/s. Endpoint actions (`do_request`/`do_upload`/`action_*`) extracted from `loadtest.sh` into a shared `actions.sh`, sourced by both scripts, so they can't drift apart. Dashboard gained a matching Mode 3 tab (endpoint checkboxes, rate controls, sortable per-endpoint breakdown table, step-ramp table)
+
+### 2026-08-04 — Load Test Dashboard: Rebuild, History Tab, Prefetch Progress
+- feat(loadtest-dashboard): full visual rebuild (dark-pink Material palette, traffic-light health colors) — status bar, health bar, and a click-to-sort per-endpoint table (any column, either direction) replace the previous plain tables
+- feat(loadtest-dashboard): History tab — every past Mode 1/Mode 2 run in one merged, timestamp-sorted list (health dot, params, key numbers, mini health bar); clicking a row loads that run's full detail into the corresponding mode's live view
+- feat(loadtest-dashboard): live "Tokens: X / Y geladen" progress bar during Mode 2's prefetch phase (`prefetch-tokens.sh` now emits a parseable `PREFETCH x/y` line the server tails) — previously this phase showed nothing moving and looked hung for large user counts
+- fix(loadtest): `NUM_USERS` self-consistency — `run-loadtest.sh` now probes whether enough fake users are actually seeded *before* running prefetch (a single deterministic login check, since `seed-extra-users.ts` fills users contiguously) and stops with the exact `SEED_USERS=<n>` fix command instead of silently running with fewer; a residual shortfall (a few individual login retries failing) still surfaces loudly in `summary.txt` and the dashboard rather than looking like a full run
+- feat(loadtest-dashboard): every metric, column header, status, and control now has a plain-language hover/focus/tap tooltip (single `TOOLTIPS` map in `tooltips.js`, not scattered across markup)
+
+### 2026-08-03 — Load Test: Three-Mode Suite (Login Capacity, Endpoint Load, Dashboard)
+- feat(loadtest): `login-capacity.sh` (Mode 1) — stepped rate ramp against `POST /auth/login` only, to find the highest sustainable logins/sec before bcrypt saturates the libuv threadpool
+- feat(loadtest): `prefetch-tokens.sh` + flat random-action `loadtest.sh` (Mode 2) — every virtual user logs in once up front (throttled batches), then the load loop itself does no login, just repeatedly fires a random action from the full endpoint list; 4xx from expected-reject actions (duplicate request, insufficient coins, non-owner hitting an admin route) categorized separately from real 5xx/transport errors
+- feat(loadtest-dashboard): mode-switchable Node dashboard (`dashboard/`, no dependencies, no build step) — live SSE view over both modes' logs/stdout, start/stop control, per-path error breakdown
 
 ### 2026-07-23 — Auth: Phantom-Token Guard Fix + Demo Seed Role Change
 - fix(auth): `JwtGuard`/`OptionalJwtGuard` verified only the JWT signature, not whether the user still exists — a token surviving `docker compose down -v` (DB wiped, `JWT_SECRET` static across restarts) kept authenticating requests for a deleted user until it naturally expired; both guards now check `users.id ... AND deleted_at IS NULL` and reject (or, for the optional guard, leave `req.user` unset)
@@ -660,6 +705,22 @@ Migrations are plain SQL files in `migrations/`. Run them in order against your 
 - feat(seed): cities dataset expanded from 206 rows (AT/DE-filtered) to ~14k European cities across 44 countries (GeoNames, CC BY 4.0) — renamed `autofill_inkl_ottensheim_style.csv` → `cities.csv`
 - fix(seed): `seed-cities.ts` used a naive `line.split(',')` — broke on quoted fields with embedded commas present in the new CSV (e.g. `"Macedonia, The former Yugoslav Rep. of"`); added an RFC 4180-aware line splitter
 - fix(seed): `cities` has no unique constraint, so the old `INSERT ... ON CONFLICT DO NOTHING` never actually skipped anything — re-running the seed would have silently duplicated every row on each container restart; switched to truncate + reload (safe: pure reference data, nothing has an FK on it)
+
+### 2026-06-14 — Interests Encoding Fix
+- fix(seed): interest names containing umlauts (ü, ö, ä, ß) were corrupted by a wrong encoding at seed time — migration 041 corrects all 11 affected rows directly in the DB
+
+### 2026-06-13 — Docker: Demo Media Path
+- fix(docker): `DEMO_MEDIA_PATH=/app` added to the backend service env — demo media (profile photos, audio) is now found by the seed script
+
+### 2026-06-10 — Discover/Matching: Radius, Migration Docs, Location Backfill
+- feat(discover): radius filter max increased to 5000 km (was 500 km) — backend validation + frontend slider (see frontend changelog)
+- docs(migrations): all 40 migration files now have a header comment briefly explaining what the migration does
+- feat(seed): migration 040 — ~80 missing interests inserted; full catalog now available
+- fix(discover): PostGIS location filter in the matching deck was hiding profiles with no location set (45 of 49 affected) — deck now shows all published profiles, distance is only shown when available
+- fix(discover): reset endpoint now clears all swipes (likes + skips), not just skips; renamed to `DELETE /discover/swipes`
+- chore: ran `npm run backfill:locations` — 39/45 profiles backfilled with PostGIS coordinates; radius filter now works correctly
+- feat(discover): `DELETE /discover/swipes/skips` — clears only own skips (kept for the "reset rejections" flow, see frontend changelog)
+- feat(seed): migration 039 — sets `is_published = true` for all users with completed onboarding
 
 ### 2026-06-09 — Matching Feature: Swipe Deck, Swipe Action, Matches List
 - feat(matching): new `MatchingModule` (`DiscoverController`, `MatchingService`) wired into `AppModule`
