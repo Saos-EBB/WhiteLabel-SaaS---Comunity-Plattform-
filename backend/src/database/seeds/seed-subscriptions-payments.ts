@@ -19,7 +19,7 @@
 import 'dotenv/config';
 import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
-import { createRng, randomInt, randomChoice, weightedChoice, seedFromString, buildBulkInsert } from './seed-shared';
+import { createRng, randomInt, randomChoice, weightedChoice, seedFromString, buildBulkInsert, chunk } from './seed-shared';
 
 const ds = new DataSource({
     type: 'postgres',
@@ -46,6 +46,10 @@ const DEFAULT_PRICES: Record<string, number> = {
     lifetime: 149.99,
 };
 const PLAN_DAYS: Record<string, number> = { monthly: 30, yearly: 365, lifetime: 0 };
+// Keeps each INSERT under Postgres's 65535-bound-parameter-per-statement
+// limit — SEED_USERS=10000+ pushes subRows/paymentRows well past that if
+// inserted in one statement.
+const INSERT_BATCH_SIZE = 1000;
 
 async function main() {
     await ds.initialize();
@@ -134,22 +138,26 @@ async function main() {
     // schon).
     if (subRows.length > 0) {
         await ds.transaction(async manager => {
-            const subs = buildBulkInsert(subRows);
-            await manager.query(
-                `INSERT INTO subscriptions
-                    (id, user_id, plan, status, payment_provider, provider_subscription_id,
-                     started_at, expires_at, cancelled_at)
-                 VALUES ${subs.placeholders}`,
-                subs.params,
-            );
+            for (const batch of chunk(subRows, INSERT_BATCH_SIZE)) {
+                const subs = buildBulkInsert(batch);
+                await manager.query(
+                    `INSERT INTO subscriptions
+                        (id, user_id, plan, status, payment_provider, provider_subscription_id,
+                         started_at, expires_at, cancelled_at)
+                     VALUES ${subs.placeholders}`,
+                    subs.params,
+                );
+            }
 
-            const payments = buildBulkInsert(paymentRows);
-            await manager.query(
-                `INSERT INTO payment_logs
-                    (user_id, subscription_id, amount, tax_amount, currency, status, provider_tx_id, created_at)
-                 VALUES ${payments.placeholders}`,
-                payments.params,
-            );
+            for (const batch of chunk(paymentRows, INSERT_BATCH_SIZE)) {
+                const payments = buildBulkInsert(batch);
+                await manager.query(
+                    `INSERT INTO payment_logs
+                        (user_id, subscription_id, amount, tax_amount, currency, status, provider_tx_id, created_at)
+                     VALUES ${payments.placeholders}`,
+                    payments.params,
+                );
+            }
         });
     }
 

@@ -21,4 +21,10 @@ RUN chmod +x docker-entrypoint.sh
 EXPOSE 3000
 
 # 7. Demo-Daten seeden (idempotent) und Dev-Server mit Hot-Reload starten
-CMD ["./docker-entrypoint.sh"]
+#    Ueber "sh" statt direkt als relativer Pfad, weil das Basis-Image sein
+#    eigenes ENTRYPOINT docker-entrypoint.sh mitbringt, das per `command -v`
+#    prueft ob CMD ein bekannter Befehl ist — wegen eines ash/dash-Bugs
+#    (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=874264) erkennt das
+#    einen relativen Pfad wie "./docker-entrypoint.sh" nicht zuverlaessig und
+#    faellt auf `node ./docker-entrypoint.sh` zurueck, was crasht.
+CMD ["sh", "./docker-entrypoint.sh"]
