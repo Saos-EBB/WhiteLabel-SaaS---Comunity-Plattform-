@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 //
-// Live view onto scripts/loadtest's log output for both modes. Plain Node
-// http, no dependencies, no build step — see scripts/loadtest/README.md for
-// usage. The bash side (login-capacity.sh / loadtest.sh / run-loadtest.sh /
-// prefetch-tokens.sh / generate-users-csv.sh) is untouched by this server;
-// it only reads their logs and, for the control endpoints, spawns them as
-// children. Mode 2 (run-loadtest.sh) tails loadtest-logs/<ts>/*.csv on disk;
-// Mode 1 (login-capacity.sh) has no log directory to tail, just a stdout
-// table, so its live state is parsed straight from the child's stdout (see
-// lib/capacityRunner.js) and persisted to capacity-logs/<ts>.log for the
-// past-runs view.
+// Live view onto scripts/loadtest's log output for all three modes. Plain
+// Node http, no dependencies, no build step — see scripts/loadtest/README.md
+// for usage. The bash side (login-capacity.sh / loadtest.sh /
+// run-loadtest.sh / endpoint-rate.sh / prefetch-tokens.sh /
+// generate-users-csv.sh) is untouched by this server; it only reads their
+// logs and, for the control endpoints, spawns them as children. Mode 2
+// (run-loadtest.sh) and Mode 3 (endpoint-rate.sh) both tail a log
+// directory's *.csv on disk (same row format, same aggregator — see
+// lib/tailer.js); Mode 1 (login-capacity.sh) has no log directory to tail,
+// just a stdout table, so its live state is parsed straight from the
+// child's stdout (see lib/capacityRunner.js) and persisted to
+// capacity-logs/<ts>.log for the past-runs view. Mode 3 reuses that same
+// stdout-table parser (endpoint-rate.sh prints the identical row format)
+// on top of its own log-directory tailing.
 //
 'use strict';
 
@@ -23,6 +27,9 @@ const runner = require('./lib/runner');
 const runs = require('./lib/runs');
 const capacityRunner = require('./lib/capacityRunner');
 const capacityRuns = require('./lib/capacityRuns');
+const rateLiveState = require('./lib/rateLiveState');
+const rateRunner = require('./lib/rateRunner');
+const rateRuns = require('./lib/rateRuns');
 
 const HOST = '127.0.0.1';
 const PORT = 4300;
@@ -64,6 +71,12 @@ setInterval(async () => {
   broadcast('tick', { ...tick, docker: lastDockerStats });
 }, CSV_POLL_MS);
 
+setInterval(async () => {
+  const tick = await rateLiveState.pollTick();
+  if (!tick) return;
+  broadcast('rate-tick', tick);
+}, CSV_POLL_MS);
+
 runner.on('prefetch', ({ loaded, total }) => {
   broadcast('prefetch', { phase: 'prefetch', loaded, total });
 });
@@ -85,6 +98,26 @@ runner.on('exit', async ({ code, hadLogDir }) => {
 capacityRunner.on('started', (state) => broadcast('capacity-started', state));
 capacityRunner.on('line', ({ line, row }) => broadcast('capacity-line', { line, row }));
 capacityRunner.on('exit', ({ code, ts }) => broadcast('capacity-finished', { code, ts, ...capacityRunner.getState() }));
+
+// Mode 3 — spawn happens before endpoint-rate.sh's own setup (token pool
+// generation/prefetch) finishes, so 'rate-started' can land well before
+// 'logdir' does; the frontend shows a generic "preparing" state in that
+// gap rather than nothing. 'rate-line' carries every step-table row as it
+// prints, same as Mode 1's 'capacity-line'.
+rateRunner.on('started', (state) => broadcast('rate-started', state));
+rateRunner.on('line', ({ line, row }) => broadcast('rate-line', { line, row }));
+rateRunner.on('logdir', (logDir) => {
+  rateLiveState.startRun(logDir, rateRunner.params);
+  broadcast('rate-logdir', rateLiveState.getState());
+});
+rateRunner.on('exit', async ({ code, hadLogDir }) => {
+  if (!hadLogDir) {
+    broadcast('rate-error', { message: `endpoint-rate.sh exited (code ${code}) before it started logging — check the dashboard server's own console output` });
+    return;
+  }
+  const final = await rateLiveState.finishRun();
+  broadcast('rate-finished', { ...final, rows: rateRunner.getState().rows });
+});
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -208,6 +241,61 @@ async function handleCapacityRunDetail(req, res, ts) {
   sendJson(res, 200, run);
 }
 
+async function handleRateStart(req, res) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    sendJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
+  const params = {
+    endpoints: Array.isArray(body.endpoints) ? body.endpoints.join(',') : (body.endpoints || ''),
+    startRate: Number(body.startRate),
+    rateStep: Number(body.rateStep),
+    stepSec: Number(body.stepSec),
+    maxRate: Number(body.maxRate),
+    autoStop: !!body.autoStop,
+    successThreshold: body.successThreshold !== undefined ? Number(body.successThreshold) : undefined,
+    baseUrl: body.baseUrl || undefined,
+    tokenPoolSize: body.tokenPoolSize !== undefined ? Number(body.tokenPoolSize) : undefined,
+  };
+  try {
+    const pid = rateRunner.start(params);
+    sendJson(res, 202, { started: true, pid });
+  } catch (err) {
+    sendJson(res, 409, { error: err.message });
+  }
+}
+
+function handleRateStop(req, res) {
+  const stopped = rateRunner.stop();
+  sendJson(res, stopped ? 202 : 409, { stopped, error: stopped ? undefined : 'no active endpoint-rate run' });
+}
+
+function handleRateState(req, res) {
+  sendJson(res, 200, { active: rateRunner.isActive(), ...rateRunner.getState(), live: rateLiveState.getState() });
+}
+
+async function handleRateRunsList(req, res) {
+  sendJson(res, 200, await rateRuns.listRuns());
+}
+
+async function handleRateRunDetail(req, res, ts) {
+  let run;
+  try {
+    run = await rateRuns.getRun(decodeURIComponent(ts));
+  } catch (err) {
+    sendJson(res, 400, { error: err.message });
+    return;
+  }
+  if (!run) {
+    sendJson(res, 404, { error: 'run not found' });
+    return;
+  }
+  sendJson(res, 200, run);
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -280,6 +368,26 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'GET' && req.url.startsWith('/api/capacity/runs/')) {
     handleCapacityRunDetail(req, res, req.url.slice('/api/capacity/runs/'.length));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/rate/start') {
+    handleRateStart(req, res);
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/rate/stop') {
+    handleRateStop(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/rate/state') {
+    handleRateState(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/rate/runs') {
+    handleRateRunsList(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url.startsWith('/api/rate/runs/')) {
+    handleRateRunDetail(req, res, req.url.slice('/api/rate/runs/'.length));
     return;
   }
   serveStatic(req, res);

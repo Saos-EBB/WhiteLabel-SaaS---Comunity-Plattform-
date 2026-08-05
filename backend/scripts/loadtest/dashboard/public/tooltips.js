@@ -72,6 +72,21 @@ const TOOLTIPS = {
   'mode1.colRateBar': "A visual comparison of this step's rate against the fastest rate reached in the test.",
   'mode1.colP95': "95% of logins in this step were faster than this number, in milliseconds — a realistic worst normal case, not skewed by a few rare, unusually slow logins.",
 
+  // Mode 3 — controls
+  'mode3.controlsInfo': "Fires a stepped ramp of requests/second — same ramp mechanism as Mode 1 — against whichever endpoints you tick below, instead of one fixed endpoint. Lets you isolate exactly which endpoint breaks first and at what rate, without a big user count muddying the picture.",
+  'mode3.endpoints': "Which of the app's endpoints get hit. Tick one to test it in isolation, or several/all to see how they behave combined. Requests are split randomly across whichever ones are ticked.",
+  'mode3.startRate': "How many requests per second the test starts at — its first, gentlest step.",
+  'mode3.rateStep': "How much the rate increases with each step, in requests per second.",
+  'mode3.stepSec': "How long each step lasts, in seconds, before the rate increases again.",
+  'mode3.maxRate': "The highest rate the test will try, in requests per second. The ramp stops here even if nothing has broken yet.",
+  'mode3.autoStop': "If checked, the test stops itself as soon as one step's success rate drops below the threshold, instead of always running every step up to Max rate.",
+  'mode3.threshold': "The success rate (%) a step must reach to count as \"still working\" — only used if Auto-stop is on.",
+  'mode3.tokenPool': "How many logged-in test accounts to prepare and reuse. User count doesn't matter here (this mode is about requests/second, not simulated people), so a small pool is enough even at a high rate — accounts just get reused across requests.",
+  'mode3.baseUrl': "The web address the requests are sent to.",
+  'mode3.state': "Whether the rate ramp is running, has finished, or hasn't started.",
+  'mode3.steps': "One row per rate step, same idea as Mode 1's table: shows exactly when (at what rate) things start to break.",
+  'mode3.perEndpoint': "Breaks the whole run down by endpoint, sorted slowest first by default (click any header to change) — this is what actually tells you WHICH endpoint is the weak point, as opposed to the Stufen table above which only tells you at what combined rate things broke.",
+
   // History
   'history.dot': "Green: no real server errors in this run (Mode 2), or it reached its login-capacity threshold (Mode 1). Red: it didn't.",
   'history.miniBar': "A shrunk-down health bar for this run: green = success, amber = expected refusal, red = real error.",

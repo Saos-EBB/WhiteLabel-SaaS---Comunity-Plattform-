@@ -10,6 +10,7 @@
   <nav class="tabs" role="tablist" aria-label="Loadtest mode">
     <button class="tab tab--active" id="tab-mode2" type="button" role="tab" aria-selected="true" aria-controls="mode2" data-mode="2">Mode 2 · Endpoint Load</button>
     <button class="tab" id="tab-mode1" type="button" role="tab" aria-selected="false" aria-controls="mode1" data-mode="1">Mode 1 · Login Capacity</button>
+    <button class="tab" id="tab-mode3" type="button" role="tab" aria-selected="false" aria-controls="mode3" data-mode="3">Mode 3 · Endpoint Rate</button>
     <button class="tab" id="tab-history" type="button" role="tab" aria-selected="false" aria-controls="history" data-mode="history">History</button>
   </nav>
 
@@ -142,6 +143,110 @@
 
     <h2>Console</h2>
     <pre id="cap-console" class="console"></pre>
+  </section>
+
+  <!-- ══════════════════════════════ MODE 3 ══════════════════════════════ -->
+  <section id="mode3" class="mode-panel" role="tabpanel" aria-labelledby="tab-mode3" hidden>
+
+    <div class="card endpoint-picker">
+      <div class="card-title">Endpoints <span class="hint" tabindex="0" data-tip="mode3.endpoints">ⓘ</span></div>
+      <div class="endpoint-checkboxes">
+        <label><input type="checkbox" class="rate-endpoint-cb" value="discover_deck" checked> Discover Deck</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="discover_matches" checked> Discover Matches</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="coin_balance" checked> Coin Balance</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="coin_test_purchase" checked> Coin Test-Purchase</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="media_upload" checked> Media Upload</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="chat_conversations_list" checked> Chat: Conversations</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="chat_messages_list" checked> Chat: Messages (list)</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="chat_messages_post" checked> Chat: Messages (post)</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="contact_request_send" checked> Contact Request: Send</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="contact_request_incoming" checked> Contact Request: Incoming</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="contact_request_accept" checked> Contact Request: Accept</label>
+        <label><input type="checkbox" class="rate-endpoint-cb" value="admin_pending" checked> Admin: Pending</label>
+      </div>
+      <div class="endpoint-picker-actions">
+        <button type="button" id="rate-select-all" class="btn-link">Alle</button>
+        <button type="button" id="rate-select-none" class="btn-link">Keine</button>
+        <button type="button" id="rate-select-one" class="btn-link">Nur eine (Zufall)</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="field"><label for="rate-start-rate">Start rate/s</label><input id="rate-start-rate" class="mono" type="number" min="1" value="5" data-tip="mode3.startRate"></div>
+      <div class="field"><label for="rate-rate-step">Rate step</label><input id="rate-rate-step" class="mono" type="number" min="1" value="5" data-tip="mode3.rateStep"></div>
+      <div class="field"><label for="rate-step-sec">Step (s)</label><input id="rate-step-sec" class="mono" type="number" min="1" value="10" data-tip="mode3.stepSec"></div>
+      <div class="field"><label for="rate-max-rate">Max rate/s</label><input id="rate-max-rate" class="mono" type="number" min="1" value="50" data-tip="mode3.maxRate"></div>
+      <div class="field checkbox"><label for="rate-auto-stop"><input id="rate-auto-stop" type="checkbox" data-tip="mode3.autoStop"> Auto-stop</label></div>
+      <div class="field"><label for="rate-threshold">Threshold %</label><input id="rate-threshold" class="mono" type="number" min="1" max="100" value="95" data-tip="mode3.threshold"></div>
+      <div class="field"><label for="rate-token-pool">Token-Pool</label><input id="rate-token-pool" class="mono" type="number" min="1" value="50" data-tip="mode3.tokenPool"></div>
+      <div class="field"><label for="rate-base-url">Base URL</label><input id="rate-base-url" class="mono" type="text" value="http://localhost:3100/api/v1" data-tip="mode3.baseUrl"></div>
+      <span class="hint" tabindex="0" data-tip="mode3.controlsInfo">ⓘ</span>
+      <div class="controls-spacer"></div>
+      <button id="rate-start-btn" class="btn btn-start" type="button">▶ Start</button>
+      <button id="rate-stop-btn" class="btn btn-stop" type="button" disabled>■ Stop</button>
+    </div>
+    <span id="rate-control-error" class="error"></span>
+
+    <div id="rate-statusbar" class="statusbar">
+      <div class="state"><span id="rate-state-dot" class="dot"></span><span id="rate-state-text">IDLE</span> <span class="hint" tabindex="0" data-tip="mode3.state">ⓘ</span></div>
+      <div class="metric"><span id="rate-stat-throughput" class="num">–</span><span class="lbl">Requests / s <span class="hint" tabindex="0" data-tip="mode2.reqs">ⓘ</span></span></div>
+      <div class="metric"><span id="rate-stat-success-rate" class="num">–</span><span class="lbl">Erfolgsrate <span class="hint" tabindex="0" data-tip="mode2.successRate">ⓘ</span></span></div>
+      <div class="metric"><span id="rate-stat-real-errors" class="num">–</span><span class="lbl">Echte Fehler <span class="hint" tabindex="0" data-tip="mode2.realErrors">ⓘ</span></span></div>
+    </div>
+
+    <div id="rate-health-bar" class="health" tabindex="0" data-tip="mode2.healthBar">
+      <div id="rate-health-ok" class="s-ok"></div><div id="rate-health-warn" class="s-warn"></div><div id="rate-health-err" class="s-err"></div>
+    </div>
+    <div id="rate-health-legend" class="health-legend">
+      <span tabindex="0" data-tip="mode2.healthOk"><i class="chip ok"></i><span id="rate-health-ok-label">Success 2xx · 0</span></span>
+      <span tabindex="0" data-tip="mode2.healthWarn"><i class="chip warn"></i><span id="rate-health-warn-label">Expected reject 4xx · 0</span></span>
+      <span tabindex="0" data-tip="mode2.healthErr"><i class="chip err"></i><span id="rate-health-err-label">Error 5xx / transport · 0</span></span>
+    </div>
+
+    <h2>Stufen <span class="hint" tabindex="0" data-tip="mode3.steps">ⓘ</span></h2>
+    <table id="rate-table">
+      <thead>
+        <tr>
+          <th>Target/s <span class="hint" tabindex="0" data-tip="mode1.colTargetRate">ⓘ</span></th>
+          <th>Attempts <span class="hint" tabindex="0" data-tip="mode1.colAttempts">ⓘ</span></th>
+          <th>Success <span class="hint" tabindex="0" data-tip="mode1.colSuccess">ⓘ</span></th>
+          <th>Success % <span class="hint" tabindex="0" data-tip="mode1.colSuccessPct">ⓘ</span></th>
+          <th class="bar-cell">Rate <span class="hint" tabindex="0" data-tip="mode1.colRateBar">ⓘ</span></th>
+          <th>p95 ms <span class="hint" tabindex="0" data-tip="mode1.colP95">ⓘ</span></th>
+        </tr>
+      </thead>
+      <tbody id="rate-table-body"></tbody>
+    </table>
+
+    <h2>Per Endpoint <span class="hint" tabindex="0" data-tip="mode3.perEndpoint">ⓘ</span></h2>
+    <table id="rate-endpoint-table">
+      <thead>
+        <tr>
+          <th data-sort="path" tabindex="0">Path</th>
+          <th data-sort="n" tabindex="0">n <span class="hint" tabindex="0" data-tip="mode2.colN">ⓘ</span></th>
+          <th data-sort="p95" tabindex="0">p95 (ms) <span class="hint" tabindex="0" data-tip="mode2.colP95">ⓘ</span></th>
+          <th class="bar-cell" data-sort="p95" tabindex="0">Latenz <span class="hint" tabindex="0" data-tip="mode2.colLatencyBar">ⓘ</span></th>
+          <th data-sort="ok" tabindex="0">ok <span class="hint" tabindex="0" data-tip="mode2.colOk">ⓘ</span></th>
+          <th data-sort="4xx" tabindex="0">4xx <span class="hint" tabindex="0" data-tip="mode2.col4xx">ⓘ</span></th>
+          <th data-sort="err" tabindex="0">err <span class="hint" tabindex="0" data-tip="mode2.colErr">ⓘ</span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Fehler</h2>
+    <div id="rate-errors-section">
+      <div id="rate-errors-clean" class="errors-clean">Keine echten Fehler — sauberer Lauf.</div>
+      <table id="rate-errors-table" class="errors-table hidden">
+        <thead>
+          <tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Body</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <h2>Console</h2>
+    <pre id="rate-console" class="console"></pre>
   </section>
 
   <!-- ══════════════════════════════ HISTORY ══════════════════════════════ -->

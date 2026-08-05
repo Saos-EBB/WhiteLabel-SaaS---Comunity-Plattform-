@@ -13,7 +13,7 @@ const el = (id) => document.getElementById(id);
 
 const MODE_STORAGE_KEY = 'loadtest-dashboard-tab';
 const tabButtons = document.querySelectorAll('.tab');
-const panels = { 2: el('mode2'), 1: el('mode1'), history: el('history') };
+const panels = { 2: el('mode2'), 1: el('mode1'), 3: el('mode3'), history: el('history') };
 
 function setTab(tab) {
   for (const btn of tabButtons) {
@@ -711,6 +711,339 @@ source.addEventListener('capacity-finished', (ev) => {
   if (!panels.history.hidden) loadHistoryList();
 });
 
+// ═══════════════════════════════ MODE 3 ════════════════════════════════════
+// Stepped rate ramp (same engine as Mode 1) against a chosen subset of
+// Mode 2's endpoints, instead of one fixed endpoint or NUM_USERS-driven
+// random traffic — for isolating exactly which endpoint is the
+// bottleneck. Reuses Mode 2's health-bar/endpoint-table rendering
+// approach (same underlying per-path CSV/aggregator data shape) and Mode
+// 1's step-table rendering approach (same row format) rather than a third
+// distinct pattern — but as its own set of functions/elements, matching
+// how Mode 1 and Mode 2 already don't share DOM, only conventions.
+
+const rateEndpointCheckboxes = document.querySelectorAll('.rate-endpoint-cb');
+const rateSelectAllBtn = el('rate-select-all');
+const rateSelectNoneBtn = el('rate-select-none');
+const rateSelectOneBtn = el('rate-select-one');
+
+const rateStartRate = el('rate-start-rate');
+const rateRateStep = el('rate-rate-step');
+const rateStepSec = el('rate-step-sec');
+const rateMaxRate = el('rate-max-rate');
+const rateAutoStop = el('rate-auto-stop');
+const rateThreshold = el('rate-threshold');
+const rateTokenPool = el('rate-token-pool');
+const rateBaseUrl = el('rate-base-url');
+const rateStartBtn = el('rate-start-btn');
+const rateStopBtn = el('rate-stop-btn');
+const rateControlError = el('rate-control-error');
+
+const rateStatusbarEl = el('rate-statusbar');
+const rateStateDot = el('rate-state-dot');
+const rateStateText = el('rate-state-text');
+const rateStatThroughput = el('rate-stat-throughput');
+const rateStatSuccessRate = el('rate-stat-success-rate');
+const rateStatRealErrors = el('rate-stat-real-errors');
+
+const rateHealthOk = el('rate-health-ok');
+const rateHealthWarn = el('rate-health-warn');
+const rateHealthErr = el('rate-health-err');
+const rateHealthOkLabel = el('rate-health-ok-label');
+const rateHealthWarnLabel = el('rate-health-warn-label');
+const rateHealthErrLabel = el('rate-health-err-label');
+
+const rateTableBody = el('rate-table-body');
+const rateEndpointBody = document.querySelector('#rate-endpoint-table tbody');
+const rateErrorsClean = el('rate-errors-clean');
+const rateErrorsTable = el('rate-errors-table');
+const rateErrorsBody = document.querySelector('#rate-errors-table tbody');
+const rateConsole = el('rate-console');
+
+function getSelectedEndpoints() {
+  return [...rateEndpointCheckboxes].filter((cb) => cb.checked).map((cb) => cb.value);
+}
+
+function setSelectedEndpoints(keys) {
+  const set = new Set(keys);
+  for (const cb of rateEndpointCheckboxes) cb.checked = set.has(cb.value);
+}
+
+rateSelectAllBtn.addEventListener('click', () => { for (const cb of rateEndpointCheckboxes) cb.checked = true; });
+rateSelectNoneBtn.addEventListener('click', () => { for (const cb of rateEndpointCheckboxes) cb.checked = false; });
+rateSelectOneBtn.addEventListener('click', () => {
+  const all = [...rateEndpointCheckboxes];
+  const pick = all[Math.floor(Math.random() * all.length)];
+  for (const cb of all) cb.checked = cb === pick;
+});
+
+function setRateRunningUI(active) {
+  rateStartBtn.disabled = active;
+  rateStopBtn.disabled = !active;
+  for (const input of [rateStartRate, rateRateStep, rateStepSec, rateMaxRate, rateAutoStop, rateThreshold, rateTokenPool, rateBaseUrl]) {
+    input.disabled = active;
+  }
+  for (const cb of rateEndpointCheckboxes) cb.disabled = active;
+}
+
+function setRateState(status, hasError) {
+  rateStateDot.className = 'dot' + (status === 'running' ? ' running' : status === 'finished' ? ' finished' : '') + (hasError ? ' errored' : '');
+  rateStateText.textContent = status === 'running' ? 'LÄUFT' : status === 'finished' ? 'FERTIG' : 'IDLE';
+  rateStatusbarEl.classList.toggle('errored', !!hasError);
+  rateStatusbarEl.classList.toggle('idle', status === 'idle');
+}
+
+// Same shape/logic as Mode 2's updateHealthAndNumbers — see that function's
+// comment for the reasoning (hasError <=> real 5xx/transport errors only).
+function updateRateHealthAndNumbers(categories, total, throughput) {
+  const c = categories || { success: 0, expectedReject: 0, error: 0 };
+  const hasError = (c.error || 0) > 0;
+  const successPct = total > 0 ? (c.success / total) * 100 : 0;
+
+  rateStatThroughput.textContent = throughput != null ? throughput.toFixed(1) : '–';
+  rateStatSuccessRate.textContent = total > 0 ? `${successPct.toFixed(1)}%` : '–';
+  rateStatSuccessRate.className = 'num ' + (hasError ? 'err' : 'ok');
+  rateStatRealErrors.textContent = String(c.error || 0);
+  rateStatRealErrors.className = 'num ' + (hasError ? 'err' : 'ok');
+
+  rateHealthOk.style.flex = String(c.success || 0);
+  rateHealthWarn.style.flex = String(c.expectedReject || 0);
+  rateHealthErr.style.flex = String(c.error || 0);
+  rateHealthOkLabel.textContent = `Success 2xx · ${c.success || 0}`;
+  rateHealthWarnLabel.textContent = `Expected reject 4xx · ${c.expectedReject || 0}`;
+  rateHealthErrLabel.textContent = `Error 5xx / transport · ${c.error || 0}`;
+
+  return hasError;
+}
+
+// Own sort state, same click-to-sort mechanism as Mode 2's endpoint table
+// (see ENDPOINT_SORT_ACCESSORS) — kept as a separate instance rather than
+// shared, since the two tables' data arrives independently.
+let rateLastPerPath = {};
+let rateEndpointSort = { key: 'p95', dir: 'desc' };
+
+function renderRateEndpointTable(perPath) {
+  rateLastPerPath = perPath || {};
+  rateEndpointBody.innerHTML = '';
+  const accessor = ENDPOINT_SORT_ACCESSORS[rateEndpointSort.key] || ENDPOINT_SORT_ACCESSORS.p95;
+  const dirMul = rateEndpointSort.dir === 'asc' ? 1 : -1;
+  const paths = Object.entries(rateLastPerPath).sort((a, b) => {
+    const av = accessor(a[0], a[1]);
+    const bv = accessor(b[0], b[1]);
+    if (av < bv) return -1 * dirMul;
+    if (av > bv) return 1 * dirMul;
+    return 0;
+  });
+  const maxP95 = paths.length ? Math.max(...paths.map(([, s]) => s.p95)) : 0;
+  for (const [p, s] of paths) {
+    const c = s.categories || { success: 0, expectedReject: 0, error: 0 };
+    const width = maxP95 > 0 ? (s.p95 / maxP95) * 100 : 0;
+    const cell = (value, cls, label) => `<td class="${value === 0 ? 'zero' : cls}" data-label="${label}">${value}</td>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="path" data-label="Path">${p}</td>`
+      + `<td data-label="n">${s.n}</td>`
+      + `<td data-label="p95">${s.p95}</td>`
+      + `<td class="bar-cell" data-label="Latenz"><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div></td>`
+      + cell(c.success, 'cell-ok', 'ok')
+      + cell(c.expectedReject, 'cell-warn', '4xx')
+      + cell(c.error, 'cell-err', 'err');
+    rateEndpointBody.appendChild(tr);
+  }
+}
+
+const rateEndpointHeaders = document.querySelectorAll('#rate-endpoint-table thead th[data-sort]');
+
+function updateRateSortIndicators() {
+  for (const th of rateEndpointHeaders) {
+    th.setAttribute('aria-sort', th.dataset.sort === rateEndpointSort.key
+      ? (rateEndpointSort.dir === 'asc' ? 'ascending' : 'descending')
+      : 'none');
+  }
+}
+
+function setRateSort(key) {
+  rateEndpointSort = key === rateEndpointSort.key
+    ? { key, dir: rateEndpointSort.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: key === 'path' ? 'asc' : 'desc' };
+  updateRateSortIndicators();
+  renderRateEndpointTable(rateLastPerPath);
+}
+
+for (const th of rateEndpointHeaders) {
+  th.addEventListener('click', () => setRateSort(th.dataset.sort));
+  th.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      setRateSort(th.dataset.sort);
+    }
+  });
+}
+updateRateSortIndicators();
+
+function renderRateErrorsPanel(errors) {
+  const hasErrors = errors && errors.length > 0;
+  rateErrorsClean.classList.toggle('hidden', hasErrors);
+  rateErrorsTable.classList.toggle('hidden', !hasErrors);
+  if (hasErrors) renderErrorRows(errors, rateErrorsBody); // shared with Mode 2, fully generic
+}
+
+// Step table — same row shape/rendering idea as Mode 1's renderCapRow,
+// reusing its successClass() (threshold-relative ok/warn/err) directly.
+function renderRateRow(row, threshold, maxRate) {
+  const tr = document.createElement('tr');
+  const width = maxRate > 0 ? (row.targetRate / maxRate) * 100 : 0;
+  tr.innerHTML = `<td data-label="Target/s">${row.targetRate}/s</td>`
+    + `<td data-label="Attempts">${row.attempts}</td>`
+    + `<td data-label="Success">${row.successes}</td>`
+    + `<td class="${successClass(row.successPct, threshold)}" data-label="Success %">${row.successPct.toFixed(1)}%</td>`
+    + `<td class="bar-cell" data-label="Rate"><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div></td>`
+    + `<td data-label="p95 ms">${row.p95Ms}</td>`;
+  return tr;
+}
+
+function renderRateTable(rows) {
+  rateTableBody.innerHTML = '';
+  const threshold = Number(rateThreshold.value || 95);
+  const maxRate = rows.reduce((m, r) => Math.max(m, r.targetRate), 0);
+  for (const row of rows) rateTableBody.appendChild(renderRateRow(row, threshold, maxRate));
+}
+
+function appendRateConsoleLine(line) {
+  rateConsole.textContent += (rateConsole.textContent ? '\n' : '') + line;
+  rateConsole.scrollTop = rateConsole.scrollHeight;
+}
+
+rateStartBtn.addEventListener('click', async () => {
+  rateControlError.textContent = '';
+  const params = {
+    endpoints: getSelectedEndpoints(),
+    startRate: Number(rateStartRate.value),
+    rateStep: Number(rateRateStep.value),
+    stepSec: Number(rateStepSec.value),
+    maxRate: Number(rateMaxRate.value),
+    autoStop: rateAutoStop.checked,
+    successThreshold: Number(rateThreshold.value),
+    tokenPoolSize: Number(rateTokenPool.value),
+    baseUrl: rateBaseUrl.value.trim() || undefined,
+  };
+  setRateRunningUI(true);
+  try {
+    const res = await fetch('/api/rate/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      rateControlError.textContent = body.error || 'failed to start';
+      setRateRunningUI(false);
+      return;
+    }
+    rateTableBody.innerHTML = '';
+    rateConsole.textContent = '';
+    setRateState('running', false);
+  } catch (err) {
+    rateControlError.textContent = String(err);
+    setRateRunningUI(false);
+  }
+});
+
+rateStopBtn.addEventListener('click', async () => {
+  rateControlError.textContent = '';
+  rateStopBtn.disabled = true;
+  try {
+    const res = await fetch('/api/rate/stop', { method: 'POST' });
+    const body = await res.json();
+    if (!res.ok) rateControlError.textContent = body.error || 'failed to stop';
+  } catch (err) {
+    rateControlError.textContent = String(err);
+  }
+});
+
+let rateRowsByStep = new Map();
+
+fetch('/api/rate/state')
+  .then((res) => res.json())
+  .then((state) => {
+    rateRowsByStep = new Map((state.rows || []).map((r) => [r.step, r]));
+    setRateRunningUI(state.active);
+    setRateState(state.active ? 'running' : 'idle', false);
+    renderRateTable(state.rows || []);
+    rateConsole.textContent = (state.lines || []).join('\n');
+    rateConsole.scrollTop = rateConsole.scrollHeight;
+    if (state.params && state.params.endpoints) setSelectedEndpoints(state.params.endpoints.split(','));
+    if (state.live) {
+      updateRateHealthAndNumbers(state.live.categories, state.live.total, state.live.throughput);
+      renderRateEndpointTable(state.live.perPath);
+      renderRateErrorsPanel(state.live.errors);
+    }
+  })
+  .catch(() => {});
+
+source.addEventListener('rate-started', () => {
+  rateRowsByStep = new Map();
+  setRateRunningUI(true);
+  setRateState('running', false);
+});
+source.addEventListener('rate-line', (ev) => {
+  const { line, row } = JSON.parse(ev.data);
+  appendRateConsoleLine(line);
+  if (row) {
+    // endpoint-rate.sh reprints nothing extra, but keyed-by-step still
+    // de-dupes safely if it ever did.
+    rateRowsByStep.set(row.step, row);
+    renderRateTable([...rateRowsByStep.values()].sort((a, b) => a.step - b.step));
+  }
+});
+source.addEventListener('rate-tick', (ev) => {
+  const tick = JSON.parse(ev.data);
+  const hasError = updateRateHealthAndNumbers(tick.categories, tick.total, tick.throughput);
+  setRateState('running', hasError);
+  renderRateEndpointTable(tick.perPath);
+  renderRateErrorsPanel(tick.errors);
+});
+source.addEventListener('rate-finished', (ev) => {
+  const final = JSON.parse(ev.data);
+  setRateRunningUI(false);
+  const hasError = updateRateHealthAndNumbers(final.categories, final.total, null);
+  setRateState('finished', hasError);
+  renderRateEndpointTable(final.perPath);
+  renderRateErrorsPanel(final.errors);
+  if (final.rows) renderRateTable(final.rows);
+  if (!panels.history.hidden) loadHistoryList();
+});
+source.addEventListener('rate-error', (ev) => {
+  rateControlError.textContent = JSON.parse(ev.data).message;
+  setRateRunningUI(false);
+  setRateState('idle', false);
+});
+
+// Loads a past Mode 3 run's full detail into the same elements the live
+// SSE events drive — same "reuse, don't duplicate a view" approach as
+// Mode 2's loadPastRunIntoMode2.
+async function loadPastRunIntoMode3(ts) {
+  const res = await fetch(`/api/rate/runs/${ts}`);
+  if (!res.ok) return;
+  const run = await res.json();
+
+  if (run.params) {
+    if (run.params.endpoints) setSelectedEndpoints(run.params.endpoints.split(','));
+    rateStartRate.value = run.params.startRate;
+    rateRateStep.value = run.params.rateStep;
+    rateStepSec.value = run.params.stepSec;
+    rateMaxRate.value = run.params.maxRate;
+  }
+
+  const total = run.stats ? run.stats.total : 0;
+  const categories = run.stats ? run.stats.categories : null;
+  const hasError = updateRateHealthAndNumbers(categories, total, null);
+  setRateState('finished', hasError);
+
+  renderRateEndpointTable(run.stats ? run.stats.perPath : {});
+  renderRateErrorsPanel(run.errors || []);
+  renderRateTable(run.steps || []);
+  rateConsole.textContent = run.summaryText || '';
+}
+
 // ═══════════════════════════════ HISTORY ═══════════════════════════════════
 
 const historyList = el('history-list');
@@ -815,7 +1148,7 @@ function renderHistRow(run) {
     miniBarHtml = `<div style="background:var(--ok);flex:${cats.success}"></div>`
       + `<div style="background:var(--warn);flex:${cats.expectedReject}"></div>`
       + `<div style="background:var(--err);flex:${cats.error}"></div>`;
-  } else {
+  } else if (run.mode === 1) {
     const rows = run.rows || [];
     const { best, knee } = historyCapVerdict(rows, run.params && run.params.successThreshold);
     healthy = rows.length > 0 && !!best;
@@ -831,6 +1164,30 @@ function renderHistRow(run) {
     const totalAttempts = rows.reduce((s, r) => s + r.attempts, 0);
     miniBarHtml = `<div style="background:var(--ok);flex:${totalSuccesses}"></div>`
       + `<div style="background:var(--err);flex:${Math.max(0, totalAttempts - totalSuccesses)}"></div>`;
+  } else {
+    // Mode 3 — same per-path stats shape as Mode 2 (identical CSV/
+    // aggregator), just a rate ramp against a chosen endpoint subset
+    // instead of NUM_USERS-driven traffic against all of them.
+    const stats = run.stats;
+    const total = stats ? stats.total : 0;
+    const cats = stats ? stats.categories : { success: 0, expectedReject: 0, error: 0 };
+    healthy = !!stats && cats.error === 0;
+    const epList = run.params && run.params.endpoints ? run.params.endpoints.split(',') : [];
+    const epLabel = epList.length === 0 ? '–' : epList.length === 1 ? epList[0] : `${epList.length} Endpoints`;
+    metaText = run.params
+      ? `Mode 3 · ${epLabel} · ${run.params.startRate}→${run.params.maxRate}/s`
+      : 'Mode 3 · Endpoint Rate';
+    const durationSec = run.params && run.steps && run.steps.length ? run.steps.length * run.params.stepSec : null;
+    const reqS = stats && durationSec ? (total / durationSec).toFixed(1) : '–';
+    const successPct = stats && total > 0 ? `${((cats.success / total) * 100).toFixed(1)}%` : '–';
+    stats3 = [
+      ['req/s', reqS, 'history.reqs'],
+      ['Erfolg', successPct, 'history.successRate'],
+      ['Fehler', stats ? String(cats.error) : '–', 'history.errors'],
+    ];
+    miniBarHtml = `<div style="background:var(--ok);flex:${cats.success}"></div>`
+      + `<div style="background:var(--warn);flex:${cats.expectedReject}"></div>`
+      + `<div style="background:var(--err);flex:${cats.error}"></div>`;
   }
 
   // These inner elements deliberately get no tabindex — they sit inside
@@ -845,19 +1202,22 @@ function renderHistRow(run) {
 
   btn.addEventListener('click', () => {
     if (run.mode === 2) { setTab('2'); loadPastRunIntoMode2(run.ts); }
-    else { setTab('1'); loadPastRunIntoMode1(run.ts); }
+    else if (run.mode === 1) { setTab('1'); loadPastRunIntoMode1(run.ts); }
+    else { setTab('3'); loadPastRunIntoMode3(run.ts); }
   });
   return btn;
 }
 
 async function loadHistoryList() {
-  const [runs2, runs1] = await Promise.all([
+  const [runs2, runs1, runs3] = await Promise.all([
     fetch('/api/runs').then((r) => r.json()).catch(() => []),
     fetch('/api/capacity/runs').then((r) => r.json()).catch(() => []),
+    fetch('/api/rate/runs').then((r) => r.json()).catch(() => []),
   ]);
   const combined = [
     ...runs2.map((r) => ({ mode: 2, ...r })),
     ...runs1.map((r) => ({ mode: 1, ...r })),
+    ...runs3.map((r) => ({ mode: 3, ...r })),
   ].sort((a, b) => Number(b.ts) - Number(a.ts));
 
   historyList.innerHTML = '';

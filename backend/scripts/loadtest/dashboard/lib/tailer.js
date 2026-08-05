@@ -1,12 +1,16 @@
 'use strict';
 //
-// Polls a loadtest-logs/<ts>/ directory for new rows in user_*.csv and
-// admin_*.csv. Keeps a persistent {filename: open fd + byte offset} map
-// across polls, so each tick only reads the bytes appended since the
-// last poll — never re-reads a file from the start. At very high
-// NUM_USERS (thousands of files) the per-tick readdir() itself is the
-// remaining cost; if that turns out to be the bottleneck, widen
-// CSV_POLL_MS in server.js rather than reworking this file.
+// Polls a loadtest-logs/<ts>/ (Mode 2) or endpoint-rate-logs/<ts>/
+// (Mode 3) directory for new rows in user_*.csv/admin_*.csv or
+// step_*.csv respectively — same row format either way (see
+// aggregator.js's parseRow), just a different filename convention per
+// mode, so one Tailer/regex serves both. Keeps a persistent {filename:
+// open fd + byte offset} map across polls, so each tick only reads the
+// bytes appended since the last poll — never re-reads a file from the
+// start. At very high NUM_USERS (thousands of files) the per-tick
+// readdir() itself is the remaining cost; if that turns out to be the
+// bottleneck, widen CSV_POLL_MS in server.js rather than reworking this
+// file.
 //
 
 const fs = require('fs');
@@ -15,7 +19,7 @@ const path = require('path');
 const { parseRow } = require('./aggregator');
 
 const CHUNK_SIZE = 64 * 1024;
-const FILE_RE = /^(user_\d+|admin_[\w-]+)\.csv$/;
+const FILE_RE = /^(user_\d+|admin_[\w-]+|step_\d+)\.csv$/;
 
 class Tailer {
   constructor() {
