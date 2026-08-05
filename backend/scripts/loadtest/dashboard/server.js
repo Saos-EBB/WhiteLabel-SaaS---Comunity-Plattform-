@@ -30,6 +30,7 @@ const capacityRuns = require('./lib/capacityRuns');
 const rateLiveState = require('./lib/rateLiveState');
 const rateRunner = require('./lib/rateRunner');
 const rateRuns = require('./lib/rateRuns');
+const resetRunner = require('./lib/resetRunner');
 
 const HOST = '127.0.0.1';
 const PORT = 4300;
@@ -119,6 +120,11 @@ rateRunner.on('exit', async ({ code, hadLogDir }) => {
   broadcast('rate-finished', { ...final, rows: rateRunner.getState().rows });
 });
 
+resetRunner.on('step', (step) => broadcast('reset-step', { step }));
+resetRunner.on('line', (line) => broadcast('reset-line', { line }));
+resetRunner.on('done', () => broadcast('reset-done', {}));
+resetRunner.on('error', (info) => broadcast('reset-error', info));
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -148,6 +154,10 @@ async function handleStart(req, res) {
     body = await readJsonBody(req);
   } catch {
     sendJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
+  if (resetRunner.isActive()) {
+    sendJson(res, 409, { error: 'Backend-Reset laeuft noch' });
     return;
   }
   const numUsers = Number(body.numUsers);
@@ -194,6 +204,10 @@ async function handleCapacityStart(req, res) {
     body = await readJsonBody(req);
   } catch {
     sendJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
+  if (resetRunner.isActive()) {
+    sendJson(res, 409, { error: 'Backend-Reset laeuft noch' });
     return;
   }
   const params = {
@@ -249,6 +263,10 @@ async function handleRateStart(req, res) {
     sendJson(res, 400, { error: 'invalid JSON body' });
     return;
   }
+  if (resetRunner.isActive()) {
+    sendJson(res, 409, { error: 'Backend-Reset laeuft noch' });
+    return;
+  }
   const params = {
     endpoints: Array.isArray(body.endpoints) ? body.endpoints.join(',') : (body.endpoints || ''),
     startRate: Number(body.startRate),
@@ -294,6 +312,23 @@ async function handleRateRunDetail(req, res, ts) {
     return;
   }
   sendJson(res, 200, run);
+}
+
+function handleResetStart(req, res) {
+  if (runner.isActive() || capacityRunner.isActive() || rateRunner.isActive()) {
+    sendJson(res, 409, { error: 'ein Loadtest laeuft noch — erst stoppen' });
+    return;
+  }
+  try {
+    resetRunner.start();
+    sendJson(res, 202, { started: true });
+  } catch (err) {
+    sendJson(res, 409, { error: err.message });
+  }
+}
+
+function handleResetState(req, res) {
+  sendJson(res, 200, { active: resetRunner.isActive(), step: resetRunner.step });
 }
 
 const MIME_TYPES = {
@@ -388,6 +423,14 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'GET' && req.url.startsWith('/api/rate/runs/')) {
     handleRateRunDetail(req, res, req.url.slice('/api/rate/runs/'.length));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/api/reset/start') {
+    handleResetStart(req, res);
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/api/reset/state') {
+    handleResetState(req, res);
     return;
   }
   serveStatic(req, res);

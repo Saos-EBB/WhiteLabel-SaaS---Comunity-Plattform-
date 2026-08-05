@@ -1227,3 +1227,70 @@ async function loadHistoryList() {
   }
   for (const run of combined) historyList.appendChild(renderHistRow(run));
 }
+
+// ── Reset widget ──────────────────────────────────────────────────────────
+// Rebuilds + recreates XXX_backend_load (see lib/resetRunner.js). Lives
+// outside the tab panels, so its elements/wiring live here at the end
+// rather than inside one mode's section.
+
+const resetDot = el('reset-dot');
+const resetStateText = el('reset-state-text');
+const resetBtn = el('reset-btn');
+const resetError = el('reset-error');
+const resetConsole = el('reset-console');
+
+const RESET_STEP_LABELS = { build: 'Baue Image…', recreate: 'Starte Container neu…' };
+
+function appendResetConsoleLine(line) {
+  resetConsole.classList.remove('hidden');
+  resetConsole.textContent += (resetConsole.textContent ? '\n' : '') + line;
+  resetConsole.scrollTop = resetConsole.scrollHeight;
+}
+
+function setResetState(state, stepLabel) {
+  resetDot.className = 'dot' + (state === 'running' ? ' running' : state === 'error' ? ' errored' : '');
+  resetStateText.textContent = stepLabel
+    || (state === 'running' ? 'Reset läuft…' : state === 'error' ? 'Reset fehlgeschlagen' : 'Backend bereit');
+  resetBtn.disabled = state === 'running';
+}
+
+resetBtn.addEventListener('click', async () => {
+  resetError.textContent = '';
+  resetConsole.textContent = '';
+  setResetState('running');
+  try {
+    const res = await fetch('/api/reset/start', { method: 'POST' });
+    const body = await res.json();
+    if (!res.ok) {
+      resetError.textContent = body.error || 'Reset fehlgeschlagen';
+      setResetState('idle');
+    }
+  } catch (err) {
+    resetError.textContent = String(err);
+    setResetState('idle');
+  }
+});
+
+fetch('/api/reset/state')
+  .then((res) => res.json())
+  .then((state) => {
+    if (state.active) setResetState('running', RESET_STEP_LABELS[state.step]);
+  })
+  .catch(() => {});
+
+source.addEventListener('reset-step', (ev) => {
+  const { step } = JSON.parse(ev.data);
+  setResetState('running', RESET_STEP_LABELS[step]);
+});
+source.addEventListener('reset-line', (ev) => {
+  appendResetConsoleLine(JSON.parse(ev.data).line);
+});
+source.addEventListener('reset-done', () => {
+  setResetState('idle');
+});
+source.addEventListener('reset-error', (ev) => {
+  const info = JSON.parse(ev.data);
+  resetError.textContent = `${info.step} fehlgeschlagen`
+    + (info.code !== undefined ? ` (exit ${info.code})` : info.message ? `: ${info.message}` : '');
+  setResetState('error');
+});

@@ -8,11 +8,25 @@
 </head>
 <body>
   <nav class="tabs" role="tablist" aria-label="Loadtest mode">
-    <button class="tab tab--active" id="tab-mode2" type="button" role="tab" aria-selected="true" aria-controls="mode2" data-mode="2">Mode 2 · Endpoint Load</button>
     <button class="tab" id="tab-mode1" type="button" role="tab" aria-selected="false" aria-controls="mode1" data-mode="1">Mode 1 · Login Capacity</button>
+    <button class="tab tab--active" id="tab-mode2" type="button" role="tab" aria-selected="true" aria-controls="mode2" data-mode="2">Mode 2 · Endpoint Load</button>
     <button class="tab" id="tab-mode3" type="button" role="tab" aria-selected="false" aria-controls="mode3" data-mode="3">Mode 3 · Endpoint Rate</button>
     <button class="tab" id="tab-history" type="button" role="tab" aria-selected="false" aria-controls="history" data-mode="history">History</button>
   </nav>
+
+  <!-- ══════════════════════════════ RESET WIDGET ══════════════════════════════
+       Rebuilds + recreates XXX_backend_load so it picks up code/config
+       changes (Dockerfile, env vars, ...) that a plain restart wouldn't.
+       Lives outside the tab panels — visible/usable no matter which mode
+       is open. -->
+  <div class="controls reset-widget">
+    <div class="state"><span id="reset-dot" class="dot"></span><span id="reset-state-text">Backend bereit</span>
+      <span class="hint" tabindex="0" data-tip="reset.info">ⓘ</span></div>
+    <div class="controls-spacer"></div>
+    <button id="reset-btn" class="btn btn-stop" type="button">⟳ Backend zurücksetzen</button>
+  </div>
+  <span id="reset-error" class="error"></span>
+  <pre id="reset-console" class="console hidden"></pre>
 
   <!-- ══════════════════════════════ MODE 2 ══════════════════════════════ -->
   <section id="mode2" class="mode-panel" role="tabpanel" aria-labelledby="tab-mode2">

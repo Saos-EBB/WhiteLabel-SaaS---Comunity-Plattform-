@@ -16,6 +16,9 @@
 //     there's no hover to rely on.
 
 const TOOLTIPS = {
+  // Reset widget
+  'reset.info': "Rebuilds the backend's Docker image and recreates its container, so it picks up code/config changes that a plain restart wouldn't (e.g. a raised connection-pool limit). The database itself is untouched — seeded data survives. Blocked while a test is running; stop it first.",
+
   // Mode 2 — controls
   'mode2.controlsInfo': "Runs the load test: checks the server is reachable, logs in a pool of temporary test accounts (shared across virtual users — see Users below), then has every virtual user repeatedly perform random actions for the set duration — then prints a summary.",
   'mode2.users': "How many virtual users hit the app at the same time. Each one repeatedly performs random actions (browsing, chatting, etc.) for the whole test.",
