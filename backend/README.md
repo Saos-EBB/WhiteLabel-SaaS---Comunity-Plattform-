@@ -611,6 +611,7 @@ Copy `.env.example` to `.env` and fill in all values.
 | `DB_NAME` | Database name |
 | `DB_USER` | Database user |
 | `DB_PASSWORD` | Database password |
+| `DB_POOL_MAX` | Postgres connection pool size (default `10`, node-postgres' own default) — the loadtest stack sets it higher in `docker-compose.loadtest.yml` |
 | `JWT_SECRET` | Secret for signing JWTs |
 | `APP_ENCRYPTION_KEY` | 32-byte hex key for AES-256-CBC (email, sensitive data) |
 | `EMAIL_SALT` | Salt for email search hash (SHA-256) |
