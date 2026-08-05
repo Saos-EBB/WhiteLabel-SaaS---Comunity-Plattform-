@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/com
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import Stripe from 'stripe';
+import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { UserCoinBalance } from './entities/user-coin-balance.entity';
 import { CoinTransaction } from './entities/coin-transaction.entity';
@@ -155,5 +156,19 @@ export class CoinService {
             }));
         });
         return { coins };
+    }
+
+    // Nur erreichbar wenn CoinTestPurchaseController gemountet ist (LOADTEST_MODE=true,
+    // siehe CoinModule). Ruft denselben Schreibpfad wie confirmCoinPurchase auf
+    // (addCoins -> Upsert user_coin_balance + Insert coin_transactions), ohne Stripe.
+    async testPurchase(userId: string, pkg?: CoinPackage): Promise<{ coins: number; package: CoinPackage; idempotency_key: string }> {
+        const packageKeys = Object.keys(COIN_PACKAGES) as CoinPackage[];
+        const selected = pkg && COIN_PACKAGES[pkg] ? pkg : packageKeys[Math.floor(Math.random() * packageKeys.length)];
+        const coins = COIN_PACKAGES[selected].coins;
+        const idempotencyKey = `loadtest_${crypto.randomUUID()}`;
+
+        await this.addCoins(userId, coins, 'purchase', undefined, idempotencyKey);
+
+        return { coins, package: selected, idempotency_key: idempotencyKey };
     }
 }

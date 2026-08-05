@@ -1,0 +1,97 @@
+# Loadtest-Stack als Override, NICHT als Ersatz fuer docker-compose.yml.
+# docker-compose.yml (Demo) bleibt unveraendert — diese Datei wird zusaetzlich
+# geladen und fuegt neue Services hinzu, ueberschreibt keinen Demo-Service.
+#
+# Start (Demo- und Loadtest-Stack zusammen, im selben Compose-Projekt):
+#   docker compose -f docker-compose.yml -f docker-compose.loadtest.yml up -d \
+#     XXX_db_load XXX_backend_load pgadmin
+#
+# Eigenes DB-Volume (XXX_load_pgdata) und eigenes Netzwerk (XXX_load_network) —
+# die Demo-DB/das Demo-Volume/-Netzwerk werden nie beruehrt.
+#
+# pgAdmin-Zugriff auf die Loadtest-DB: der bestehende `pgadmin`-Service (siehe
+# docker-compose.yml) wird hier NICHT neu definiert, sondern per Compose-Merge
+# nur um eine zusaetzliche Netzwerk-Mitgliedschaft (XXX_load_network) erweitert.
+# Dadurch sieht pgAdmin XXX_db_load per Docker-DNS unter dem Container-Namen
+# und dem INTERNEN Port 5432 — z.B. neue Server-Verbindung in pgAdmin:
+#   Host: XXX_db_load   Port: 5432
+# NICHT localhost:5532 (das ist nur der Host-Port fuer externe Clients wie
+# DBeaver, den pgAdmin von innerhalb seines eigenen Containers aus so nicht
+# erreicht).
+#
+# Auto-Seed: docker-entrypoint.sh (bereits vorhanden, unveraendert) ruft
+# seed-extra-users.ts idempotent mit SEED_USERS auf — kein manueller
+# ts-node-Aufruf noetig, einfach SEED_USERS beim `docker compose up` setzen
+# (gleicher Variablenname wie im Demo-Stack, gilt hier nur fuer XXX_backend_load).
+# SEED_TX_PER_USER/SEED_MEDIA_PER_USER bleiben 0, weil der Loadtest seine
+# Coin-Historie selbst live erzeugt (POST /hidden/coin/test-purchase).
+
+services:
+
+  XXX_db_load:
+    build:
+      context: ./backend
+      dockerfile: db/Dockerfile
+    image: xxx_db_load:local
+    container_name: XXX_db_load
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${DB_NAME}
+      POSTGRES_USER:     ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5532:5432"
+    volumes:
+      - XXX_load_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - XXX_load_network
+
+  XXX_backend_load:
+    build:
+      context: ./backend
+    image: xxx_backend_load:local
+    container_name: XXX_backend_load
+    restart: unless-stopped
+    environment:
+      DB_HOST:     XXX_db_load
+      DB_PORT:     5432
+      DB_NAME:     ${DB_NAME}
+      DB_USER:     ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET:  ${JWT_SECRET}
+      DEMO_MEDIA_PATH: /app
+      LOADTEST_MODE: "true"
+      SEED_USERS:  ${SEED_USERS:-10000}
+      SEED_TX_PER_USER: 0
+      SEED_MEDIA_PER_USER: 0
+      SEED_RESET:  ${SEED_RESET:-false}
+    ports:
+      - "3100:3000"
+    depends_on:
+      XXX_db_load:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - XXX_load_network
+
+  # Nicht neu definiert — nur um eine zweite Netzwerk-Mitgliedschaft erweitert,
+  # damit das bestehende Demo-pgAdmin auch XXX_db_load per Container-DNS sieht.
+  # Alle anderen Felder (image, container_name, environment, ports, volumes)
+  # bleiben die aus docker-compose.yml.
+  pgadmin:
+    networks:
+      - XXX_load_network
+
+networks:
+  XXX_load_network:
+    driver: bridge
+
+volumes:
+  XXX_load_pgdata:

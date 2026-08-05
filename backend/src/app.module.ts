@@ -40,7 +40,16 @@ import databaseConfig from './config/database.config';
       load: [appConfig, databaseConfig],
       envFilePath: '.env',
     }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    // skipIf greift nur im Loadtest-Stack (LOADTEST_MODE=true): dort teilen sich
+    // alle simulierten User dieselbe Quell-IP (der Testrunner), gegen die der
+    // globale 100req/60s-Throttle sonst sofort greift. Prod/Demo unveraendert.
+    // Achtung Array-Form: skipIf muss im Throttler-Objekt selbst stehen, nicht
+    // als Sibling von "throttlers" (das waere nur bei der Objekt-Form gueltig)
+    // — ThrottlerGuard liest bei Array-Konfiguration ausschliesslich das
+    // per-Throttler skipIf, commonOptions.skipIf bleibt dabei immer leer.
+    ThrottlerModule.forRoot([
+      { ttl: 60000, limit: 100, skipIf: () => process.env.LOADTEST_MODE === 'true' },
+    ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

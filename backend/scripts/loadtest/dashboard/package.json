@@ -1,0 +1,10 @@
+{
+  "name": "loadtest-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live view onto scripts/loadtest's log output — no dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

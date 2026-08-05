@@ -750,6 +750,28 @@ Posts to `POST /hidden/beef/dev/quick-fight` (backend returns 404 in production)
 ### 2026-07-23 — Onboarding: Fix Admin/Dashboard Redirect Loop
 - fix(onboarding): `/onboarding` force-redirected any `admin`/`owner` role straight to `/dashboard`, while `useBootstrap` force-redirects any account with `onboardingCompleted: false` back to `/onboarding` — an admin account with incomplete onboarding (e.g. the `saos43` demo/test account) bounced between the two routes on every render, tripping the global rate limiter (429s on dashboard/admin endpoints); removed the role-based redirect — onboarding completion is now the only gate for leaving `/onboarding`
 
+### 2026-07-22 — Color Panel: Two New Themes
+- feat(theme): two new color schemes, "lavender" and "darkPink", available in the Color Panel (dev tool) — carried over from the b2b-cv/whitelabel showcase (light purple theme + dark pink theme)
+
+### 2026-06-14 — Chat Header Positioning Fix
+- fix(chat): chat header in the web view now sticks to the very top (was sitting 64px too low, since the mobile TopNav is hidden on desktop but was still reserving its height)
+
+### 2026-06-13 — Hidden Zone Master Password
+- chore(hidden): Hidden Zone master password changed to "YourBrand"
+
+### 2026-06-10 — Discover/Matching UI Fixes
+- feat(discover): radius filter slider max increased to 5000 km (was 500 km), matching the backend validation change (see backend changelog)
+- feat(matching): "Ablehnungen zurücksetzen" button added to the empty deck state (clears own skips only, not likes) — calls `DELETE /discover/swipes/skips`
+- fix(notifications): request-notification badge showed the wrong count — ID mismatch between the socket event and the page fixed; notifications now clear correctly when opening the requests page
+- feat(profile): public profile page now shows 💚/🚩 flags on interests (green-/red-flag system)
+
+### 2026-06-09 — Theme Persistence Fixes
+- fix(theme): custom theme is now restored immediately on page load, not only once the Color Panel is opened
+- fix(theme): self-saved custom themes in the Color Panel now survive F5 and re-login (active theme name persisted to `localStorage`, restored on start)
+- fix(theme): deleting or resetting a theme now cleans up the active-theme state correctly
+- fix(hidden): Hidden Zone theme and the "visited once" flag are now persisted to `localStorage` (survive F5 and re-login)
+- fix(hidden): Colors tab in the sidebar stays visible once the Hidden Zone has been entered at least once
+
 ### 2026-06-09 — Matching Page: Swipe + Matches tabs; nav rename
 - feat(matches): `/matches` page is now a two-tab Matching hub — "Swipen" (swipe deck with like/skip + match-flash banner) and "Matches" (mutual matches list with photo, age, city, chat button)
 - feat(matching): match-flash banner lifted to page level; shows on mutual match with a "Zu deinen Matches" button to switch tabs; card advances after 2 s
