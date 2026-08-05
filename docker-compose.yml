@@ -1,3 +1,14 @@
+# Pinned explicitly so the Compose project name doesn't drift when the repo
+# folder gets renamed (it already has once — see commit c364412). Compose
+# defaults the project name to the current directory's name; a stale/renamed
+# directory then makes `docker compose up` treat already-running containers
+# as belonging to a different project, try to recreate them, and collide on
+# their fixed container_name. Must match the label already on the running
+# containers (`docker inspect <name> --format '{{index .Config.Labels
+# "com.docker.compose.project"}}'`) or compose creates a second, empty set
+# of volumes alongside the real ones instead of reusing them.
+name: whitelabel-saas---comunity-plattform-
+
 services:
 
   XXX_db:
