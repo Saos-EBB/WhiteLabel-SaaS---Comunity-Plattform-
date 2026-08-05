@@ -667,7 +667,7 @@ Three modes, all controllable from the dashboard or directly as bash scripts:
 | **3 — Endpoint Rate** | `endpoint-rate.sh` | Same stepped rate ramp as Mode 1, generalized to any chosen subset of Mode 2's endpoints (one, several, or all) instead of one fixed endpoint — isolates exactly which endpoint breaks first and at what req/s |
 
 Shared building blocks:
-- `generate-users-csv.sh` / `prefetch-tokens.sh` — deterministic `seed_user_NNNN@seed.local` accounts, logged in once and cached to `tokens.csv`. Modes 2 and 3 **reuse** a small token pool round-robin across many workers/requests (Mode 2: pool sized at `NUM_USERS/10` by `run-loadtest.sh`; Mode 3: fixed `TOKEN_POOL_SIZE`, default 50) rather than needing one seeded account per worker — a 100k-user Mode 2 run needs 10k seeded accounts, not 100k.
+- `generate-users-csv.sh` / `prefetch-tokens.sh` — deterministic `seed_user_NNNN@seed.local` accounts, logged in once and cached to `tokens.csv`. Modes 2 and 3 **reuse** a small token pool round-robin across many workers/requests (Mode 2: pool sized at `NUM_USERS/10` by `run-loadtest.sh`; Mode 3: fixed `TOKEN_POOL_SIZE`, default 500) rather than needing one seeded account per worker — a 100k-user Mode 2 run needs 10k seeded accounts, not 100k.
 - `actions.sh` — the 12 endpoint actions (discover, chat, coin, media upload, contact requests, admin), sourced by both `loadtest.sh` and `endpoint-rate.sh` so they can never drift apart.
 - `src/database/seeds/seed-extra-users.ts` (`SEED_USERS=<n>`) — seeds the fake accounts these scripts log in as; idempotent top-up, batched inserts (1000 rows/statement, under Postgres's parameter limit) so it scales to `SEED_USERS=100000` in one `docker compose up`.
 

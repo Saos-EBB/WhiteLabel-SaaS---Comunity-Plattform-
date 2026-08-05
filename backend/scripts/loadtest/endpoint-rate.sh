@@ -10,7 +10,7 @@
 #
 # Needs auth tokens (unlike Mode 1, which tests login itself) — builds its
 # own small token pool the same self-sufficient way login-capacity.sh
-# builds users.csv, sized by TOKEN_POOL_SIZE (default 50, NOT tied to the
+# builds users.csv, sized by TOKEN_POOL_SIZE (default 500, NOT tied to the
 # rate — request identity doesn't matter for finding a bottleneck, tokens
 # are reused round-robin across every fired request, same model as
 # loadtest.sh's NUM_USERS/10 pool).
@@ -35,14 +35,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 source ./actions.sh   # do_request/do_upload/log_error_if_needed/action_*/ACTIONS, BASE_URL default
 
-TOKEN_POOL_SIZE="${TOKEN_POOL_SIZE:-50}"
+TOKEN_POOL_SIZE="${TOKEN_POOL_SIZE:-500}"
 USERS_FILE="${USERS_FILE:-./users.csv}"
 TOKENS_FILE="${TOKENS_FILE:-./tokens.csv}"
 
 START_RATE="${START_RATE:-5}"     # Requests/Sekunde in Step 1
 RATE_STEP="${RATE_STEP:-5}"       # Steigerung pro Step
 STEP_SEC="${STEP_SEC:-10}"        # Dauer eines Steps in Sekunden
-MAX_RATE="${MAX_RATE:-50}"        # Ramp stoppt, sobald target rate das ueberschreitet
+MAX_RATE="${MAX_RATE:-2000}"      # Ramp stoppt, sobald target rate das ueberschreitet
 
 AUTO_STOP="${AUTO_STOP:-false}"           # bei true: Ramp stoppt, sobald success% < SUCCESS_THRESHOLD
 SUCCESS_THRESHOLD="${SUCCESS_THRESHOLD:-95}"

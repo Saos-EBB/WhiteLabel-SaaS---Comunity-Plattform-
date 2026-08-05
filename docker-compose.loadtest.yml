@@ -67,7 +67,7 @@ services:
       JWT_SECRET:  ${JWT_SECRET}
       DEMO_MEDIA_PATH: /app
       LOADTEST_MODE: "true"
-      SEED_USERS:  ${SEED_USERS:-10000}
+      SEED_USERS:  ${SEED_USERS:-5000}
       SEED_TX_PER_USER: 0
       SEED_MEDIA_PER_USER: 0
       SEED_RESET:  ${SEED_RESET:-false}

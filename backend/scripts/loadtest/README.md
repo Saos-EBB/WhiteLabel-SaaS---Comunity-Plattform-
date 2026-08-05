@@ -19,7 +19,7 @@ Three independent modes (see each script's header comment for usage/env vars), a
   (`ENDPOINTS=discover_deck,media_upload ...`, unset = all) instead of one
   fixed endpoint — for isolating exactly which endpoint becomes the
   bottleneck and at what req/s, independent of user count. Own small
-  self-sufficient token pool (`TOKEN_POOL_SIZE`, default 50). Dashboard's
+  self-sufficient token pool (`TOKEN_POOL_SIZE`, default 500). Dashboard's
   "Mode 3" tab.
 
 `actions.sh` holds the shared endpoint actions (discover, chat, coin,
