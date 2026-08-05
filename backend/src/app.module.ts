@@ -59,6 +59,7 @@ import databaseConfig from './config/database.config';
         database: configService.get('database.name'),
         username: configService.get('database.user'),
         password: configService.get('database.password'),
+        extra: { max: configService.get<number>('database.poolMax') },
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false,
         logging: configService.get('app.nodeEnv') === 'development',

@@ -63,6 +63,7 @@ services:
       DB_NAME:     ${DB_NAME}
       DB_USER:     ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
       JWT_SECRET:  ${JWT_SECRET}
       DEMO_MEDIA_PATH: /app
       LOADTEST_MODE: "true"
